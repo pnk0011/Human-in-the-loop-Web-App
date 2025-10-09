@@ -1,0 +1,320 @@
+import { useState } from 'react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Badge } from './ui/badge';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from './ui/pagination';
+import { Eye, Search, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+
+interface CompletedDocument {
+  id: string;
+  documentName: string;
+  documentType: string;
+  completedDate: string;
+  fieldsCount: number;
+  acceptedCount: number;
+  correctedCount: number;
+  rejectedCount: number;
+  accuracy: number;
+}
+
+interface WorkHistoryProps {
+  onViewClick: (doc: CompletedDocument) => void;
+}
+
+// Generate mock completed documents
+const generateMockHistory = (): CompletedDocument[] => {
+  const types = ['Invoice', 'Policy Document', 'Claim Form', 'Medical Record'];
+  const documents: CompletedDocument[] = [];
+  
+  for (let i = 1; i <= 48; i++) {
+    const fieldsCount = Math.floor(Math.random() * 8) + 5;
+    const acceptedCount = Math.floor(fieldsCount * (0.5 + Math.random() * 0.3));
+    const correctedCount = Math.floor((fieldsCount - acceptedCount) * (Math.random() * 0.7));
+    const rejectedCount = fieldsCount - acceptedCount - correctedCount;
+    
+    documents.push({
+      id: String(i),
+      documentName: `DOC-2024-${String(i).padStart(4, '0')}`,
+      documentType: types[Math.floor(Math.random() * types.length)],
+      completedDate: new Date(2024, 2, Math.floor(Math.random() * 30) + 1, Math.floor(Math.random() * 24)).toISOString(),
+      fieldsCount,
+      acceptedCount,
+      correctedCount,
+      rejectedCount,
+      accuracy: Math.floor((acceptedCount / fieldsCount) * 100),
+    });
+  }
+  
+  // Sort by date descending (most recent first)
+  return documents.sort((a, b) => new Date(b.completedDate).getTime() - new Date(a.completedDate).getTime());
+};
+
+const mockHistory = generateMockHistory();
+
+export function WorkHistory({ onViewClick }: WorkHistoryProps) {
+  const [documents] = useState<CompletedDocument[]>(mockHistory);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const filteredDocuments = documents.filter((doc) => {
+    if (searchQuery && !doc.documentName.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    if (typeFilter !== 'all' && doc.documentType !== typeFilter) {
+      return false;
+    }
+    if (dateFilter !== 'all') {
+      const docDate = new Date(doc.completedDate);
+      const now = new Date();
+      if (dateFilter === 'today') {
+        return docDate.toDateString() === now.toDateString();
+      } else if (dateFilter === 'week') {
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return docDate >= weekAgo;
+      } else if (dateFilter === 'month') {
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        return docDate >= monthAgo;
+      }
+    }
+    return true;
+  });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredDocuments.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
+
+  const handleFilterChange = (filterSetter: (value: string) => void, value: string) => {
+    filterSetter(value);
+    setCurrentPage(1);
+  };
+
+  const getAccuracyColor = (accuracy: number) => {
+    if (accuracy >= 90) return 'text-green-600';
+    if (accuracy >= 70) return 'text-[#FFC018]';
+    return 'text-[#FF0081]';
+  };
+
+  const getTypeBadgeColor = (type: string) => {
+    switch (type) {
+      case 'Invoice':
+        return 'bg-[#0292DC]/10 text-[#0292DC]';
+      case 'Policy Document':
+        return 'bg-[#10B981]/10 text-[#10B981]';
+      case 'Claim Form':
+        return 'bg-[#FFC018]/10 text-[#FFC018]';
+      case 'Medical Record':
+        return 'bg-[#FF0081]/10 text-[#FF0081]';
+      default:
+        return 'bg-[#80989A]/10 text-[#80989A]';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Completed</div>
+          <div className="text-[#012F66] dark:text-white text-3xl font-bold">{documents.length}</div>
+        </div>
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">This Week</div>
+          <div className="text-[#0292DC] dark:text-[#0292DC] text-3xl font-bold">
+            {documents.filter(d => {
+              const docDate = new Date(d.completedDate);
+              const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+              return docDate >= weekAgo;
+            }).length}
+          </div>
+        </div>
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Avg. Accuracy</div>
+          <div className="text-green-600 text-3xl font-bold">
+            {Math.round(documents.reduce((sum, doc) => sum + doc.accuracy, 0) / documents.length)}%
+          </div>
+        </div>
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Fields</div>
+          <div className="text-[#FFC018] text-3xl font-bold">
+            {documents.reduce((sum, doc) => sum + doc.fieldsCount, 0)}
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-[#80989A] absolute left-3 top-1/2 -translate-y-1/2" />
+            <Input
+              placeholder="Search documents..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a]"
+            />
+          </div>
+          <Select value={typeFilter} onValueChange={(value) => handleFilterChange(setTypeFilter, value)}>
+            <SelectTrigger className="w-48 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a]">
+              <SelectValue placeholder="Document Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="Invoice">Invoice</SelectItem>
+              <SelectItem value="Policy Document">Policy Document</SelectItem>
+              <SelectItem value="Claim Form">Claim Form</SelectItem>
+              <SelectItem value="Medical Record">Medical Record</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={dateFilter} onValueChange={(value) => handleFilterChange(setDateFilter, value)}>
+            <SelectTrigger className="w-48 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a]">
+              <SelectValue placeholder="Date Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">Last 7 Days</SelectItem>
+              <SelectItem value="month">Last 30 Days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Work History Table */}
+      <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-[#F5F7FA] dark:bg-[#1a1a1a] border-b border-[#E5E7EB] dark:border-[#4a4a4a]">
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Document</th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Type</th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Completed</th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Fields</th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Actions</th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Accuracy</th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">View</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedDocuments.map((doc) => (
+                <tr key={doc.id} className="hover:bg-[#F9FAFB] dark:hover:bg-[#3a3a3a] border-b border-[#E5E7EB] dark:border-[#4a4a4a]">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-[#80989A]" />
+                      <span className="text-[#012F66] dark:text-white">{doc.documentName}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge className={getTypeBadgeColor(doc.documentType)}>
+                      {doc.documentType}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">
+                    {new Date(doc.completedDate).toLocaleDateString()} {new Date(doc.completedDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                  <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.fieldsCount}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.acceptedCount}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <AlertCircle className="w-4 h-4 text-[#FFC018]" />
+                        <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.correctedCount}</span>
+                      </div>
+                      {doc.rejectedCount > 0 && (
+                        <div className="flex items-center gap-1">
+                          <AlertCircle className="w-4 h-4 text-[#FF0081]" />
+                          <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.rejectedCount}</span>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={getAccuracyColor(doc.accuracy)}>{doc.accuracy}%</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onViewClick(doc)}
+                      className="text-[#0292DC] hover:bg-[#0292DC]/10"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-4 border-t border-[#E5E7EB] dark:border-[#4a4a4a]">
+            <div className="text-[#80989A] dark:text-[#a0a0a0]">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredDocuments.length)} of {filteredDocuments.length} documents
+            </div>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  } else if (page === currentPage - 2 || page === currentPage + 2) {
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  }
+                  return null;
+                })}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

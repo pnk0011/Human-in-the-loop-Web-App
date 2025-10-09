@@ -1,0 +1,852 @@
+import { useState } from "react";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Badge } from "./ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "./ui/pagination";
+import { Label } from "./ui/label";
+import { UserPlus, Pencil, Trash2, Search } from "lucide-react";
+import { toast } from "sonner@2.0.3";
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: "Reviewer" | "QC";
+  status: "Active" | "Inactive";
+  currentLoad: number;
+  totalValidated: number;
+  accuracy: number;
+  createdDate: string;
+}
+
+// Generate more mock users for pagination
+const generateMockUsers = (): User[] => {
+  const firstNames = ['Jane', 'John', 'Mike', 'Sarah', 'Tom', 'Emily', 'David', 'Lisa', 'Chris', 'Anna', 'Mark', 'Rachel', 'Kevin', 'Laura', 'Steven'];
+  const lastNames = ['Smith', 'Doe', 'Johnson', 'Wilson', 'Brown', 'Davis', 'Garcia', 'Miller', 'Martinez', 'Anderson', 'Taylor', 'Thomas', 'Jackson', 'White', 'Harris'];
+  const roles: Array<'Reviewer' | 'QC'> = ['Reviewer', 'QC'];
+  const statuses: Array<'Active' | 'Inactive'> = ['Active', 'Inactive'];
+  
+  const users: User[] = [];
+  
+  for (let i = 1; i <= 32; i++) {
+    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const role = roles[Math.floor(Math.random() * roles.length)];
+    const status = statuses[Math.floor(Math.random() * statuses.length)];
+    
+    users.push({
+      id: String(i),
+      name: `${firstName} ${lastName}`,
+      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@medpro.com`,
+      role,
+      status,
+      currentLoad: status === 'Active' ? Math.floor(Math.random() * 20) : 0,
+      totalValidated: Math.floor(Math.random() * 500) + 50,
+      accuracy: Math.floor(Math.random() * 15) + 85,
+      createdDate: new Date(2024, Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1).toISOString().split('T')[0],
+    });
+  }
+  
+  return users;
+};
+
+const initialUsers = generateMockUsers();
+
+export function UserManagement() {
+  const [users, setUsers] = useState<User[]>(initialUsers);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] =
+    useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] =
+    useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] =
+    useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(
+    null,
+  );
+  const [userToDelete, setUserToDelete] = useState<User | null>(
+    null,
+  );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    role: "Reviewer" as "Reviewer" | "QC",
+    status: "Active" as "Active" | "Inactive",
+    assignedQC: "",
+  });
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      email: "",
+      role: "Reviewer",
+      status: "Active",
+      assignedQC: "",
+    });
+  };
+
+  const handleCreateUser = () => {
+    if (!formData.name || !formData.email) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    const newUser: User = {
+      id: String(Date.now()),
+      name: formData.name,
+      email: formData.email,
+      role: formData.role,
+      status: formData.status,
+      currentLoad: 0,
+      totalValidated: 0,
+      accuracy: 0,
+      createdDate: new Date().toISOString().split("T")[0],
+    };
+
+    setUsers([...users, newUser]);
+    toast.success(`User ${formData.name} created successfully`);
+    setIsCreateDialogOpen(false);
+    resetForm();
+  };
+
+  const handleEditUser = () => {
+    if (!editingUser || !formData.name || !formData.email) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setUsers(
+      users.map((user) =>
+        user.id === editingUser.id
+          ? {
+              ...user,
+              name: formData.name,
+              email: formData.email,
+              role: formData.role,
+              status: formData.status,
+            }
+          : user,
+      ),
+    );
+
+    toast.success(`User ${formData.name} updated successfully`);
+    setIsEditDialogOpen(false);
+    setEditingUser(null);
+    resetForm();
+  };
+
+  const openDeleteDialog = (user: User) => {
+    setUserToDelete(user);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteUser = () => {
+    if (userToDelete) {
+      setUsers(users.filter((u) => u.id !== userToDelete.id));
+      toast.success(`User ${userToDelete.name} deleted successfully`);
+      setIsDeleteDialogOpen(false);
+      setUserToDelete(null);
+    }
+  };
+
+  const openEditDialog = (user: User) => {
+    setEditingUser(user);
+    setFormData({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      assignedQC: "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  // Get list of QC users for assignment
+  const qcUsers = users.filter((u) => u.role === "QC" && u.status === "Active");
+
+  const filteredUsers = users.filter((user) => {
+    if (roleFilter !== "all" && user.role !== roleFilter)
+      return false;
+    if (statusFilter !== "all" && user.status !== statusFilter)
+      return false;
+    if (
+      searchQuery &&
+      !user.name
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) &&
+      !user.email
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase())
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  const getRoleBadgeColor = (role: string) => {
+    return role === "QC"
+      ? "bg-[#FFC018] text-white"
+      : "bg-[#0292DC] text-white";
+  };
+
+  const getStatusBadgeColor = (status: string) => {
+    return status === "Active"
+      ? "bg-green-600 text-white"
+      : "bg-[#80989A] text-white";
+  };
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  const handleFilterChange = (filterSetter: (value: string) => void, value: string) => {
+    filterSetter(value);
+    setCurrentPage(1);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Users</div>
+          <div className="text-[#012F66] dark:text-white text-3xl font-bold">{users.length}</div>
+        </div>
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">
+            Active Users
+          </div>
+          <div className="text-green-600 text-3xl font-bold">
+            {users.filter((u) => u.status === "Active").length}
+          </div>
+        </div>
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Reviewers</div>
+          <div className="text-[#0292DC] text-3xl font-bold">
+            {users.filter((u) => u.role === "Reviewer").length}
+          </div>
+        </div>
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">
+            QC Specialists
+          </div>
+          <div className="text-[#FFC018] text-3xl font-bold">
+            {users.filter((u) => u.role === "QC").length}
+          </div>
+        </div>
+      </div>
+
+      {/* Filters and Actions */}
+      <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search className="w-4 h-4 text-[#80989A] absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input
+                placeholder="Search users..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-64 pl-10 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              />
+            </div>
+            <Select
+              value={roleFilter}
+              onValueChange={(value) => handleFilterChange(setRoleFilter, value)}
+            >
+              <SelectTrigger className="w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                <SelectValue placeholder="Role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="Reviewer">
+                  Reviewer
+                </SelectItem>
+                <SelectItem value="QC">QC</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => handleFilterChange(setStatusFilter, value)}
+            >
+              <SelectTrigger className="w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Inactive">
+                  Inactive
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={() => {
+              resetForm();
+              setIsCreateDialogOpen(true);
+            }}
+            className="bg-[#0292DC] hover:bg-[#012F66] text-white"
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Create User
+          </Button>
+        </div>
+      </div>
+
+      {/* Users Table */}
+      <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm overflow-hidden border border-[#E5E7EB] dark:border-[#3a3a3a]">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-[#F5F7FA] dark:bg-[#1a1a1a] border-b border-[#E5E7EB] dark:border-[#3a3a3a]">
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Name
+                </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Email
+                </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Role
+                </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Status
+                </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Current Load
+                </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Total Validated
+                </th>
+                {/* <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Accuracy</th> */}
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Created Date
+                </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedUsers.map((user) => (
+                <tr
+                  key={user.id}
+                  className="hover:bg-[#F9FAFB] dark:hover:bg-[#3a3a3a] border-b border-[#E5E7EB] dark:border-[#3a3a3a]"
+                >
+                  <td className="px-6 py-4">
+                    <div className="text-[#012F66] dark:text-white">
+                      {user.name}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">
+                    {user.email}
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge
+                      className={getRoleBadgeColor(user.role)}
+                    >
+                      {user.role}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge
+                      className={getStatusBadgeColor(
+                        user.status,
+                      )}
+                    >
+                      {user.status}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4 text-[#012F66] dark:text-white">
+                    {user.currentLoad}
+                  </td>
+                  <td className="px-6 py-4 text-[#012F66] dark:text-white">
+                    {user.totalValidated}
+                  </td>
+                  {/* <td className="px-6 py-4 text-[#012F66] dark:text-white">{user.accuracy}%</td> */}
+                  <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">
+                    {new Date(
+                      user.createdDate,
+                    ).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditDialog(user)}
+                        className="text-[#0292DC] hover:bg-[#0292DC]/10"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openDeleteDialog(user)}
+                        className="text-[#FF0081] hover:bg-[#FF0081]/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-4 border-t border-[#E5E7EB] dark:border-[#3a3a3a]">
+            <div className="text-[#80989A] dark:text-[#a0a0a0]">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length} users
+            </div>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  // Show first page, last page, current page, and pages around current
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  } else if (page === currentPage - 2 || page === currentPage + 2) {
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  }
+                  return null;
+                })}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
+      </div>
+
+      {/* Create User Dialog */}
+      <Dialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      >
+        <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a]">
+          <DialogHeader>
+            <DialogTitle className="text-[#012F66] dark:text-white">
+              Create New User
+            </DialogTitle>
+            <DialogDescription className="text-[#80989A] dark:text-[#a0a0a0]">
+              Add a new reviewer or QC specialist to the system.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="name" className="text-[#012F66] dark:text-white">
+                Full Name *
+              </Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    name: e.target.value,
+                  })
+                }
+                placeholder="Enter full name"
+                className="mt-2 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              />
+            </div>
+            <div>
+              <Label htmlFor="email" className="text-[#012F66] dark:text-white">
+                Email Address *
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    email: e.target.value,
+                  })
+                }
+                placeholder="email@medpro.com"
+                className="mt-2 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              />
+            </div>
+            <div>
+              <Label htmlFor="role" className="text-[#012F66] dark:text-white">
+                Role *
+              </Label>
+              <Select
+                value={formData.role}
+                onValueChange={(value: "Reviewer" | "QC") =>
+                  setFormData({ ...formData, role: value, assignedQC: value === "QC" ? "" : formData.assignedQC })
+                }
+              >
+                <SelectTrigger className="mt-2 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Reviewer">
+                    Reviewer
+                  </SelectItem>
+                  <SelectItem value="QC">
+                    QC Specialist
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {formData.role === "Reviewer" && (
+              <div>
+                <Label htmlFor="assignedQC" className="text-[#012F66] dark:text-white">
+                  Assign QC Specialist
+                </Label>
+                <Select
+                  value={formData.assignedQC || "none"}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, assignedQC: value === "none" ? "" : value })
+                  }
+                >
+                  <SelectTrigger className="mt-2 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                    <SelectValue placeholder="Select QC Specialist (Optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {qcUsers.map((qc) => (
+                      <SelectItem key={qc.id} value={qc.id}>
+                        {qc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[#80989A] dark:text-[#a0a0a0] mt-1">
+                  Assign a QC specialist to review this reviewer's work
+                </p>
+              </div>
+            )}
+            <div>
+              <Label
+                htmlFor="status"
+                className="text-[#012F66] dark:text-white"
+              >
+                Status
+              </Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value: "Active" | "Inactive") =>
+                  setFormData({ ...formData, status: value })
+                }
+              >
+                <SelectTrigger className="mt-2 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">
+                    Inactive
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCreateDialogOpen(false);
+                resetForm();
+              }}
+              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateUser}
+              className="bg-[#0292DC] hover:bg-[#012F66] text-white"
+            >
+              Create User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+      >
+        <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a]">
+          <DialogHeader>
+            <DialogTitle className="text-[#012F66] dark:text-white">
+              Edit User
+            </DialogTitle>
+            <DialogDescription className="text-[#80989A] dark:text-[#a0a0a0]">
+              Update user information and permissions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label
+                htmlFor="edit-name"
+                className="text-[#012F66] dark:text-white"
+              >
+                Full Name *
+              </Label>
+              <Input
+                id="edit-name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    name: e.target.value,
+                  })
+                }
+                placeholder="Enter full name"
+                className="mt-2 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              />
+            </div>
+            <div>
+              <Label
+                htmlFor="edit-email"
+                className="text-[#012F66] dark:text-white"
+              >
+                Email Address *
+              </Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    email: e.target.value,
+                  })
+                }
+                placeholder="email@medpro.com"
+                className="mt-2 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              />
+            </div>
+            <div>
+              <Label
+                htmlFor="edit-role"
+                className="text-[#012F66] dark:text-white"
+              >
+                Role *
+              </Label>
+              <Select
+                value={formData.role}
+                onValueChange={(value: "Reviewer" | "QC") =>
+                  setFormData({ ...formData, role: value, assignedQC: value === "QC" ? "" : formData.assignedQC })
+                }
+              >
+                <SelectTrigger className="mt-2 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Reviewer">
+                    Reviewer
+                  </SelectItem>
+                  <SelectItem value="QC">
+                    QC Specialist
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {formData.role === "Reviewer" && (
+              <div>
+                <Label htmlFor="edit-assignedQC" className="text-[#012F66] dark:text-white">
+                  Assign QC Specialist
+                </Label>
+                <Select
+                  value={formData.assignedQC || "none"}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, assignedQC: value === "none" ? "" : value })
+                  }
+                >
+                  <SelectTrigger className="mt-2 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                    <SelectValue placeholder="Select QC Specialist (Optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {qcUsers.map((qc) => (
+                      <SelectItem key={qc.id} value={qc.id}>
+                        {qc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[#80989A] dark:text-[#a0a0a0] mt-1">
+                  Assign a QC specialist to review this reviewer's work
+                </p>
+              </div>
+            )}
+            <div>
+              <Label
+                htmlFor="edit-status"
+                className="text-[#012F66] dark:text-white"
+              >
+                Status
+              </Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value: "Active" | "Inactive") =>
+                  setFormData({ ...formData, status: value })
+                }
+              >
+                <SelectTrigger className="mt-2 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">
+                    Inactive
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                setEditingUser(null);
+                resetForm();
+              }}
+              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditUser}
+              className="bg-[#0292DC] hover:bg-[#012F66] text-white"
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a]">
+          <DialogHeader>
+            <DialogTitle className="text-[#012F66] dark:text-white">
+              Delete User
+            </DialogTitle>
+            <DialogDescription className="text-[#80989A] dark:text-[#a0a0a0]">
+              Are you sure you want to delete this user? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-[#FFF0F5] border border-[#FF0081]/20 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-[#FF0081] rounded-full flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-[#012F66] mb-1">
+                    {userToDelete?.name}
+                  </div>
+                  <div className="text-[#80989A]">
+                    {userToDelete?.email}
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Badge
+                      className={getRoleBadgeColor(
+                        userToDelete?.role || "Reviewer",
+                      )}
+                    >
+                      {userToDelete?.role}
+                    </Badge>
+                    <span className="text-[#80989A]">
+                      • {userToDelete?.currentLoad} documents assigned
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setUserToDelete(null);
+              }}
+              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteUser}
+              className="bg-[#FF0081] hover:bg-[#FF0081]/90 text-white"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
