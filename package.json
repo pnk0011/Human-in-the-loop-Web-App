@@ -1,6 +1,6 @@
 
   {
-      "name": "Web App Design for Medical Insurance",
+      "name": "human-in-the-loop-web-app",
       "version": "0.1.0",
       "private": true,
       "dependencies": {

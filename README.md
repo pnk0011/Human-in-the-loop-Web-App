@@ -1,7 +1,7 @@
 
-  # Web App Design for Medical Insurance
+# human-in-the-loop-web-app
 
-  This is a code bundle for Web App Design for Medical Insurance. The original project is available at https://www.figma.com/design/tKdnjAgaQCTH6pk0rESzGk/Web-App-Design-for-Medical-Insurance.
+This is a code bundle for human-in-the-loop-web-app. The original project is available at https://www.figma.com/design/tKdnjAgaQCTH6pk0rESzGk/Web-App-Design-for-Medical-Insurance.
 
   ## Running the code
 
