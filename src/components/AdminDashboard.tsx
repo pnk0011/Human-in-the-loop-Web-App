@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   Tabs,
   TabsContent,
@@ -18,12 +18,22 @@ interface AdminDashboardProps {
   onToggleTheme?: () => void;
 }
 
-export function AdminDashboard({
+export const AdminDashboard = React.memo(function AdminDashboard({
   onLogout,
   theme,
   onToggleTheme,
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState("assignment");
+
+  const handleTabChange = useCallback((value: string) => {
+    setActiveTab(value);
+  }, []);
+
+  const tabsData = useMemo(() => [
+    { value: "assignment", label: "Document Assignment" },
+    { value: "users", label: "User Management" },
+    { value: "analytics", label: "Analytics & Progress" }
+  ], []);
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a]">
@@ -76,28 +86,19 @@ export function AdminDashboard({
       <main className="p-6 max-w-[1400px] mx-auto">
         <Tabs
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={handleTabChange}
           className="w-full"
         >
           <TabsList className="mb-6 bg-white dark:bg-[#2a2a2a]">
-            <TabsTrigger
-              value="assignment"
-              className="data-[state=active]:bg-[#0292DC] data-[state=active]:text-white cursor-pointer"
-            >
-              Document Assignment
-            </TabsTrigger>
-            <TabsTrigger
-              value="users"
-              className="data-[state=active]:bg-[#0292DC] data-[state=active]:text-white cursor-pointer"
-            >
-              User Management
-            </TabsTrigger>
-            <TabsTrigger
-              value="analytics"
-              className="data-[state=active]:bg-[#0292DC] data-[state=active]:text-white cursor-pointer"
-            >
-              Analytics & Progress
-            </TabsTrigger>
+            {tabsData.map((tab) => (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className="data-[state=active]:bg-[#0292DC] data-[state=active]:text-white cursor-pointer"
+              >
+                {tab.label}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           <TabsContent value="assignment">
@@ -115,4 +116,4 @@ export function AdminDashboard({
       </main>
     </div>
   );
-}
+});

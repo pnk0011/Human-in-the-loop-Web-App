@@ -70,9 +70,10 @@ interface QCValidationScreenProps {
   onSubmit: (decisions: QCDecision[]) => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
+  isReadOnly?: boolean;
 }
 
-export function QCValidationScreen({ document, queueCount, onBack, onSubmit, theme, onToggleTheme }: QCValidationScreenProps) {
+export function QCValidationScreen({ document, queueCount, onBack, onSubmit, theme, onToggleTheme, isReadOnly = false }: QCValidationScreenProps) {
   const [zoom, setZoom] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages] = useState(3);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
@@ -27,6 +27,8 @@ import {
   Sun,
 } from "lucide-react";
 import logo from "figma:asset/d37108ff06015dcbcdb272cec41a1cfc0b3b3dfd.png";
+import { LoadingSpinner, LoadingOverlay } from "./LoadingComponents";
+import { useLoading } from "../hooks/useLoading";
 
 interface ExtractedField {
   id: string;
@@ -66,6 +68,7 @@ interface ValidationScreenProps {
   onSubmit: (validations: FieldValidation[]) => void;
   theme?: "light" | "dark";
   onToggleTheme?: () => void;
+  isReadOnly?: boolean;
 }
 
 export function ValidationScreen({
@@ -75,6 +78,7 @@ export function ValidationScreen({
   onSubmit,
   theme,
   onToggleTheme,
+  isReadOnly = false,
 }: ValidationScreenProps) {
   const [zoom, setZoom] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
@@ -86,6 +90,10 @@ export function ValidationScreen({
   const [validatedToday] = useState(47);
   const [avgTime] = useState("0:32");
   const [accuracy] = useState(94);
+  
+  // Loading states
+  const { loading: validationLoading, withLoading } = useLoading({ delay: 200 });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Track validation state for each field
   const [fieldValidations, setFieldValidations] = useState<
@@ -201,7 +209,7 @@ export function ValidationScreen({
 
     // Check if all fields have been validated
     const unvalidatedFields = validations.filter(
-      (v) => !v.action,
+      (v: FieldValidation) => !v.action,
     );
     if (unvalidatedFields.length > 0) {
       alert(
@@ -238,7 +246,7 @@ export function ValidationScreen({
       }
     }
 
-    onSubmit(validations);
+    onSubmit(validations as FieldValidation[]);
   };
 
   const getConfidenceColor = (confidence: number) => {
@@ -255,7 +263,7 @@ export function ValidationScreen({
 
   const getValidatedFieldsCount = () => {
     return Object.values(fieldValidations).filter(
-      (v) => v.action,
+      (v: FieldValidation) => v.action,
     ).length;
   };
 
@@ -760,14 +768,20 @@ export function ValidationScreen({
           {/* Submit Button */}
           <Button
             onClick={handleSubmitAll}
-            disabled={getValidatedFieldsCount() === 0}
+            disabled={getValidatedFieldsCount() === 0 || isSubmitting}
             className="w-full bg-[#0292DC] hover:bg-[#012F66] text-white"
           >
-            Submit All Validations ({getValidatedFieldsCount()}/
-            {document.fields.length})
-            <span className="ml-2 text-xs opacity-70">
-              (⌘Enter)
-            </span>
+            {isSubmitting ? (
+              <LoadingSpinner size="sm" text="Submitting..." />
+            ) : (
+              <>
+                Submit All Validations ({getValidatedFieldsCount()}/
+                {document.fields.length})
+                <span className="ml-2 text-xs opacity-70">
+                  (⌘Enter)
+                </span>
+              </>
+            )}
           </Button>
         </div>
       </div>

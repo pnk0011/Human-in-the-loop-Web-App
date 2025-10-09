@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import {
@@ -28,7 +28,7 @@ import {
 } from "./ui/pagination";
 import { Label } from "./ui/label";
 import { UserPlus, Pencil, Trash2, Search } from "lucide-react";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 interface User {
   id: string;

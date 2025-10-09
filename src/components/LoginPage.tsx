@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Moon, Sun } from 'lucide-react';
 import {
   Dialog,
@@ -25,7 +24,6 @@ interface LoginPageProps {
 export function LoginPage({ onLogin, theme, onToggleTheme }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('Reviewer');
   const [resetEmail, setResetEmail] = useState('');
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetSent, setResetSent] = useState(false);
@@ -34,7 +32,7 @@ export function LoginPage({ onLogin, theme, onToggleTheme }: LoginPageProps) {
     e.preventDefault();
     // Simple validation
     if (email && password) {
-      onLogin(selectedRole);
+      onLogin('Reviewer'); // Default to Reviewer role
     }
   };
 
@@ -83,22 +81,6 @@ export function LoginPage({ onLogin, theme, onToggleTheme }: LoginPageProps) {
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="role" className="text-[#012F66] dark:text-white">
-                Sign in as
-              </Label>
-              <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as UserRole)}>
-                <SelectTrigger className="bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Reviewer">Reviewer</SelectItem>
-                  <SelectItem value="QC">QC (Quality Control)</SelectItem>
-                  <SelectItem value="Admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="email" className="text-[#012F66] dark:text-white">
                 Email Address

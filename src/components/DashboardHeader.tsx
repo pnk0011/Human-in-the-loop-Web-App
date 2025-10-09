@@ -1,3 +1,4 @@
+import React, { useMemo } from "react";
 import logo from "figma:asset/d37108ff06015dcbcdb272cec41a1cfc0b3b3dfd.png";
 import { Button } from "./ui/button";
 import { LogOut, Moon, Sun } from "lucide-react";
@@ -10,14 +11,14 @@ interface DashboardHeaderProps {
   onToggleTheme?: () => void;
 }
 
-export function DashboardHeader({
+export const DashboardHeader = React.memo(function DashboardHeader({
   activeTab,
   onTabChange,
   onLogout,
   theme,
   onToggleTheme,
 }: DashboardHeaderProps) {
-  const tabs = ["Current Queue", "Work History"];
+  const tabs = useMemo(() => ["Current Queue", "Work History"], []);
 
   return (
     <header className="bg-[#012F66] text-white py-3 px-6">
@@ -85,4 +86,4 @@ export function DashboardHeader({
       </div>
     </header>
   );
-}
+});
