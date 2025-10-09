@@ -1,14 +1,6 @@
 import { useState } from "react";
-import logo from "figma:asset/d37108ff06015dcbcdb272cec41a1cfc0b3b3dfd.png";
+import { QCHeader } from "./AppHeader";
 import { Button } from "./ui/button";
-import {
-  LogOut,
-  FileText,
-  ChevronUp,
-  ChevronDown,
-  Moon,
-  Sun,
-} from "lucide-react";
 import { DashboardStats } from "./DashboardStats";
 import { Badge } from "./ui/badge";
 import {
@@ -19,6 +11,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { QCWorkHistory } from "./QCWorkHistory";
+import { ChevronUp, ChevronDown, FileText } from "lucide-react";
 
 interface QCDashboardProps {
   onValidateClick: (item: any) => void;
@@ -218,67 +211,13 @@ export function QCDashboard({
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a]">
-      {/* Header */}
-      <header className="bg-[#012F66] text-white py-3 px-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img src={logo} alt="MedPro" className="h-8" />
-            {/* <span className="text-white/80">QC Portal - Quality Control</span> */}
-
-            {/* Tabs */}
-            <div className="flex gap-2 ml-8">
-              {["Current Queue", "Work History"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 rounded-md transition-colors cursor-pointer ${
-                    activeTab === tab
-                      ? "bg-white/20 text-white"
-                      : "text-white/70 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-[#FFC018] rounded-full flex items-center justify-center">
-                <span className="text-[#012F66]">QC</span>
-              </div>
-              <div>
-                <div className="text-white">QC User</div>
-                <div className="text-white/60">
-                  Quality Control
-                </div>
-              </div>
-            </div>
-            {onToggleTheme && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onToggleTheme}
-                className="text-white hover:bg-white/10"
-              >
-                {theme === "dark" ? (
-                  <Sun className="w-5 h-5" />
-                ) : (
-                  <Moon className="w-5 h-5" />
-                )}
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              onClick={onLogout}
-              className="text-white hover:bg-white/10"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+      <QCHeader 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        onLogout={onLogout} 
+        theme={theme} 
+        onToggleTheme={onToggleTheme} 
+      />
 
       {/* Main Content */}
       <main className="p-6 max-w-[1400px] mx-auto">

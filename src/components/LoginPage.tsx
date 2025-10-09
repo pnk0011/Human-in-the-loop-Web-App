@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,28 +11,40 @@ import {
   DialogTitle,
   DialogTrigger,
 } from './ui/dialog';
+import { useAuth } from '../contexts/AuthContext';
 import logo from 'figma:asset/d37108ff06015dcbcdb272cec41a1cfc0b3b3dfd.png';
 
-type UserRole = 'Admin' | 'Reviewer' | 'QC';
-
 interface LoginPageProps {
-  onLogin: (role: UserRole) => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
 }
 
-export function LoginPage({ onLogin, theme, onToggleTheme }: LoginPageProps) {
+export function LoginPage({ theme, onToggleTheme }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [resetEmail, setResetEmail] = useState('');
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  
+  const { login, isLoading } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple validation
-    if (email && password) {
-      onLogin('Reviewer'); // Default to Reviewer role
+    setLoginError('');
+    
+    if (!email || !password) {
+      setLoginError('Please enter both email and password');
+      return;
+    }
+
+    try {
+      const success = await login(email, password);
+      if (!success) {
+        setLoginError('Invalid email or password. Please try again.');
+      }
+    } catch (error) {
+      setLoginError('Login failed. Please try again.');
     }
   };
 
@@ -81,6 +93,14 @@ export function LoginPage({ onLogin, theme, onToggleTheme }: LoginPageProps) {
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Error Message */}
+            {loginError && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                <p className="text-red-700 dark:text-red-300 text-sm">{loginError}</p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="email" className="text-[#012F66] dark:text-white">
                 Email Address
@@ -196,9 +216,17 @@ export function LoginPage({ onLogin, theme, onToggleTheme }: LoginPageProps) {
 
             <Button
               type="submit"
-              className="w-full bg-[#0292DC] hover:bg-[#012F66] text-white"
+              disabled={isLoading}
+              className="w-full bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign In
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Signing In...
+                </div>
+              ) : (
+                'Sign In'
+              )}
             </Button>
           </form>
         </div>

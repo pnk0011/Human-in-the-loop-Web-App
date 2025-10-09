@@ -3,6 +3,8 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LoadingPage, LoadingOverlay } from "./components/LoadingComponents";
 import { useLoading } from "./hooks/useLoading";
 import { LazyComponents } from "./components/LazyComponents";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { RoleGuard } from "./components/RoleGuard";
 
 interface ExtractedField {
   id: string;
@@ -55,11 +57,8 @@ interface QCDecision {
   qcNote?: string;
 }
 
-type UserRole = "Admin" | "Reviewer" | "QC";
-
-const App = React.memo(function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole>("Reviewer");
+const AppContent = React.memo(function AppContent() {
+  const { user, isAuthenticated, logout } = useAuth();
   const [currentView, setCurrentView] = useState<
     | "dashboard"
     | "validation"
@@ -411,25 +410,16 @@ const App = React.memo(function App() {
     });
   }, [withLoading]);
 
-  const handleLogin = useCallback((role: UserRole = "Reviewer") => {
-    withLoading(async () => {
-      // Simulate login process
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setUserRole(role);
-      setIsLoggedIn(true);
-    });
-  }, [withLoading]);
-
   const handleLogout = useCallback(() => {
-    setIsLoggedIn(false);
-    setUserRole("Reviewer");
+    logout();
     setCurrentView("dashboard");
     setSelectedDocument(null);
-  }, []);
+    setSelectedQCDocument(null);
+  }, [logout]);
 
   // Memoized values for performance
-  const currentUserRole = useMemo(() => userRole, [userRole]);
-  const isLoggedInState = useMemo(() => isLoggedIn, [isLoggedIn]);
+  const currentUserRole = useMemo(() => user?.role, [user]);
+  const isLoggedInState = useMemo(() => isAuthenticated, [isAuthenticated]);
   const currentTheme = useMemo(() => theme, [theme]);
   const isLoading = useMemo(() => appLoading || isNavigating, [appLoading, isNavigating]);
 
@@ -440,7 +430,6 @@ const App = React.memo(function App() {
           <LoadingPage text="Initializing application..." />
         ) : !isLoggedInState ? (
           <LazyComponents.LoginPage
-            onLogin={handleLogin}
             theme={currentTheme}
             onToggleTheme={toggleTheme}
           />
@@ -511,6 +500,14 @@ const App = React.memo(function App() {
         {isLoading && <LoadingOverlay />}
       </div>
     </ErrorBoundary>
+  );
+});
+
+const App = React.memo(function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 });
 

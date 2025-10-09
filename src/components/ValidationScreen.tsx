@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ValidationHeader } from "./AppHeader";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
@@ -209,7 +210,7 @@ export function ValidationScreen({
 
     // Check if all fields have been validated
     const unvalidatedFields = validations.filter(
-      (v: FieldValidation) => !v.action,
+      (v) => !(v as FieldValidation).action,
     );
     if (unvalidatedFields.length > 0) {
       alert(
@@ -219,7 +220,7 @@ export function ValidationScreen({
     }
 
     // Validate corrections and rejections
-    for (const validation of validations) {
+    for (const validation of validations as FieldValidation[]) {
       if (
         validation.action === "correct" &&
         !validation.correctedValue
@@ -263,7 +264,7 @@ export function ValidationScreen({
 
   const getValidatedFieldsCount = () => {
     return Object.values(fieldValidations).filter(
-      (v: FieldValidation) => v.action,
+      (v) => (v as FieldValidation).action,
     ).length;
   };
 
@@ -286,55 +287,14 @@ export function ValidationScreen({
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a] flex flex-col">
-      {/* Header */}
-      <header className="bg-[#012F66] text-white py-3 px-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={onBack}
-              className="text-white hover:bg-white/10 p-2"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <img src={logo} alt="MedPro" className="h-8" />
-            {/* <span className="text-white/80">Validation Portal - {document.documentType}</span> */}
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-[#0292DC] rounded-full flex items-center justify-center">
-                <span className="text-white">JD</span>
-              </div>
-              <div>
-                <div className="text-white">John Doe</div>
-                <div className="text-white/60">Reviewer</div>
-              </div>
-            </div>
-            {onToggleTheme && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onToggleTheme}
-                className="text-white hover:bg-white/10"
-              >
-                {theme === "dark" ? (
-                  <Sun className="w-5 h-5" />
-                ) : (
-                  <Moon className="w-5 h-5" />
-                )}
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              onClick={onBack}
-              className="text-white hover:bg-white/10"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+      <ValidationHeader 
+        onBack={onBack}
+        onLogout={onBack}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+        title="Validation Portal"
+        subtitle={document.documentType}
+      />
 
       <div className="flex-1 flex gap-6 p-6">
         {/* Document Viewer */}

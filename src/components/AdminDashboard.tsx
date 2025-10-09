@@ -8,9 +8,7 @@ import {
 import { DocumentAssignment } from "./DocumentAssignment";
 import { UserManagement } from "./UserManagement";
 import { AdminAnalytics } from "./AdminAnalytics";
-import logo from "figma:asset/d37108ff06015dcbcdb272cec41a1cfc0b3b3dfd.png";
-import { Button } from "./ui/button";
-import { LogOut, Moon, Sun } from "lucide-react";
+import { AdminHeader } from "./AppHeader";
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -37,50 +35,7 @@ export const AdminDashboard = React.memo(function AdminDashboard({
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a]">
-      {/* Header */}
-      <header className="bg-[#012F66] text-white py-3 px-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img src={logo} alt="MedPro" className="h-8" />
-            {/* <span className="text-white/80">Admin Portal - Document Management</span> */}
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-[#FFC018] rounded-full flex items-center justify-center">
-                <span className="text-[#012F66]">AD</span>
-              </div>
-              <div>
-                <div className="text-white">Admin User</div>
-                <div className="text-white/60">
-                  Administrator
-                </div>
-              </div>
-            </div>
-            {onToggleTheme && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onToggleTheme}
-                className="text-white hover:bg-white/10"
-              >
-                {theme === "dark" ? (
-                  <Sun className="w-5 h-5" />
-                ) : (
-                  <Moon className="w-5 h-5" />
-                )}
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              onClick={onLogout}
-              className="text-white hover:bg-white/10"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+      <AdminHeader onLogout={onLogout} theme={theme} onToggleTheme={onToggleTheme} />
 
       {/* Main Content */}
       <main className="p-6 max-w-[1400px] mx-auto">

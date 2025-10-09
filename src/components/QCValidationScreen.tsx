@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ValidationHeader } from './AppHeader';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
@@ -156,17 +157,17 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, the
     const decisions = Object.values(qcDecisions);
     
     // Check if all fields have been reviewed
-    const unreviewed = decisions.filter((d) => !d.decision);
+    const unreviewed = decisions.filter((d) => !(d as QCDecision).decision);
     if (unreviewed.length > 0) {
       alert(`Please review all fields. ${unreviewed.length} field(s) remaining.`);
       return;
     }
 
-    onSubmit(decisions);
+    onSubmit(decisions as QCDecision[]);
   };
 
   const getReviewedFieldsCount = () => {
-    return Object.values(qcDecisions).filter((d) => d.decision).length;
+    return Object.values(qcDecisions).filter((d) => (d as QCDecision).decision).length;
   };
 
   const getFieldStatusIcon = (fieldId: string) => {
@@ -197,55 +198,19 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, the
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a] flex flex-col">
-      {/* Header */}
-      <header className="bg-[#012F66] text-white py-3 px-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={onBack}
-              className="text-white hover:bg-white/10 p-2"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <img src={logo} alt="MedPro" className="h-8" />
-            <span className="text-white/80">QC Portal - {document.documentType}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-[#FFC018] rounded-full flex items-center justify-center">
-                <span className="text-[#012F66]">QC</span>
-              </div>
-              <div>
-                <div className="text-white">QC User</div>
-                <div className="text-white/60">Quality Control</div>
-              </div>
-            </div>
-            {onToggleTheme && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onToggleTheme}
-                className="text-white hover:bg-white/10"
-              >
-                {theme === 'dark' ? (
-                  <Sun className="w-5 h-5" />
-                ) : (
-                  <Moon className="w-5 h-5" />
-                )}
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              onClick={onBack}
-              className="text-white hover:bg-white/10"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+      <ValidationHeader 
+        onBack={onBack}
+        onLogout={onBack}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+        title="QC Portal"
+        subtitle={document.documentType}
+        customUser={{
+          name: "QC User",
+          role: "QC",
+          initials: "QC"
+        }}
+      />
 
       <div className="flex-1 flex gap-6 p-6">
         {/* Document Viewer */}

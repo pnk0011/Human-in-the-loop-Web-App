@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DashboardHeader } from './DashboardHeader';
+import { DashboardHeader } from './AppHeader';
 import { DashboardStats } from './DashboardStats';
 import { ValidationQueue } from './ValidationQueue';
 import { WorkHistory } from './WorkHistory';
