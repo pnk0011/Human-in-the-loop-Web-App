@@ -25,27 +25,18 @@ export function LoginPage({ theme, onToggleTheme }: LoginPageProps) {
   const [resetEmail, setResetEmail] = useState('');
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetSent, setResetSent] = useState(false);
-  const [loginError, setLoginError] = useState('');
   
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, loginError, clearLoginError } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginError('');
+    clearLoginError();
     
     if (!email || !password) {
-      setLoginError('Please enter both email and password');
       return;
     }
 
-    try {
-      const success = await login(email, password);
-      if (!success) {
-        setLoginError('Invalid email or password. Please try again.');
-      }
-    } catch (error) {
-      setLoginError('Login failed. Please try again.');
-    }
+    await login(email, password);
   };
 
   const handleResetPassword = (e: React.FormEvent) => {

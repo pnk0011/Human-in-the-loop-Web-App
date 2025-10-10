@@ -1,0 +1,108 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "name": "Admin User",
+      "email": "admin@medpro.com",
+      "password": "YWRtaW4xMjNfc2FsdA==",
+      "role": "Admin",
+      "permissions": [
+        "user.manage",
+        "document.assign",
+        "analytics.view",
+        "document.validate",
+        "document.qc",
+        "history.view"
+      ],
+      "createdAt": "2024-01-15T10:30:00Z",
+      "lastLogin": "2024-01-20T14:22:00Z",
+      "isActive": true
+    },
+    {
+      "id": "2",
+      "name": "Reviewer User",
+      "email": "reviewer@medpro.com",
+      "password": "cmV2aWV3ZXIxMjNfc2FsdA==",
+      "role": "Reviewer",
+      "permissions": [
+        "document.validate",
+        "history.view"
+      ],
+      "createdAt": "2024-01-16T09:15:00Z",
+      "lastLogin": "2024-01-20T11:45:00Z",
+      "isActive": true
+    },
+    {
+      "id": "3",
+      "name": "QC User",
+      "email": "qc@medpro.com",
+      "password": "cWMxMjNfc2FsdA==",
+      "role": "QC",
+      "permissions": [
+        "document.qc",
+        "history.view"
+      ],
+      "createdAt": "2024-01-17T13:20:00Z",
+      "lastLogin": "2024-01-20T16:30:00Z",
+      "isActive": true
+    },
+    {
+      "id": "4",
+      "name": "John Doe",
+      "email": "john.doe@medpro.com",
+      "password": "am9objEyM19zYWx0",
+      "role": "Reviewer",
+      "permissions": [
+        "document.validate",
+        "history.view"
+      ],
+      "createdAt": "2024-01-18T08:45:00Z",
+      "lastLogin": "2024-01-19T15:20:00Z",
+      "isActive": true
+    },
+    {
+      "id": "5",
+      "name": "Sarah Wilson",
+      "email": "sarah.wilson@medpro.com",
+      "password": "c2FyYWgxMjNfc2FsdA==",
+      "role": "QC",
+      "permissions": [
+        "document.qc",
+        "history.view"
+      ],
+      "createdAt": "2024-01-19T12:10:00Z",
+      "lastLogin": "2024-01-20T09:15:00Z",
+      "isActive": true
+    },
+    {
+      "id": "6",
+      "name": "Mike Johnson",
+      "email": "mike.johnson@medpro.com",
+      "password": "bWlrZTEyM19zYWx0",
+      "role": "Reviewer",
+      "permissions": [
+        "document.validate",
+        "history.view"
+      ],
+      "createdAt": "2024-01-20T07:30:00Z",
+      "lastLogin": null,
+      "isActive": true
+    },
+    {
+      "id": "7",
+      "name": "Jane Smith",
+      "email": "jane.smith@medpro.com",
+      "password": "amFuZTEyM19zYWx0",
+      "role": "QC",
+      "permissions": [
+        "document.qc",
+        "history.view"
+      ],
+      "createdAt": "2024-01-20T11:00:00Z",
+      "lastLogin": null,
+      "isActive": false
+    }
+  ],
+  "loginAttempts": [],
+  "sessions": []
+}
