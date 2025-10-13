@@ -184,3 +184,10 @@ pids/
 
 # TernJS port file
 .tern-port
+
+# Backend directory (separate repository)
+backend/
+
+# All markdown files except README.md
+*.md
+!README.md
