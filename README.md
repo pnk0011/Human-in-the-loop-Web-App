@@ -1,42 +1,39 @@
-# Medical Insurance Backend API
+# Human-in-the-Loop Web App
 
-A robust Node.js backend API for the Medical Insurance Web App with JWT authentication, role-based access control, and comprehensive user management.
+A modern React-based web application for medical insurance data validation with role-based access control, document management, and quality assurance workflows.
 
 ## 🚀 Features
 
-- **JWT Authentication** with access and refresh tokens
 - **Role-based Access Control** (Admin, Reviewer, QC)
-- **Password Security** with bcrypt hashing
-- **Session Management** with automatic expiration
-- **Rate Limiting** to prevent abuse
-- **Input Validation** with express-validator
-- **Comprehensive Error Handling**
-- **Security Headers** with Helmet
-- **CORS Configuration** for frontend integration
-- **Request Logging** with Morgan
+- **Document Validation Workflows**
+- **Quality Assurance (QC) Reviews**
+- **User Management** for Admins
+- **Document Assignment** and tracking
+- **Real-time Progress Tracking**
+- **Responsive Design** for all devices
+- **Dark/Light Theme** support
+- **Performance Optimized** with React.memo and lazy loading
 - **TypeScript Support** for type safety
+- **Modern UI Components** with Tailwind CSS
 
 ## 📁 Project Structure
 
 ```
-medical-insurance-backend/
+human-in-the-loop-web-app/
 ├── src/
-│   ├── server.ts              # Main server file
-│   ├── models/
-│   │   └── User.ts           # User model and database
-│   ├── routes/
-│   │   ├── auth.ts           # Authentication routes
-│   │   └── users.ts          # User management routes
-│   ├── middleware/
-│   │   ├── auth.ts           # Authentication middleware
-│   │   ├── errorHandler.ts   # Error handling middleware
-│   │   └── validation.ts     # Input validation middleware
-│   └── utils/
-│       └── jwt.ts            # JWT utility functions
+│   ├── components/           # React components
+│   │   ├── ui/              # Reusable UI components
+│   │   ├── Dashboard.tsx    # Main dashboard
+│   │   ├── ValidationScreen.tsx
+│   │   └── ...
+│   ├── contexts/            # React contexts
+│   │   └── AuthContext.tsx  # Authentication context
+│   ├── hooks/               # Custom hooks
+│   ├── services/            # API services
+│   └── main.tsx            # Application entry point
 ├── package.json
-├── tsconfig.json
-├── config.env               # Environment configuration template
-├── setup.sh                 # Automated setup script
+├── vite.config.ts
+├── tailwind.config.js
 └── README.md
 ```
 
@@ -46,197 +43,130 @@ medical-insurance-backend/
 - Node.js 18+ 
 - npm (comes with Node.js)
 
-### Quick Setup
+### Setup
 
 1. **Clone or download this repository**
 
-2. **Run the automated setup:**
-   ```bash
-   chmod +x setup.sh
-   ./setup.sh
-   ```
-
-### Manual Setup
-
-1. **Install dependencies:**
+2. **Install dependencies:**
    ```bash
    npm install
    ```
 
-2. **Build the project:**
+3. **Start the development server:**
    ```bash
-   npm run build
+   npm run dev
    ```
 
-3. **Create environment file:**
-   ```bash
-   cp config.env .env
-   ```
+4. **Open your browser:**
+   Navigate to `http://localhost:5173`
 
-4. **Edit environment variables:**
-   ```bash
-   # Edit .env file with your configuration
-   nano .env
-   ```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Create a `.env` file based on `config.env`:
-
-```env
-NODE_ENV=development
-PORT=5000
-
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-JWT_EXPIRES_IN=24h
-JWT_REFRESH_EXPIRES_IN=7d
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-
-# CORS Configuration
-CORS_ORIGIN=http://localhost:3000
-
-# Logging
-LOG_LEVEL=info
-```
-
-## 🚀 Running the Server
+## 🚀 Running the Application
 
 ### Development Mode
 ```bash
 npm run dev
 ```
-- Auto-restarts on file changes
-- Detailed error logging
 - Hot reload enabled
+- Fast refresh for React components
+- TypeScript compilation
 
-### Production Mode
+### Production Build
 ```bash
-npm start
+npm run build
 ```
-- Optimized for performance
-- Minimal logging
-- Production-ready
+- Optimized bundle for production
+- Minified assets
+- Tree shaking enabled
 
-## 🔍 Testing the API
+## 👥 User Roles
 
-### Health Check
-```bash
-curl http://localhost:5000/health
-```
+The application supports three user roles with different permissions:
 
-### Login Test
-```bash
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "admin@medpro.com",
-    "password": "admin123"
-  }'
-```
+### Admin
+- Full system access
+- User management
+- Document assignment
+- Analytics and reporting
+- System settings
 
-## 🔐 Default Test Users
+### Reviewer  
+- Document validation
+- Field correction and acceptance
+- History viewing
+- Document processing
+
+### QC (Quality Control)
+- QC validation of reviewed documents
+- Quality assurance workflows
+- Review history access
+- Document approval/sendback decisions
+
+## 🔐 Test Credentials
+
+For testing purposes, you can use these credentials:
 
 | Email | Password | Role | Status |
 |-------|----------|------|--------|
 | admin@medpro.com | admin123 | Admin | Active |
 | reviewer@medpro.com | reviewer123 | Reviewer | Active |
 | qc@medpro.com | qc123 | QC | Active |
-| john.doe@medpro.com | john123 | Reviewer | Active |
-| sarah.wilson@medpro.com | sarah123 | QC | Active |
-| mike.johnson@medpro.com | mike123 | Reviewer | Active |
-| jane.smith@medpro.com | jane123 | QC | Inactive |
 
-## 📚 API Endpoints
+## 🛠️ Tech Stack
 
-### Authentication
+### Frontend
+- **React 18** - Modern React with hooks and concurrent features
+- **TypeScript** - Type-safe development
+- **Vite** - Fast build tool and dev server
+- **Tailwind CSS** - Utility-first CSS framework
+- **Shadcn/ui** - Modern component library
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/api/auth/login` | User login | No |
-| POST | `/api/auth/logout` | User logout | Yes |
-| POST | `/api/auth/logout-all` | Logout from all devices | Yes |
-| POST | `/api/auth/refresh` | Refresh access token | No |
-| GET | `/api/auth/validate` | Validate token | Yes |
-| GET | `/api/auth/me` | Get current user | Yes |
-| GET | `/api/auth/login-attempts` | Get login attempts (Admin) | Yes |
-| GET | `/api/auth/sessions` | Get active sessions (Admin) | Yes |
+### State Management
+- **React Context** - Global state management
+- **Custom Hooks** - Reusable stateful logic
+- **Local Storage** - Persistent user sessions
+
+### Development Tools
+- **ESLint** - Code linting
+- **Prettier** - Code formatting
+- **TypeScript** - Static type checking
+
+## 🎨 Design Features
+
+- **Responsive Design** - Works on desktop, tablet, and mobile
+- **Dark/Light Theme** - Toggle between themes
+- **Modern UI** - Clean and intuitive interface
+- **Accessibility** - WCAG compliant components
+- **Loading States** - Smooth user experience
+- **Error Boundaries** - Graceful error handling
+- **Performance Optimized** - Lazy loading and memoization
+
+## 📱 Responsive Design
+
+The application is fully responsive and works across all device sizes:
+
+- **Desktop** (1024px+)
+- **Tablet** (768px - 1023px)  
+- **Mobile** (320px - 767px)
+
+## 🎯 Key Features
+
+### Document Validation
+- Extract and validate field data from documents
+- Confidence scoring for extracted data
+- Manual correction capabilities
+- Batch processing workflows
+
+### Quality Assurance
+- QC review of validated documents
+- Approval/sendback decisions
+- Quality metrics tracking
+- Reviewer performance monitoring
 
 ### User Management
-
-| Method | Endpoint | Description | Auth Required | Role Required |
-|--------|----------|-------------|---------------|---------------|
-| GET | `/api/users` | Get all users | Yes | Admin |
-| GET | `/api/users/:id` | Get user by ID | Yes | Self or Admin |
-| POST | `/api/users` | Create new user | Yes | Admin |
-| PUT | `/api/users/:id` | Update user | Yes | Self or Admin |
-| PUT | `/api/users/:id/change-password` | Change password | Yes | Self |
-| PUT | `/api/users/:id/deactivate` | Deactivate user | Yes | Admin |
-| PUT | `/api/users/:id/activate` | Activate user | Yes | Admin |
-| DELETE | `/api/users/:id` | Delete user | Yes | Admin |
-
-## 🔗 Frontend Integration
-
-This backend is designed to work with the Medical Insurance Web App frontend. Update your frontend API calls to use:
-
-```javascript
-const API_BASE_URL = 'http://localhost:5000/api';
-
-// Login
-const response = await fetch(`${API_BASE_URL}/auth/login`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({ email, password }),
-});
-
-// Authenticated requests
-const response = await fetch(`${API_BASE_URL}/auth/me`, {
-  headers: {
-    'Authorization': `Bearer ${accessToken}`,
-  },
-});
-```
-
-## 🛡️ Security Features
-
-- **Password Hashing**: bcrypt with salt rounds
-- **JWT Tokens**: Signed with secret key
-- **Rate Limiting**: 100 requests per 15 minutes
-- **CORS Protection**: Configured origins only
-- **Security Headers**: Helmet middleware
-- **Input Validation**: Comprehensive validation
-- **Session Management**: Automatic expiration
-- **Login Attempt Tracking**: Security monitoring
-
-## 🔍 Error Handling
-
-All API responses follow a consistent format:
-
-**Success Response:**
-```json
-{
-  "success": true,
-  "message": "Operation successful",
-  "data": { ... }
-}
-```
-
-**Error Response:**
-```json
-{
-  "success": false,
-  "error": "Error message",
-  "code": "ERROR_CODE",
-  "details": { ... }
-}
-```
+- Role-based access control
+- User creation and management
+- Activity tracking
+- Permission management
 
 ## 🧪 Development Commands
 
@@ -244,17 +174,17 @@ All API responses follow a consistent format:
 # Install dependencies
 npm install
 
-# Run in development mode
+# Run development server
 npm run dev
 
 # Build for production
 npm run build
 
-# Start production server
-npm start
+# Preview production build
+npm run preview
 
-# Run tests
-npm test
+# Type checking
+npm run type-check
 
 # Lint code
 npm run lint
@@ -265,51 +195,42 @@ npm run lint:fix
 
 ## 🚀 Production Deployment
 
-1. **Set production environment:**
-   ```env
-   NODE_ENV=production
-   JWT_SECRET=your-production-secret-key
-   PORT=5000
-   ```
-
-2. **Build the application:**
+1. **Build the application:**
    ```bash
    npm run build
    ```
 
-3. **Start the server:**
-   ```bash
-   npm start
-   ```
+2. **Deploy the `dist` folder to your hosting service:**
+   - Vercel, Netlify, AWS S3, or any static hosting
+   - The built files are in the `dist` directory
+
+3. **Environment Configuration:**
+   - Update API endpoints in your environment configuration
+   - Configure any necessary environment variables
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-1. **Port 5000 already in use:**
+1. **Port 5173 already in use:**
    ```bash
-   # Change port in .env file
-   PORT=5001
+   # Vite will automatically use the next available port
+   # Or specify a different port:
+   npm run dev -- --port 3000
    ```
 
-2. **CORS errors:**
-   ```bash
-   # Update CORS_ORIGIN in .env file
-   CORS_ORIGIN=http://localhost:3000
-   ```
-
-3. **JWT errors:**
-   ```bash
-   # Make sure JWT_SECRET is set in .env
-   JWT_SECRET=your-secret-key-here
-   ```
-
-4. **Build errors:**
+2. **Build errors:**
    ```bash
    # Clean and rebuild
    rm -rf dist node_modules
    npm install
    npm run build
+   ```
+
+3. **TypeScript errors:**
+   ```bash
+   # Check TypeScript configuration
+   npm run type-check
    ```
 
 ## 📄 License
@@ -328,19 +249,19 @@ MIT License - see LICENSE file for details.
 
 If you encounter any issues:
 
-1. Check the console logs for error messages
-2. Verify all environment variables are set correctly
+1. Check the browser console for error messages
+2. Verify all dependencies are installed correctly
 3. Ensure Node.js version is 18+
 4. Check that the port is available
 
-## 🎉 Success!
+## 🎉 Getting Started
 
 Once everything is set up correctly, you should see:
 
-- ✅ Backend API running on `http://localhost:5000`
-- ✅ Health check endpoint responding
+- ✅ Development server running on `http://localhost:5173`
+- ✅ Hot reload working for React components
 - ✅ Login working with test credentials
-- ✅ JWT tokens being generated and validated
 - ✅ Role-based access control functioning
+- ✅ Responsive design working across devices
 
-The backend API is ready to serve your Medical Insurance Web App! 🚀
+The Human-in-the-Loop Web App is ready for development! 🚀

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import {
@@ -27,20 +27,11 @@ import {
   PaginationPrevious,
 } from "./ui/pagination";
 import { Label } from "./ui/label";
-import { UserPlus, Pencil, Trash2, Search } from "lucide-react";
+import { UserPlus, Pencil, Trash2, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { userAPI, User, CreateUserRequest, UpdateUserRequest } from "../services/userAPI";
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: "Reviewer" | "QC";
-  status: "Active" | "Inactive";
-  currentLoad: number;
-  totalValidated: number;
-  accuracy: number;
-  createdDate: string;
-}
+// User interface is imported from userAPI service
 
 // Generate more mock users for pagination
 const generateMockUsers = (): User[] => {
@@ -62,7 +53,10 @@ const generateMockUsers = (): User[] => {
       name: `${firstName} ${lastName}`,
       email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@medpro.com`,
       role,
+      isActive: status === 'Active',
       status,
+      createdAt: new Date(2024, Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1).toISOString(),
+      lastLogin: Math.random() > 0.3 ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : null,
       currentLoad: status === 'Active' ? Math.floor(Math.random() * 20) : 0,
       totalValidated: Math.floor(Math.random() * 500) + 50,
       accuracy: Math.floor(Math.random() * 15) + 85,
@@ -76,30 +70,53 @@ const generateMockUsers = (): User[] => {
 const initialUsers = generateMockUsers();
 
 export function UserManagement() {
-  const [users, setUsers] = useState<User[]>(initialUsers);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] =
-    useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] =
-    useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] =
-    useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(
-    null,
-  );
-  const [userToDelete, setUserToDelete] = useState<User | null>(
-    null,
-  );
+  const [users, setUsers] = useState<User[]>([]);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const itemsPerPage = 10;
+
+  // Load users on component mount
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    setIsLoading(true);
+    try {
+      const response = await userAPI.getUsers();
+      if (response.success && response.data) {
+        setUsers(response.data);
+      } else {
+        toast.error(response.error || 'Failed to load users');
+        // Fallback to mock data
+        setUsers(initialUsers);
+      }
+    } catch (error: any) {
+      console.error('Failed to load users:', error);
+      toast.error('Failed to load users. Using offline data.');
+      setUsers(initialUsers);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Form state
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    role: "Reviewer" as "Reviewer" | "QC",
+    password: "",
+    role: "Reviewer" as "Admin" | "Reviewer" | "QC",
     status: "Active" as "Active" | "Inactive",
     assignedQC: "",
   });
@@ -108,60 +125,92 @@ export function UserManagement() {
     setFormData({
       name: "",
       email: "",
+      password: "",
       role: "Reviewer",
       status: "Active",
       assignedQC: "",
     });
   };
 
-  const handleCreateUser = () => {
-    if (!formData.name || !formData.email) {
+  const handleCreateUser = async () => {
+    if (!formData.name || !formData.email || !formData.password) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    const newUser: User = {
-      id: String(Date.now()),
-      name: formData.name,
-      email: formData.email,
-      role: formData.role,
-      status: formData.status,
-      currentLoad: 0,
-      totalValidated: 0,
-      accuracy: 0,
-      createdDate: new Date().toISOString().split("T")[0],
-    };
+    setIsCreating(true);
+    try {
+      const createUserData: CreateUserRequest = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+      };
 
-    setUsers([...users, newUser]);
-    toast.success(`User ${formData.name} created successfully`);
-    setIsCreateDialogOpen(false);
-    resetForm();
+      const response = await userAPI.createUser(createUserData);
+      
+      if (response.success && response.data) {
+        setUsers([...users, response.data]);
+        toast.success(`User ${formData.name} created successfully`);
+        setIsCreateDialogOpen(false);
+        resetForm();
+      } else {
+        toast.error(response.error || 'Failed to create user');
+      }
+    } catch (error: any) {
+      console.error('Failed to create user:', error);
+      toast.error(error.message || 'Failed to create user');
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const handleEditUser = () => {
+  const handleEditUser = async () => {
     if (!editingUser || !formData.name || !formData.email) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    setUsers(
-      users.map((user) =>
-        user.id === editingUser.id
-          ? {
-              ...user,
-              name: formData.name,
-              email: formData.email,
-              role: formData.role,
-              status: formData.status,
-            }
-          : user,
-      ),
-    );
+    setIsUpdating(true);
+    try {
+      const updateUserData: UpdateUserRequest = {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
+        isActive: formData.status === 'Active',
+      };
 
-    toast.success(`User ${formData.name} updated successfully`);
-    setIsEditDialogOpen(false);
-    setEditingUser(null);
-    resetForm();
+      const response = await userAPI.updateUser(editingUser.id, updateUserData);
+      
+      if (response.success) {
+        // Update the user in the local state
+        setUsers(
+          users.map((user) =>
+            user.id === editingUser.id
+              ? {
+                  ...user,
+                  name: formData.name,
+                  email: formData.email,
+                  role: formData.role,
+                  status: formData.status,
+                }
+              : user,
+          ),
+        );
+
+        toast.success(`User ${formData.name} updated successfully`);
+        setIsEditDialogOpen(false);
+        setEditingUser(null);
+        resetForm();
+      } else {
+        toast.error(response.error || 'Failed to update user');
+      }
+    } catch (error: any) {
+      console.error('Failed to update user:', error);
+      toast.error(error.message || 'Failed to update user');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const openDeleteDialog = (user: User) => {
@@ -169,12 +218,26 @@ export function UserManagement() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleDeleteUser = () => {
-    if (userToDelete) {
-      setUsers(users.filter((u) => u.id !== userToDelete.id));
-      toast.success(`User ${userToDelete.name} deleted successfully`);
-      setIsDeleteDialogOpen(false);
-      setUserToDelete(null);
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await userAPI.deleteUser(userToDelete.id);
+      
+      if (response.success) {
+        setUsers(users.filter((u) => u.id !== userToDelete.id));
+        toast.success(`User ${userToDelete.name} deleted successfully`);
+        setIsDeleteDialogOpen(false);
+        setUserToDelete(null);
+      } else {
+        toast.error(response.error || 'Failed to delete user');
+      }
+    } catch (error: any) {
+      console.error('Failed to delete user:', error);
+      toast.error(error.message || 'Failed to delete user');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -530,12 +593,30 @@ export function UserManagement() {
               />
             </div>
             <div>
+              <Label htmlFor="password" className="text-[#012F66] dark:text-white">
+                Password *
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    password: e.target.value,
+                  })
+                }
+                placeholder="Enter password"
+                className="mt-2 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              />
+            </div>
+            <div>
               <Label htmlFor="role" className="text-[#012F66] dark:text-white">
                 Role *
               </Label>
               <Select
                 value={formData.role}
-                onValueChange={(value: "Reviewer" | "QC") =>
+                onValueChange={(value: "Admin" | "Reviewer" | "QC") =>
                   setFormData({ ...formData, role: value, assignedQC: value === "QC" ? "" : formData.assignedQC })
                 }
               >
@@ -543,6 +624,9 @@ export function UserManagement() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="Admin">
+                    Admin
+                  </SelectItem>
                   <SelectItem value="Reviewer">
                     Reviewer
                   </SelectItem>
@@ -618,9 +702,17 @@ export function UserManagement() {
             </Button>
             <Button
               onClick={handleCreateUser}
-              className="bg-[#0292DC] hover:bg-[#012F66] text-white"
+              disabled={isCreating}
+              className="bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50"
             >
-              Create User
+              {isCreating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create User'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -775,9 +867,17 @@ export function UserManagement() {
             </Button>
             <Button
               onClick={handleEditUser}
-              className="bg-[#0292DC] hover:bg-[#012F66] text-white"
+              disabled={isUpdating}
+              className="bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50"
             >
-              Save Changes
+              {isUpdating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Save Changes'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -839,10 +939,20 @@ export function UserManagement() {
             </Button>
             <Button
               onClick={handleDeleteUser}
-              className="bg-[#FF0081] hover:bg-[#FF0081]/90 text-white"
+              disabled={isDeleting}
+              className="bg-[#FF0081] hover:bg-[#FF0081]/90 text-white disabled:opacity-50"
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete User
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete User
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

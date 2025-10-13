@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { backendAPI, LoginRequest, LoginResponse, ValidateResponse } from '../services/backendAPI';
+import { authAPI, LoginRequest, LoginResponse, ValidateResponse } from '../services/authAPI';
 
 export type UserRole = 'Admin' | 'Reviewer' | 'QC';
 
@@ -47,8 +47,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
           const parsedUser = JSON.parse(savedUser);
           
-          // Validate token with backend API
-          const validation = await backendAPI.validateToken();
+          // Validate token with auth API
+          const validation = await authAPI.validateToken();
           
           if (validation.success && validation.data) {
             setUser(validation.data.user);
@@ -72,7 +72,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     try {
       const loginRequest: LoginRequest = { email, password };
-      const response: LoginResponse = await backendAPI.login(loginRequest);
+      const response: LoginResponse = await authAPI.login(loginRequest);
 
       if (response.success && response.data) {
         setUser(response.data.user);
@@ -93,7 +93,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = useCallback(async () => {
     try {
-      await backendAPI.logout();
+      await authAPI.logout();
     } catch (error) {
       console.error('Logout API error:', error);
     }
