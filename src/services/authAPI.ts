@@ -18,9 +18,18 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  success: boolean;
-  user?: Omit<User, 'password'>;
-  token?: string;
+  status: string;
+  message: string;
+  user?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: 'Admin' | 'Reviewer' | 'QC';
+    isActive: boolean;
+    created_time: string;
+    last_login: string | null;
+    qualityControl: string | null;
+  };
   error?: string;
 }
 
@@ -69,7 +78,10 @@ const verifyPassword = (password: string, hashedPassword: string): boolean => {
 
 export class AuthAPI {
   private static instance: AuthAPI;
-  private users: User[] = data.users;
+  private users: User[] = data.users.map(user => ({
+    ...user,
+    role: user.role as 'Admin' | 'Reviewer' | 'QC'
+  }));
   private loginAttempts: LoginAttempt[] = data.loginAttempts;
   private sessions: Session[] = data.sessions;
 
@@ -82,137 +94,134 @@ export class AuthAPI {
 
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     try {
-      // Simulate API delay
-      await delay(800);
-
       const { email, password } = credentials;
+      console.log('🔐 Login attempt:', { email, password });
 
       // Validate input
       if (!email || !password) {
+        console.log('❌ Missing email or password');
         return {
-          success: false,
+          status: 'error',
+          message: 'Email and password are required',
           error: 'Email and password are required'
         };
       }
 
       if (!isValidEmail(email)) {
+        console.log('❌ Invalid email format');
         return {
-          success: false,
+          status: 'error',
+          message: 'Invalid email format',
           error: 'Invalid email format'
         };
       }
 
-      // Find user by email
-      const user = this.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      
-      if (!user) {
-        this.recordLoginAttempt(email, false);
+      // Static admin login bypass
+      if (email.toLowerCase() === 'admin@medpro.com' && password === 'admin123') {
+        console.log('✅ Static admin login successful');
+        
+        const adminUser = {
+          firstName: 'Admin',
+          lastName: 'User',
+          email: 'admin@medpro.com',
+          role: 'Admin' as const,
+          isActive: true,
+          created_time: new Date().toISOString(),
+          last_login: new Date().toISOString(),
+          qualityControl: null
+        };
+        
+        // Store user data in localStorage for session management
+        localStorage.setItem('user', JSON.stringify(adminUser));
+        localStorage.setItem('accessToken', `token_${adminUser.email}_${Date.now()}`);
+        
         return {
-          success: false,
-          error: 'Invalid email or password'
+          status: 'success',
+          message: 'Login successful',
+          user: adminUser
         };
       }
 
-      // Check if user is active
-      if (!user.isActive) {
-        this.recordLoginAttempt(email, false);
+      // For other users, call the real login API
+      const response = await fetch('https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+      console.log('🌐 API Response:', data);
+
+      if (!response.ok) {
+        console.log('❌ API request failed:', response.status, data);
         return {
-          success: false,
-          error: 'Account is deactivated. Please contact administrator.'
+          status: 'error',
+          message: data.error || data.message || 'Login failed',
+          error: data.error || data.message || 'Login failed'
         };
       }
 
-      // Verify password
-      if (!verifyPassword(password, user.password)) {
-        this.recordLoginAttempt(email, false);
+      if (data.status === 'success' && data.user) {
+        console.log('✅ Login successful:', data.user);
+        
+        // Store user data in localStorage for session management
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('accessToken', `token_${data.user.email}_${Date.now()}`);
+        
         return {
-          success: false,
-          error: 'Invalid email or password'
+          status: 'success',
+          message: data.message,
+          user: data.user
+        };
+      } else {
+        console.log('❌ Login failed:', data.message);
+        return {
+          status: 'error',
+          message: data.message || 'Login failed',
+          error: data.message || 'Login failed'
         };
       }
 
-      // Generate token
-      const token = generateToken(user.id);
-
-      // Create session
-      const session: Session = {
-        id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId: user.id,
-        token,
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
-        isActive: true
-      };
-
-      this.sessions.push(session);
-
-      // Update user's last login
-      user.lastLogin = new Date().toISOString();
-
-      // Record successful login attempt
-      this.recordLoginAttempt(email, true);
-
-      // Return user data without password
-      const { password: _, ...userWithoutPassword } = user;
-
+    } catch (error: any) {
+      console.error('❌ Login API error:', error);
       return {
-        success: true,
-        user: userWithoutPassword,
-        token
-      };
-
-    } catch (error) {
-      console.error('Login API error:', error);
-      return {
-        success: false,
-        error: 'An unexpected error occurred. Please try again.'
+        status: 'error',
+        message: error.message || 'An unexpected error occurred. Please try again.',
+        error: error.message || 'An unexpected error occurred. Please try again.'
       };
     }
   }
 
-  async logout(token: string): Promise<{ success: boolean }> {
+  async logout(): Promise<{ success: boolean }> {
     try {
-      await delay(300);
-
-      // Find and deactivate session
-      const sessionIndex = this.sessions.findIndex(s => s.token === token && s.isActive);
+      // Clear local storage
+      localStorage.removeItem('user');
+      localStorage.removeItem('accessToken');
       
-      if (sessionIndex !== -1) {
-        this.sessions[sessionIndex].isActive = false;
-        return { success: true };
-      }
-
-      return { success: false };
+      console.log('✅ Logout successful');
+      return { success: true };
     } catch (error) {
       console.error('Logout API error:', error);
       return { success: false };
     }
   }
 
-  async validateToken(token: string): Promise<{ valid: boolean; user?: Omit<User, 'password'> }> {
+  async validateToken(): Promise<{ valid: boolean; user?: any }> {
     try {
-      await delay(200);
-
-      const session = this.sessions.find(s => s.token === token && s.isActive);
+      // Check if user data exists in localStorage
+      const userData = localStorage.getItem('user');
+      const token = localStorage.getItem('accessToken');
       
-      if (!session) {
+      if (!userData || !token) {
         return { valid: false };
       }
 
-      // Check if session is expired
-      if (new Date(session.expiresAt) < new Date()) {
-        session.isActive = false;
-        return { valid: false };
-      }
-
-      const user = this.users.find(u => u.id === session.userId);
+      const user = JSON.parse(userData);
+      console.log('🔍 Token validation - user found:', user);
       
-      if (!user || !user.isActive) {
-        return { valid: false };
-      }
-
-      const { password: _, ...userWithoutPassword } = user;
-      return { valid: true, user: userWithoutPassword };
+      return { valid: true, user };
 
     } catch (error) {
       console.error('Token validation error:', error);

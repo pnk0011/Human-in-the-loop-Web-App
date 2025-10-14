@@ -1,26 +1,40 @@
 export interface CreateUserRequest {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   role: 'Admin' | 'Reviewer' | 'QC';
-  password?: string;
+  password: string;
+  qualityControl?: string;
 }
 
 export interface UpdateUserRequest {
-  name?: string;
-  email?: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
   role?: 'Admin' | 'Reviewer' | 'QC';
-  isActive?: boolean;
+  isactive?: boolean;
+}
+
+export interface DeleteUserRequest {
+  email: string;
 }
 
 export interface User {
-  id: string;
-  name: string;
+  id?: string;
   email: string;
+  first_name: string;
+  last_name: string;
+  name?: string; // For compatibility with component
   role: 'Admin' | 'Reviewer' | 'QC';
-  isActive: boolean;
-  status: 'Active' | 'Inactive';
-  createdAt: string;
-  lastLogin: string | null;
+  isactive: boolean;
+  isActive?: boolean; // For compatibility with component
+  status?: 'Active' | 'Inactive'; // For compatibility with component
+  created_time: string;
+  createdAt?: string; // For compatibility with component
+  last_login: string | null;
+  lastLogin?: string | null; // For compatibility with component
+  quality_control: string | null;
+  qualityControl?: string | null; // For compatibility with component
   currentLoad?: number;
   totalValidated?: number;
   accuracy?: number;
@@ -28,19 +42,26 @@ export interface User {
 }
 
 export interface UserResponse {
-  success: boolean;
+  status: string;
   message: string;
-  data?: User;
+  user?: User;
+  Email?: string;
+  updates?: any;
+  deleted_email?: string;
   error?: string;
-  code?: string;
 }
 
 export interface UsersListResponse {
-  success: boolean;
+  status: string;
   message: string;
-  data?: User[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total_records: number;
+    total_pages: number;
+  };
+  users?: User[];
   error?: string;
-  code?: string;
 }
 
 class UserAPI {
@@ -99,132 +120,59 @@ class UserAPI {
 
       return response;
     } catch (error: any) {
-      // If the API call fails, we'll simulate a successful response for demo purposes
-      // In a real application, you would handle the error appropriately
-      console.warn('API call failed, using mock response:', error.message);
-      
-      const mockUser: User = {
-        id: String(Date.now()),
-        name: userData.name,
-        email: userData.email,
-        role: userData.role,
-        isActive: true,
-        status: 'Active',
-        createdAt: new Date().toISOString(),
-        lastLogin: null,
-        currentLoad: 0,
-        totalValidated: 0,
-        accuracy: 0,
-        createdDate: new Date().toISOString().split('T')[0],
-      };
-
-      return {
-        success: true,
-        message: 'User created successfully',
-        data: mockUser,
-      };
+      console.error('Create user API call failed:', error);
+      throw error;
     }
   }
 
-  async getUsers(): Promise<UsersListResponse> {
+  async getUsers(page: number = 1, limit: number = 10, search?: string, roleFilter?: string, statusFilter?: string): Promise<UsersListResponse> {
     try {
-      // This would be your actual API endpoint for getting users
-      const response = await this.makeRequest<UsersListResponse>('/users', {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      if (search) params.append('search', search);
+      if (roleFilter) params.append('rolefilter', roleFilter);
+      if (statusFilter) params.append('statusfilter', statusFilter);
+
+      const response = await this.makeRequest<UsersListResponse>(`/get-all-users?${params.toString()}`, {
         method: 'GET',
       });
 
       return response;
     } catch (error: any) {
-      console.warn('API call failed, using mock response:', error.message);
-      
-      // Return mock data for demo purposes
-      const mockUsers: User[] = [
-        {
-          id: '1',
-          name: 'Jane Smith',
-          email: 'jane.smith@medpro.com',
-          role: 'Reviewer',
-          isActive: true,
-          status: 'Active',
-          createdAt: '2024-01-15T10:30:00Z',
-          lastLogin: '2024-01-20T14:30:00Z',
-          currentLoad: 12,
-          totalValidated: 245,
-          accuracy: 94,
-          createdDate: '2024-01-15',
-        },
-        {
-          id: '2',
-          name: 'John Doe',
-          email: 'john.doe@medpro.com',
-          role: 'Reviewer',
-          isActive: true,
-          status: 'Active',
-          createdAt: '2024-01-16T09:15:00Z',
-          lastLogin: '2024-01-20T16:45:00Z',
-          currentLoad: 8,
-          totalValidated: 189,
-          accuracy: 92,
-          createdDate: '2024-01-16',
-        },
-        {
-          id: '3',
-          name: 'Mike Johnson',
-          email: 'mike.johnson@medpro.com',
-          role: 'QC',
-          isActive: true,
-          status: 'Active',
-          createdAt: '2024-01-17T11:20:00Z',
-          lastLogin: '2024-01-20T13:15:00Z',
-          currentLoad: 5,
-          totalValidated: 156,
-          accuracy: 96,
-          createdDate: '2024-01-17',
-        },
-      ];
-
-      return {
-        success: true,
-        message: 'Users retrieved successfully',
-        data: mockUsers,
-      };
+      console.error('Get users API call failed:', error);
+      throw error;
     }
   }
 
-  async updateUser(userId: string, userData: UpdateUserRequest): Promise<UserResponse> {
+  async updateUser(userData: UpdateUserRequest): Promise<UserResponse> {
     try {
-      const response = await this.makeRequest<UserResponse>(`/users/${userId}`, {
+      const response = await this.makeRequest<UserResponse>('/update-user', {
         method: 'PUT',
         body: JSON.stringify(userData),
       });
 
       return response;
     } catch (error: any) {
-      console.warn('API call failed, using mock response:', error.message);
-      
-      // Return mock success response
-      return {
-        success: true,
-        message: 'User updated successfully',
-      };
+      console.error('Update user API call failed:', error);
+      throw error;
     }
   }
 
-  async deleteUser(userId: string): Promise<UserResponse> {
+  async deleteUser(email: string): Promise<UserResponse> {
     try {
-      const response = await this.makeRequest<UserResponse>(`/users/${userId}`, {
+      const deleteData: DeleteUserRequest = { email };
+      const response = await this.makeRequest<UserResponse>('/delete-user', {
         method: 'DELETE',
+        body: JSON.stringify(deleteData),
       });
 
       return response;
     } catch (error: any) {
-      console.warn('API call failed, using mock response:', error.message);
-      
-      // Return mock success response
-      return {
-        success: true,
-        message: 'User deleted successfully',
-      };
+      console.error('Delete user API call failed:', error);
+      throw error;
     }
   }
 }

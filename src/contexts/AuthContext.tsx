@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { authAPI, LoginRequest, LoginResponse, ValidateResponse } from '../services/authAPI';
+import { authAPI, LoginRequest, LoginResponse } from '../services/authAPI';
 
 export type UserRole = 'Admin' | 'Reviewer' | 'QC';
 
@@ -29,6 +29,30 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper function to get permissions for a role
+const getPermissionsForRole = (role: UserRole): string[] => {
+  const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
+    Admin: [
+      'user.manage',
+      'document.assign',
+      'analytics.view',
+      'settings.manage',
+      'document.validate',
+      'document.qc',
+      'history.view'
+    ],
+    Reviewer: [
+      'document.validate',
+      'history.view'
+    ],
+    QC: [
+      'document.qc',
+      'history.view'
+    ]
+  };
+  return ROLE_PERMISSIONS[role] || [];
+};
+
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -50,11 +74,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // Validate token with auth API
           const validation = await authAPI.validateToken();
           
-          if (validation.success && validation.data) {
-            setUser(validation.data.user);
+          if (validation.valid && validation.user) {
+            setUser(validation.user);
           } else {
             // Token is invalid, clear storage
             localStorage.removeItem('user');
+            localStorage.removeItem('accessToken');
           }
         } catch (error) {
           console.error('Failed to validate token:', error);
@@ -74,12 +99,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const loginRequest: LoginRequest = { email, password };
       const response: LoginResponse = await authAPI.login(loginRequest);
 
-      if (response.success && response.data) {
-        setUser(response.data.user);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+      console.log('🔍 AuthContext received response:', response);
+      
+      if (response.status === 'success' && response.user) {
+        console.log('✅ Setting user in context:', response.user);
+        
+        // Convert API response to match our User interface
+        const userData = {
+          id: response.user.email, // Use email as ID
+          name: `${response.user.firstName} ${response.user.lastName}`,
+          email: response.user.email,
+          role: response.user.role,
+          permissions: getPermissionsForRole(response.user.role),
+          createdAt: response.user.created_time,
+          lastLogin: response.user.last_login,
+          isActive: response.user.isActive,
+        };
+        
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
         return true;
       } else {
-        setLoginError(response.error || 'Login failed');
+        console.log('❌ Login failed in AuthContext:', response.error || response.message);
+        setLoginError(response.error || response.message || 'Login failed');
         return false;
       }
     } catch (error: any) {
@@ -99,7 +141,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     setUser(null);
-    localStorage.removeItem('user');
+    // authAPI.logout() already clears localStorage
   }, []);
 
   const hasPermission = useCallback((permission: string) => {

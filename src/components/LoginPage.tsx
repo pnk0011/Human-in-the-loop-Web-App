@@ -52,6 +52,7 @@ export function LoginPage({ theme, onToggleTheme }: LoginPageProps) {
     }
   };
 
+
   return (
     <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a] flex items-center justify-center p-4">
       <div className="w-full max-w-md">

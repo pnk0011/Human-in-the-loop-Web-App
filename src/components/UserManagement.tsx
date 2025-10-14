@@ -48,19 +48,27 @@ const generateMockUsers = (): User[] => {
     const role = roles[Math.floor(Math.random() * roles.length)];
     const status = statuses[Math.floor(Math.random() * statuses.length)];
     
+    const createdTime = new Date(2024, Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1).toISOString();
     users.push({
       id: String(i),
-      name: `${firstName} ${lastName}`,
       email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@medpro.com`,
+      first_name: firstName,
+      last_name: lastName,
+      name: `${firstName} ${lastName}`,
       role,
+      isactive: status === 'Active',
       isActive: status === 'Active',
       status,
-      createdAt: new Date(2024, Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1).toISOString(),
+      created_time: createdTime,
+      createdAt: createdTime,
+      last_login: Math.random() > 0.3 ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : null,
       lastLogin: Math.random() > 0.3 ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : null,
+      quality_control: null,
+      qualityControl: null,
       currentLoad: status === 'Active' ? Math.floor(Math.random() * 20) : 0,
       totalValidated: Math.floor(Math.random() * 500) + 50,
       accuracy: Math.floor(Math.random() * 15) + 85,
-      createdDate: new Date(2024, Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1).toISOString().split('T')[0],
+      createdDate: createdTime.split('T')[0],
     });
   }
   
@@ -86,19 +94,34 @@ export function UserManagement() {
   const [isDeleting, setIsDeleting] = useState(false);
   const itemsPerPage = 10;
 
-  // Load users on component mount
+  // Load users on component mount and when filters change
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [currentPage, searchQuery, roleFilter, statusFilter]);
 
   const loadUsers = async () => {
     setIsLoading(true);
     try {
-      const response = await userAPI.getUsers();
-      if (response.success && response.data) {
-        setUsers(response.data);
+      const response = await userAPI.getUsers(currentPage, itemsPerPage, searchQuery, roleFilter !== 'all' ? roleFilter : undefined, statusFilter !== 'all' ? statusFilter : undefined);
+      if (response.status === 'success' && response.users) {
+        // Convert API response to match component expectations
+        const formattedUsers = response.users.map(user => ({
+          ...user,
+          id: user.email, // Use email as ID since API doesn't provide separate ID
+          name: `${user.first_name} ${user.last_name}`,
+          isActive: user.isactive,
+          status: user.isactive ? 'Active' as const : 'Inactive' as const,
+          createdAt: user.created_time,
+          lastLogin: user.last_login,
+          qualityControl: user.quality_control,
+          createdDate: user.created_time.split('T')[0],
+          currentLoad: Math.floor(Math.random() * 20), // Mock data for display
+          totalValidated: Math.floor(Math.random() * 500) + 50, // Mock data for display
+          accuracy: Math.floor(Math.random() * 15) + 85, // Mock data for display
+        }));
+        setUsers(formattedUsers);
       } else {
-        toast.error(response.error || 'Failed to load users');
+        toast.error(response.message || 'Failed to load users');
         // Fallback to mock data
         setUsers(initialUsers);
       }
@@ -113,27 +136,29 @@ export function UserManagement() {
 
   // Form state
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
     role: "Reviewer" as "Admin" | "Reviewer" | "QC",
     status: "Active" as "Active" | "Inactive",
-    assignedQC: "",
+    qualityControl: "",
   });
 
   const resetForm = () => {
     setFormData({
-      name: "",
+      firstName: "",
+      lastName: "",
       email: "",
       password: "",
       role: "Reviewer",
       status: "Active",
-      assignedQC: "",
+      qualityControl: "",
     });
   };
 
   const handleCreateUser = async () => {
-    if (!formData.name || !formData.email || !formData.password) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -141,21 +166,24 @@ export function UserManagement() {
     setIsCreating(true);
     try {
       const createUserData: CreateUserRequest = {
-        name: formData.name,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
         email: formData.email,
         password: formData.password,
         role: formData.role,
+        qualityControl: formData.qualityControl || undefined,
       };
 
       const response = await userAPI.createUser(createUserData);
       
-      if (response.success && response.data) {
-        setUsers([...users, response.data]);
-        toast.success(`User ${formData.name} created successfully`);
+      if (response.status === 'success') {
+        toast.success(`User ${formData.firstName} ${formData.lastName} created successfully`);
         setIsCreateDialogOpen(false);
         resetForm();
+        // Reload users list
+        loadUsers();
       } else {
-        toast.error(response.error || 'Failed to create user');
+        toast.error(response.message || 'Failed to create user');
       }
     } catch (error: any) {
       console.error('Failed to create user:', error);
@@ -166,7 +194,7 @@ export function UserManagement() {
   };
 
   const handleEditUser = async () => {
-    if (!editingUser || !formData.name || !formData.email) {
+    if (!editingUser || !formData.firstName || !formData.lastName || !formData.email) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -174,36 +202,24 @@ export function UserManagement() {
     setIsUpdating(true);
     try {
       const updateUserData: UpdateUserRequest = {
-        name: formData.name,
-        email: formData.email,
+        email: editingUser.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
         role: formData.role,
-        isActive: formData.status === 'Active',
+        isactive: formData.status === 'Active',
       };
 
-      const response = await userAPI.updateUser(editingUser.id, updateUserData);
+      const response = await userAPI.updateUser(updateUserData);
       
-      if (response.success) {
-        // Update the user in the local state
-        setUsers(
-          users.map((user) =>
-            user.id === editingUser.id
-              ? {
-                  ...user,
-                  name: formData.name,
-                  email: formData.email,
-                  role: formData.role,
-                  status: formData.status,
-                }
-              : user,
-          ),
-        );
-
-        toast.success(`User ${formData.name} updated successfully`);
+      if (response.status === 'success') {
+        toast.success(`User ${formData.firstName} ${formData.lastName} updated successfully`);
         setIsEditDialogOpen(false);
         setEditingUser(null);
         resetForm();
+        // Reload users list
+        loadUsers();
       } else {
-        toast.error(response.error || 'Failed to update user');
+        toast.error(response.message || 'Failed to update user');
       }
     } catch (error: any) {
       console.error('Failed to update user:', error);
@@ -223,15 +239,16 @@ export function UserManagement() {
 
     setIsDeleting(true);
     try {
-      const response = await userAPI.deleteUser(userToDelete.id);
+      const response = await userAPI.deleteUser(userToDelete.email);
       
-      if (response.success) {
-        setUsers(users.filter((u) => u.id !== userToDelete.id));
+      if (response.status === 'success') {
         toast.success(`User ${userToDelete.name} deleted successfully`);
         setIsDeleteDialogOpen(false);
         setUserToDelete(null);
+        // Reload users list
+        loadUsers();
       } else {
-        toast.error(response.error || 'Failed to delete user');
+        toast.error(response.message || 'Failed to delete user');
       }
     } catch (error: any) {
       console.error('Failed to delete user:', error);
@@ -244,11 +261,13 @@ export function UserManagement() {
   const openEditDialog = (user: User) => {
     setEditingUser(user);
     setFormData({
-      name: user.name,
+      firstName: user.first_name || user.name?.split(' ')[0] || '',
+      lastName: user.last_name || user.name?.split(' ').slice(1).join(' ') || '',
       email: user.email,
+      password: '', // Don't populate password for security
       role: user.role,
-      status: user.status,
-      assignedQC: "",
+      status: user.status || (user.isActive ? 'Active' : 'Inactive'),
+      qualityControl: user.qualityControl || user.quality_control || '',
     });
     setIsEditDialogOpen(true);
   };
@@ -558,19 +577,36 @@ export function UserManagement() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="name" className="text-[#012F66] dark:text-white">
-                Full Name *
+              <Label htmlFor="firstName" className="text-[#012F66] dark:text-white">
+                First Name *
               </Label>
               <Input
-                id="name"
-                value={formData.name}
+                id="firstName"
+                value={formData.firstName}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    name: e.target.value,
+                    firstName: e.target.value,
                   })
                 }
-                placeholder="Enter full name"
+                placeholder="Enter first name"
+                className="mt-2 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              />
+            </div>
+            <div>
+              <Label htmlFor="lastName" className="text-[#012F66] dark:text-white">
+                Last Name *
+              </Label>
+              <Input
+                id="lastName"
+                value={formData.lastName}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    lastName: e.target.value,
+                  })
+                }
+                placeholder="Enter last name"
                 className="mt-2 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
               />
             </div>
@@ -617,7 +653,7 @@ export function UserManagement() {
               <Select
                 value={formData.role}
                 onValueChange={(value: "Admin" | "Reviewer" | "QC") =>
-                  setFormData({ ...formData, role: value, assignedQC: value === "QC" ? "" : formData.assignedQC })
+                  setFormData({ ...formData, role: value, qualityControl: value === "QC" ? "" : formData.qualityControl })
                 }
               >
                 <SelectTrigger className="mt-2 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
@@ -638,29 +674,21 @@ export function UserManagement() {
             </div>
             {formData.role === "Reviewer" && (
               <div>
-                <Label htmlFor="assignedQC" className="text-[#012F66] dark:text-white">
-                  Assign QC Specialist
+                <Label htmlFor="qualityControl" className="text-[#012F66] dark:text-white">
+                  Quality Control Email
                 </Label>
-                <Select
-                  value={formData.assignedQC || "none"}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, assignedQC: value === "none" ? "" : value })
+                <Input
+                  id="qualityControl"
+                  type="email"
+                  value={formData.qualityControl}
+                  onChange={(e) =>
+                    setFormData({ ...formData, qualityControl: e.target.value })
                   }
-                >
-                  <SelectTrigger className="mt-2 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
-                    <SelectValue placeholder="Select QC Specialist (Optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {qcUsers.map((qc) => (
-                      <SelectItem key={qc.id} value={qc.id}>
-                        {qc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="qc@example.com (Optional)"
+                  className="mt-2 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+                />
                 <p className="text-[#80989A] dark:text-[#a0a0a0] mt-1">
-                  Assign a QC specialist to review this reviewer's work
+                  Enter the email of the QC specialist who will review this reviewer's work
                 </p>
               </div>
             )}
@@ -735,21 +763,41 @@ export function UserManagement() {
           <div className="space-y-4">
             <div>
               <Label
-                htmlFor="edit-name"
+                htmlFor="edit-firstName"
                 className="text-[#012F66] dark:text-white"
               >
-                Full Name *
+                First Name *
               </Label>
               <Input
-                id="edit-name"
-                value={formData.name}
+                id="edit-firstName"
+                value={formData.firstName}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    name: e.target.value,
+                    firstName: e.target.value,
                   })
                 }
-                placeholder="Enter full name"
+                placeholder="Enter first name"
+                className="mt-2 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              />
+            </div>
+            <div>
+              <Label
+                htmlFor="edit-lastName"
+                className="text-[#012F66] dark:text-white"
+              >
+                Last Name *
+              </Label>
+              <Input
+                id="edit-lastName"
+                value={formData.lastName}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    lastName: e.target.value,
+                  })
+                }
+                placeholder="Enter last name"
                 className="mt-2 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
               />
             </div>
@@ -783,14 +831,17 @@ export function UserManagement() {
               </Label>
               <Select
                 value={formData.role}
-                onValueChange={(value: "Reviewer" | "QC") =>
-                  setFormData({ ...formData, role: value, assignedQC: value === "QC" ? "" : formData.assignedQC })
+                onValueChange={(value: "Admin" | "Reviewer" | "QC") =>
+                  setFormData({ ...formData, role: value, qualityControl: value === "QC" ? "" : formData.qualityControl })
                 }
               >
                 <SelectTrigger className="mt-2 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="Admin">
+                    Admin
+                  </SelectItem>
                   <SelectItem value="Reviewer">
                     Reviewer
                   </SelectItem>
@@ -802,29 +853,21 @@ export function UserManagement() {
             </div>
             {formData.role === "Reviewer" && (
               <div>
-                <Label htmlFor="edit-assignedQC" className="text-[#012F66] dark:text-white">
-                  Assign QC Specialist
+                <Label htmlFor="edit-qualityControl" className="text-[#012F66] dark:text-white">
+                  Quality Control Email
                 </Label>
-                <Select
-                  value={formData.assignedQC || "none"}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, assignedQC: value === "none" ? "" : value })
+                <Input
+                  id="edit-qualityControl"
+                  type="email"
+                  value={formData.qualityControl}
+                  onChange={(e) =>
+                    setFormData({ ...formData, qualityControl: e.target.value })
                   }
-                >
-                  <SelectTrigger className="mt-2 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
-                    <SelectValue placeholder="Select QC Specialist (Optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {qcUsers.map((qc) => (
-                      <SelectItem key={qc.id} value={qc.id}>
-                        {qc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="qc@example.com (Optional)"
+                  className="mt-2 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+                />
                 <p className="text-[#80989A] dark:text-[#a0a0a0] mt-1">
-                  Assign a QC specialist to review this reviewer's work
+                  Enter the email of the QC specialist who will review this reviewer's work
                 </p>
               </div>
             )}
