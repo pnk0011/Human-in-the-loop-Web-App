@@ -92,12 +92,15 @@ export function UserManagement() {
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [currentPageFromAPI, setCurrentPageFromAPI] = useState(1);
 
   // Load users on component mount and when filters change
   useEffect(() => {
     loadUsers();
-  }, [currentPage, searchQuery, roleFilter, statusFilter]);
+  }, [currentPage, searchQuery, roleFilter, statusFilter, itemsPerPage]);
 
   const loadUsers = async () => {
     setIsLoading(true);
@@ -120,15 +123,33 @@ export function UserManagement() {
           accuracy: Math.floor(Math.random() * 15) + 85, // Mock data for display
         }));
         setUsers(formattedUsers);
+        
+        // Set pagination data from API response
+        if (response.pagination) {
+          setTotalUsers(response.pagination.total_records);
+          setTotalPages(response.pagination.total_pages);
+          setCurrentPageFromAPI(response.pagination.page);
+          setItemsPerPage(response.pagination.limit);
+        } else {
+          setTotalUsers(formattedUsers.length);
+          setTotalPages(1);
+          setCurrentPageFromAPI(1);
+        }
       } else {
         toast.error(response.message || 'Failed to load users');
         // Fallback to mock data
         setUsers(initialUsers);
+        setTotalUsers(initialUsers.length);
+        setTotalPages(Math.ceil(initialUsers.length / itemsPerPage));
+        setCurrentPageFromAPI(1);
       }
     } catch (error: any) {
       console.error('Failed to load users:', error);
       toast.error('Failed to load users. Using offline data.');
       setUsers(initialUsers);
+      setTotalUsers(initialUsers.length);
+      setTotalPages(Math.ceil(initialUsers.length / itemsPerPage));
+      setCurrentPageFromAPI(1);
     } finally {
       setIsLoading(false);
     }
@@ -306,11 +327,12 @@ export function UserManagement() {
       : "bg-[#80989A] text-white";
   };
 
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+  // Server-side pagination calculations
+  const startIndex = (currentPageFromAPI - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + users.length, totalUsers);
+  
+  // Use API paginated data directly (server-side pagination)
+  const paginatedUsers = users;
 
   // Reset to page 1 when filters change
   const handleFilterChange = (filterSetter: (value: string) => void, value: string) => {
@@ -324,7 +346,7 @@ export function UserManagement() {
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Users</div>
-          <div className="text-[#012F66] dark:text-white text-3xl font-bold">{users.length}</div>
+          <div className="text-[#012F66] dark:text-white text-3xl font-bold">{totalUsers}</div>
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">
@@ -332,12 +354,14 @@ export function UserManagement() {
           </div>
           <div className="text-green-600 text-3xl font-bold">
             {users.filter((u) => u.status === "Active").length}
+            <span className="text-sm text-[#80989A] ml-1">(current page)</span>
           </div>
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Reviewers</div>
           <div className="text-[#0292DC] text-3xl font-bold">
             {users.filter((u) => u.role === "Reviewer").length}
+            <span className="text-sm text-[#80989A] ml-1">(current page)</span>
           </div>
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
@@ -346,6 +370,7 @@ export function UserManagement() {
           </div>
           <div className="text-[#FFC018] text-3xl font-bold">
             {users.filter((u) => u.role === "QC").length}
+            <span className="text-sm text-[#80989A] ml-1">(current page)</span>
           </div>
         </div>
       </div>
@@ -393,6 +418,27 @@ export function UserManagement() {
                 </SelectItem>
               </SelectContent>
             </Select>
+            <div className="flex items-center gap-2">
+              <span className="text-[#80989A] dark:text-[#a0a0a0] text-sm">Show:</span>
+              <Select
+                value={itemsPerPage.toString()}
+                onValueChange={(value) => {
+                  const newPageSize = Number(value);
+                  setItemsPerPage(newPageSize);
+                  setCurrentPage(1); // Reset to first page when changing page size
+                }}
+              >
+                <SelectTrigger className="w-20 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5</SelectItem>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <Button
             onClick={() => {
@@ -512,14 +558,35 @@ export function UserManagement() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between p-4 border-t border-[#E5E7EB] dark:border-[#3a3a3a]">
             <div className="text-[#80989A] dark:text-[#a0a0a0]">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length} users
+              Showing {startIndex + 1} to {endIndex} of {totalUsers} users
+              {isLoading && <span className="ml-2">(Loading...)</span>}
             </div>
-            <Pagination>
+            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[#80989A] dark:text-[#a0a0a0] text-sm">Go to:</span>
+              <Input
+                type="number"
+                min="1"
+                max={totalPages}
+                value={currentPage}
+                onChange={(e) => {
+                  const page = parseInt(e.target.value);
+                  if (page >= 1 && page <= totalPages && !isLoading) {
+                    setCurrentPage(page);
+                  }
+                }}
+                className="w-16 h-8 text-center dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              />
+              <span className="text-[#80989A] dark:text-[#a0a0a0] text-sm">
+                of {totalPages} pages
+              </span>
+            </div>
+              <Pagination>
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
-                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    onClick={() => !isLoading && setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    className={currentPage === 1 || isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                   />
                 </PaginationItem>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
@@ -532,9 +599,9 @@ export function UserManagement() {
                     return (
                       <PaginationItem key={page}>
                         <PaginationLink
-                          onClick={() => setCurrentPage(page)}
+                          onClick={() => !isLoading && setCurrentPage(page)}
                           isActive={currentPage === page}
-                          className="cursor-pointer"
+                          className={isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         >
                           {page}
                         </PaginationLink>
@@ -551,12 +618,13 @@ export function UserManagement() {
                 })}
                 <PaginationItem>
                   <PaginationNext
-                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    onClick={() => !isLoading && setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    className={currentPage === totalPages || isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                   />
                 </PaginationItem>
               </PaginationContent>
-            </Pagination>
+              </Pagination>
+            </div>
           </div>
         )}
       </div>
