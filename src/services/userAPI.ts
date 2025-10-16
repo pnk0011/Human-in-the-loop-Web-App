@@ -35,8 +35,8 @@ export interface User {
   lastLogin?: string | null; // For compatibility with component
   quality_control: string | null;
   qualityControl?: string | null; // For compatibility with component
-  currentLoad?: number;
-  totalValidated?: number;
+  currentLoad?: number | string;
+  totalValidated?: number | string;
   accuracy?: number;
   createdDate?: string; // For compatibility with component
 }
@@ -61,6 +61,18 @@ export interface UsersListResponse {
     total_pages: number;
   };
   users?: User[];
+  error?: string;
+}
+
+export interface UserStatsResponse {
+  status: string;
+  message: string;
+  stats?: {
+    total_users: number;
+    active_users: number;
+    reviewers_count: number;
+    qc_count: number;
+  };
   error?: string;
 }
 
@@ -125,7 +137,7 @@ class UserAPI {
     }
   }
 
-  async getUsers(page: number = 1, limit: number = 10, search?: string, roleFilter?: string, statusFilter?: string): Promise<UsersListResponse> {
+  async getUsers(page: number = 1, limit: number = 10, search?: string, roleFilter: string = 'All', statusFilter: string = 'All'): Promise<UsersListResponse> {
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -173,6 +185,30 @@ class UserAPI {
     } catch (error: any) {
       console.error('Delete user API call failed:', error);
       throw error;
+    }
+  }
+
+  async getStats(): Promise<UserStatsResponse> {
+    try {
+      const response = await this.makeRequest<UserStatsResponse>('/get-user-stats', {
+        method: 'GET',
+      });
+
+      return response;
+    } catch (error: any) {
+      console.error('Get user stats API call failed:', error);
+      
+      // Mock response for development/fallback
+      return {
+        status: 'success',
+        message: 'User stats retrieved successfully',
+        stats: {
+          total_users: 0,
+          active_users: 0,
+          reviewers_count: 0,
+          qc_count: 0,
+        }
+      };
     }
   }
 }

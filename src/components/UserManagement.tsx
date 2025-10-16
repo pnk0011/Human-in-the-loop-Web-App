@@ -27,55 +27,12 @@ import {
   PaginationPrevious,
 } from "./ui/pagination";
 import { Label } from "./ui/label";
-import { UserPlus, Pencil, Trash2, Search, Loader2 } from "lucide-react";
+import { UserPlus, Pencil, Trash2, Search, Loader2, Users, AlertCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { userAPI, User, CreateUserRequest, UpdateUserRequest } from "../services/userAPI";
+import { userAPI, User, CreateUserRequest, UpdateUserRequest, UserStatsResponse } from "../services/userAPI";
 
 // User interface is imported from userAPI service
 
-// Generate more mock users for pagination
-const generateMockUsers = (): User[] => {
-  const firstNames = ['Jane', 'John', 'Mike', 'Sarah', 'Tom', 'Emily', 'David', 'Lisa', 'Chris', 'Anna', 'Mark', 'Rachel', 'Kevin', 'Laura', 'Steven'];
-  const lastNames = ['Smith', 'Doe', 'Johnson', 'Wilson', 'Brown', 'Davis', 'Garcia', 'Miller', 'Martinez', 'Anderson', 'Taylor', 'Thomas', 'Jackson', 'White', 'Harris'];
-  const roles: Array<'Reviewer' | 'QC'> = ['Reviewer', 'QC'];
-  const statuses: Array<'Active' | 'Inactive'> = ['Active', 'Inactive'];
-  
-  const users: User[] = [];
-  
-  for (let i = 1; i <= 32; i++) {
-    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-    const role = roles[Math.floor(Math.random() * roles.length)];
-    const status = statuses[Math.floor(Math.random() * statuses.length)];
-    
-    const createdTime = new Date(2024, Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1).toISOString();
-    users.push({
-      id: String(i),
-      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@medpro.com`,
-      first_name: firstName,
-      last_name: lastName,
-      name: `${firstName} ${lastName}`,
-      role,
-      isactive: status === 'Active',
-      isActive: status === 'Active',
-      status,
-      created_time: createdTime,
-      createdAt: createdTime,
-      last_login: Math.random() > 0.3 ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : null,
-      lastLogin: Math.random() > 0.3 ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : null,
-      quality_control: null,
-      qualityControl: null,
-      currentLoad: status === 'Active' ? Math.floor(Math.random() * 20) : 0,
-      totalValidated: Math.floor(Math.random() * 500) + 50,
-      accuracy: Math.floor(Math.random() * 15) + 85,
-      createdDate: createdTime.split('T')[0],
-    });
-  }
-  
-  return users;
-};
-
-const initialUsers = generateMockUsers();
 
 export function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -85,6 +42,7 @@ export function UserManagement() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -96,16 +54,55 @@ export function UserManagement() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [currentPageFromAPI, setCurrentPageFromAPI] = useState(1);
+  const [hasApiError, setHasApiError] = useState(false);
+  const [stats, setStats] = useState({
+    total_users: 0,
+    active_users: 0,
+    reviewers_count: 0,
+    qc_count: 0,
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Load stats on component mount
+  useEffect(() => {
+    loadStats();
+  }, []);
 
   // Load users on component mount and when filters change
   useEffect(() => {
     loadUsers();
-  }, [currentPage, searchQuery, roleFilter, statusFilter, itemsPerPage]);
+  }, [currentPage, debouncedSearchQuery, roleFilter, statusFilter, itemsPerPage]);
+
+  const loadStats = async () => {
+    setIsLoadingStats(true);
+    try {
+      const response = await userAPI.getStats();
+      if (response.status === 'success' && response.stats) {
+        setStats(response.stats);
+      } else {
+        console.error('Failed to load stats:', response.message);
+      }
+    } catch (error: any) {
+      console.error('Failed to load stats:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
 
   const loadUsers = async () => {
     setIsLoading(true);
+    setHasApiError(false);
     try {
-      const response = await userAPI.getUsers(currentPage, itemsPerPage, searchQuery, roleFilter !== 'all' ? roleFilter : undefined, statusFilter !== 'all' ? statusFilter : undefined);
+      const response = await userAPI.getUsers(currentPage, itemsPerPage, debouncedSearchQuery, roleFilter !== 'all' ? roleFilter : undefined, statusFilter !== 'all' ? statusFilter : undefined);
       if (response.status === 'success' && response.users) {
         // Convert API response to match component expectations
         const formattedUsers = response.users.map(user => ({
@@ -118,8 +115,8 @@ export function UserManagement() {
           lastLogin: user.last_login,
           qualityControl: user.quality_control,
           createdDate: user.created_time.split('T')[0],
-          currentLoad: Math.floor(Math.random() * 20), // Mock data for display
-          totalValidated: Math.floor(Math.random() * 500) + 50, // Mock data for display
+          currentLoad: 'N/A',
+          totalValidated: 'N/A',
           accuracy: Math.floor(Math.random() * 15) + 85, // Mock data for display
         }));
         setUsers(formattedUsers);
@@ -137,19 +134,20 @@ export function UserManagement() {
         }
       } else {
         toast.error(response.message || 'Failed to load users');
-        // Fallback to mock data
-        setUsers(initialUsers);
-        setTotalUsers(initialUsers.length);
-        setTotalPages(Math.ceil(initialUsers.length / itemsPerPage));
+        setUsers([]);
+        setTotalUsers(0);
+        setTotalPages(0);
         setCurrentPageFromAPI(1);
+        setHasApiError(true);
       }
     } catch (error: any) {
       console.error('Failed to load users:', error);
-      toast.error('Failed to load users. Using offline data.');
-      setUsers(initialUsers);
-      setTotalUsers(initialUsers.length);
-      setTotalPages(Math.ceil(initialUsers.length / itemsPerPage));
+      toast.error('Failed to load users. Please try again.');
+      setUsers([]);
+      setTotalUsers(0);
+      setTotalPages(0);
       setCurrentPageFromAPI(1);
+      setHasApiError(true);
     } finally {
       setIsLoading(false);
     }
@@ -201,8 +199,9 @@ export function UserManagement() {
         toast.success(`User ${formData.firstName} ${formData.lastName} created successfully`);
         setIsCreateDialogOpen(false);
         resetForm();
-        // Reload users list
+        // Reload users list and stats
         loadUsers();
+        loadStats();
       } else {
         toast.error(response.message || 'Failed to create user');
       }
@@ -237,8 +236,9 @@ export function UserManagement() {
         setIsEditDialogOpen(false);
         setEditingUser(null);
         resetForm();
-        // Reload users list
+        // Reload users list and stats
         loadUsers();
+        loadStats();
       } else {
         toast.error(response.message || 'Failed to update user');
       }
@@ -266,8 +266,9 @@ export function UserManagement() {
         toast.success(`User ${userToDelete.name} deleted successfully`);
         setIsDeleteDialogOpen(false);
         setUserToDelete(null);
-        // Reload users list
+        // Reload users list and stats
         loadUsers();
+        loadStats();
       } else {
         toast.error(response.message || 'Failed to delete user');
       }
@@ -346,32 +347,45 @@ export function UserManagement() {
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Users</div>
-          <div className="text-[#012F66] dark:text-white text-3xl font-bold">{totalUsers}</div>
+          {isLoadingStats ? (
+            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+          ) : (
+            <div className="text-[#012F66] dark:text-white text-3xl font-bold">{stats.total_users}</div>
+          )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">
             Active Users
           </div>
-          <div className="text-green-600 text-3xl font-bold">
-            {users.filter((u) => u.status === "Active").length}
-            <span className="text-sm text-[#80989A] ml-1">(current page)</span>
-          </div>
+          {isLoadingStats ? (
+            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+          ) : (
+            <div className="text-green-600 text-3xl font-bold">
+              {stats.active_users}
+            </div>
+          )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Reviewers</div>
-          <div className="text-[#0292DC] text-3xl font-bold">
-            {users.filter((u) => u.role === "Reviewer").length}
-            <span className="text-sm text-[#80989A] ml-1">(current page)</span>
-          </div>
+          {isLoadingStats ? (
+            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+          ) : (
+            <div className="text-[#0292DC] text-3xl font-bold">
+              {stats.reviewers_count}
+            </div>
+          )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">
             QC Specialists
           </div>
-          <div className="text-[#FFC018] text-3xl font-bold">
-            {users.filter((u) => u.role === "QC").length}
-            <span className="text-sm text-[#80989A] ml-1">(current page)</span>
-          </div>
+          {isLoadingStats ? (
+            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+          ) : (
+            <div className="text-[#FFC018] text-3xl font-bold">
+              {stats.qc_count}
+            </div>
+          )}
         </div>
       </div>
 
@@ -379,6 +393,12 @@ export function UserManagement() {
       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
+            {isLoading && (
+              <div className="flex items-center gap-2 text-[#80989A] dark:text-[#a0a0a0]">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Loading users...</span>
+              </div>
+            )}
             <div className="relative">
               <Search className="w-4 h-4 text-[#80989A] absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
@@ -438,6 +458,23 @@ export function UserManagement() {
                   <SelectItem value="50">50</SelectItem>
                 </SelectContent>
               </Select>
+              {(searchQuery || roleFilter !== 'all' || statusFilter !== 'all') && (
+                <Button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setDebouncedSearchQuery("");
+                    setRoleFilter("all");
+                    setStatusFilter("all");
+                    setCurrentPage(1);
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white text-xs mb-4 cursor-pointer"
+                >
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Reset
+                </Button>
+              )}
             </div>
           </div>
           <Button
@@ -445,7 +482,7 @@ export function UserManagement() {
               resetForm();
               setIsCreateDialogOpen(true);
             }}
-            className="bg-[#0292DC] hover:bg-[#012F66] text-white"
+            className="bg-[#0292DC] hover:bg-[#012F66] text-white cursor-pointer"
           >
             <UserPlus className="w-4 h-4 mr-2" />
             Create User
@@ -487,72 +524,187 @@ export function UserManagement() {
               </tr>
             </thead>
             <tbody>
-              {paginatedUsers.map((user) => (
-                <tr
-                  key={user.id}
-                  className="hover:bg-[#F9FAFB] dark:hover:bg-[#3a3a3a] border-b border-[#E5E7EB] dark:border-[#3a3a3a]"
-                >
-                  <td className="px-6 py-4">
-                    <div className="text-[#012F66] dark:text-white">
-                      {user.name}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">
-                    {user.email}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge
-                      className={getRoleBadgeColor(user.role)}
-                    >
-                      {user.role}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge
-                      className={getStatusBadgeColor(
-                        user.status,
-                      )}
-                    >
-                      {user.status}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-[#012F66] dark:text-white">
-                    {user.currentLoad}
-                  </td>
-                  <td className="px-6 py-4 text-[#012F66] dark:text-white">
-                    {user.totalValidated}
-                  </td>
-                  {/* <td className="px-6 py-4 text-[#012F66] dark:text-white">{user.accuracy}%</td> */}
-                  <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">
-                    {new Date(
-                      user.createdDate,
-                    ).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
+              {isLoading ? (
+                // Loading skeleton rows
+                Array.from({ length: itemsPerPage }, (_, index) => (
+                  <tr
+                    key={`loading-${index}`}
+                    className="border-b border-[#E5E7EB] dark:border-[#3a3a3a]"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-32"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-48"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-16"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-16"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-8"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-12"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+                        <div className="h-8 w-8 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                // Actual user data
+                paginatedUsers.map((user) => (
+                  <tr
+                    key={user.id}
+                    className="hover:bg-[#F9FAFB] dark:hover:bg-[#3a3a3a] border-b border-[#E5E7EB] dark:border-[#3a3a3a]"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="text-[#012F66] dark:text-white">
+                        {user.name}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">
+                      {user.email}
+                    </td>
+                    <td className="px-6 py-4">
+                      <Badge
+                        className={getRoleBadgeColor(user.role)}
+                      >
+                        {user.role}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Badge
+                        className={getStatusBadgeColor(
+                          user.status,
+                        )}
+                      >
+                        {user.status}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4 text-[#012F66] dark:text-white">
+                      {user.currentLoad}
+                    </td>
+                    <td className="px-6 py-4 text-[#012F66] dark:text-white">
+                      {user.totalValidated}
+                    </td>
+                    {/* <td className="px-6 py-4 text-[#012F66] dark:text-white">{user.accuracy}%</td> */}
+                    <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">
+                      {new Date(
+                        user.createdDate,
+                      ).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => openEditDialog(user)}
-                        className="text-[#0292DC] hover:bg-[#0292DC]/10"
+                        className="text-[#0292DC] hover:bg-[#0292DC]/10 cursor-pointer"
                       >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openDeleteDialog(user)}
-                        className="text-[#FF0081] hover:bg-[#FF0081]/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openDeleteDialog(user)}
+                          className="text-[#FF0081] hover:bg-[#FF0081]/10 cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+        
+        {/* No Data Found State */}
+        {!isLoading && users.length === 0 && !hasApiError && (
+          <div className="flex flex-col items-center justify-center py-16 px-6">
+            <div className="w-24 h-24 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-6">
+              <Users className="w-12 h-12 text-[#80989A] dark:text-[#a0a0a0]" />
+            </div>
+            <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
+              No Users Found
+            </h3>
+            <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-6 max-w-md">
+              {debouncedSearchQuery || roleFilter !== 'all' || statusFilter !== 'all' 
+                ? "No users match your current filters. Try adjusting your search criteria or reset the filters."
+                : "No users have been created yet. Start by adding your first user."
+              }
+            </p>
+            {(debouncedSearchQuery || roleFilter !== 'all' || statusFilter !== 'all') && (
+              <Button
+                onClick={() => {
+                  setSearchQuery("");
+                  setDebouncedSearchQuery("");
+                  setRoleFilter("all");
+                  setStatusFilter("all");
+                  setCurrentPage(1);
+                }}
+                variant="outline"
+                className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reset Filters
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* API Error State */}
+        {!isLoading && hasApiError && (
+          <div className="flex flex-col items-center justify-center py-16 px-6">
+            <div className="w-24 h-24 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-6">
+              <AlertCircle className="w-12 h-12 text-red-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
+              Failed to Load Users
+            </h3>
+            <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-6 max-w-md">
+              There was an error loading the user data. Please check your connection and try again.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                onClick={loadUsers}
+                variant="outline"
+                className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+              {(debouncedSearchQuery || roleFilter !== 'all' || statusFilter !== 'all') && (
+                <Button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setDebouncedSearchQuery("");
+                    setRoleFilter("all");
+                    setStatusFilter("all");
+                    setCurrentPage(1);
+                    loadUsers();
+                  }}
+                  variant="outline"
+                  className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Reset Filters
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
         
         {/* Pagination */}
         {totalPages > 1 && (
@@ -561,27 +713,7 @@ export function UserManagement() {
               Showing {startIndex + 1} to {endIndex} of {totalUsers} users
               {isLoading && <span className="ml-2">(Loading...)</span>}
             </div>
-            <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-[#80989A] dark:text-[#a0a0a0] text-sm">Go to:</span>
-              <Input
-                type="number"
-                min="1"
-                max={totalPages}
-                value={currentPage}
-                onChange={(e) => {
-                  const page = parseInt(e.target.value);
-                  if (page >= 1 && page <= totalPages && !isLoading) {
-                    setCurrentPage(page);
-                  }
-                }}
-                className="w-16 h-8 text-center dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
-              />
-              <span className="text-[#80989A] dark:text-[#a0a0a0] text-sm">
-                of {totalPages} pages
-              </span>
-            </div>
-              <Pagination>
+            <Pagination>
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
@@ -623,8 +755,7 @@ export function UserManagement() {
                   />
                 </PaginationItem>
               </PaginationContent>
-              </Pagination>
-            </div>
+            </Pagination>
           </div>
         )}
       </div>
@@ -792,14 +923,14 @@ export function UserManagement() {
                 setIsCreateDialogOpen(false);
                 resetForm();
               }}
-              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white"
+              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               onClick={handleCreateUser}
               disabled={isCreating}
-              className="bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50"
+              className="bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50 cursor-pointer"
             >
               {isCreating ? (
                 <>
@@ -972,14 +1103,14 @@ export function UserManagement() {
                 setEditingUser(null);
                 resetForm();
               }}
-              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white"
+              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               onClick={handleEditUser}
               disabled={isUpdating}
-              className="bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50"
+              className="bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50 cursor-pointer"
             >
               {isUpdating ? (
                 <>
@@ -1044,14 +1175,14 @@ export function UserManagement() {
                 setIsDeleteDialogOpen(false);
                 setUserToDelete(null);
               }}
-              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white"
+              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               onClick={handleDeleteUser}
               disabled={isDeleting}
-              className="bg-[#FF0081] hover:bg-[#FF0081]/90 text-white disabled:opacity-50"
+              className="bg-[#FF0081] hover:bg-[#FF0081]/90 text-white disabled:opacity-50 cursor-pointer"
             >
               {isDeleting ? (
                 <>

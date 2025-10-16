@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -14,20 +14,11 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from './ui/pagination';
-import { Users, ChevronUp, ChevronDown, Filter } from 'lucide-react';
+import { Users, ChevronUp, ChevronDown, Filter, Loader2, FileText, AlertCircle, RefreshCw } from 'lucide-react';
 import { toast } from "sonner";
+import { documentAPI, Document, GetDocumentsRequest } from '../services/documentAPI';
 
-interface Document {
-  id: string;
-  documentName: string;
-  documentType: string;
-  fieldsCount: number;
-  confidence: number;
-  priority: 'High' | 'Medium' | 'Low';
-  uploadDate: string;
-  status: 'Unassigned' | 'Assigned' | 'In Progress' | 'Completed';
-  assignedTo?: string;
-}
+// Document interface is imported from documentAPI service
 
 interface User {
   id: string;
@@ -40,37 +31,7 @@ interface User {
 type SortField = 'documentName' | 'confidence' | 'priority' | 'uploadDate';
 type SortDirection = 'asc' | 'desc';
 
-// Generate more mock documents for pagination
-const generateMockDocuments = (): Document[] => {
-  const types = ['Invoice', 'Purchase Order', 'Receipt', 'Contract'];
-  const statuses: Array<'Unassigned' | 'Assigned' | 'In Progress' | 'Completed'> = ['Unassigned', 'Assigned', 'In Progress', 'Completed'];
-  const priorities: Array<'High' | 'Medium' | 'Low'> = ['High', 'Medium', 'Low'];
-  const assignees = ['Jane Smith', 'John Doe', 'Mike Johnson', 'Sarah Wilson', 'Tom Brown'];
-  
-  const documents: Document[] = [];
-  
-  for (let i = 1; i <= 47; i++) {
-    const type = types[Math.floor(Math.random() * types.length)];
-    const status = statuses[Math.floor(Math.random() * statuses.length)];
-    const priority = priorities[Math.floor(Math.random() * priorities.length)];
-    
-    documents.push({
-      id: String(i),
-      documentName: `${type.substring(0, 3).toUpperCase()}-2024-${String(i).padStart(4, '0')}`,
-      documentType: type,
-      fieldsCount: Math.floor(Math.random() * 10) + 3,
-      confidence: Math.floor(Math.random() * 60) + 35,
-      priority,
-      uploadDate: new Date(2024, 2, Math.floor(Math.random() * 20) + 1).toISOString().split('T')[0],
-      status,
-      assignedTo: status === 'Assigned' || status === 'In Progress' ? assignees[Math.floor(Math.random() * assignees.length)] : undefined,
-    });
-  }
-  
-  return documents;
-};
-
-const mockDocuments = generateMockDocuments();
+// Mock documents removed - now using real API data
 
 const mockUsers: User[] = [
   { id: '1', name: 'Jane Smith', email: 'jane.smith@medpro.com', role: 'Reviewer', currentLoad: 12 },
@@ -81,18 +42,118 @@ const mockUsers: User[] = [
 ];
 
 export function DocumentAssignment() {
-  const [documents, setDocuments] = useState<Document[]>(mockDocuments);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [typeFilter, setTypeFilter] = useState('All');
+  const [priorityFilter, setPriorityFilter] = useState('All');
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalDocuments, setTotalDocuments] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [currentPageFromAPI, setCurrentPageFromAPI] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasApiError, setHasApiError] = useState(false);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Load documents on component mount and when filters change
+  useEffect(() => {
+    loadDocuments();
+  }, [currentPage, debouncedSearchQuery, statusFilter, typeFilter, priorityFilter, itemsPerPage]);
+
+  const loadDocuments = async () => {
+    setIsLoading(true);
+    setHasApiError(false);
+    try {
+      const params: GetDocumentsRequest = {
+        page: currentPage,
+        limit: itemsPerPage,
+        file_name: debouncedSearchQuery || undefined,
+        doc_type_name: typeFilter !== 'All' ? typeFilter : undefined,
+        priority: priorityFilter !== 'All' ? priorityFilter : undefined,
+        status: statusFilter !== 'All' ? statusFilter : undefined,
+      };
+
+      const response = await documentAPI.getDocuments(params);
+      
+      if (response.status === 'success' && response.documents) {
+        // Convert API response to match component expectations
+        const formattedDocuments = response.documents.map(doc => ({
+          ...doc,
+          id: doc.doc_handle_id, // Use doc_handle_id as ID
+          documentName: doc.file_name,
+          documentType: doc.doc_type_name || 'Unknown',
+          fieldsCount: doc.distinct_entity_type_count,
+          confidence: Math.round(doc.avg_confidence_percentage),
+          priority: doc.priority,
+          uploadDate: doc.latest_update_datetime.split(' ')[0], // Extract date part
+          status: getStatusFromApi(doc.status),
+          assignedTo: doc.reviewer_assigned || undefined,
+        }));
+        
+        setDocuments(formattedDocuments);
+        
+        // Set pagination data from API response
+        if (response.pagination) {
+          setTotalDocuments(response.pagination.total_records);
+          setTotalPages(response.pagination.total_pages);
+          setCurrentPageFromAPI(response.pagination.page);
+          setItemsPerPage(response.pagination.limit);
+        } else {
+          setTotalDocuments(formattedDocuments.length);
+          setTotalPages(1);
+          setCurrentPageFromAPI(1);
+        }
+      } else {
+        toast.error(response.message || 'Failed to load documents');
+        setDocuments([]);
+        setTotalDocuments(0);
+        setTotalPages(0);
+        setCurrentPageFromAPI(1);
+        setHasApiError(true);
+      }
+    } catch (error: any) {
+      console.error('Failed to load documents:', error);
+      toast.error('Failed to load documents. Please try again.');
+      setDocuments([]);
+      setTotalDocuments(0);
+      setTotalPages(0);
+      setCurrentPageFromAPI(1);
+      setHasApiError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper function to convert API status to component status
+  const getStatusFromApi = (status: string): 'Unassigned' | 'Assigned' | 'In Progress' | 'Completed' => {
+    switch (status) {
+      case '0':
+        return 'Unassigned';
+      case '1':
+        return 'Assigned';
+      case '2':
+        return 'In Progress';
+      case '3':
+        return 'Completed';
+      default:
+        return 'Unassigned';
+    }
+  };
 
   const toggleDocument = (id: string) => {
     const newSelected = new Set(selectedDocuments);
@@ -165,15 +226,8 @@ export function DocumentAssignment() {
     setSelectedDocuments(new Set());
   };
 
-  let filteredDocuments = documents.filter((doc) => {
-    if (statusFilter !== 'all' && doc.status !== statusFilter) return false;
-    if (typeFilter !== 'all' && doc.documentType !== typeFilter) return false;
-    if (priorityFilter !== 'all' && doc.priority !== priorityFilter) return false;
-    if (searchQuery && !doc.documentName.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    return true;
-  });
+  // Use API paginated data directly (server-side pagination)
+  let filteredDocuments = documents;
 
   if (sortField) {
     filteredDocuments = [...filteredDocuments].sort((a, b) => {
@@ -227,11 +281,12 @@ export function DocumentAssignment() {
     return 'bg-[#FF0081] text-white';
   };
 
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredDocuments.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
+  // Server-side pagination calculations
+  const startIndex = (currentPageFromAPI - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + documents.length, totalDocuments);
+  
+  // Use API paginated data directly (server-side pagination)
+  const paginatedDocuments = filteredDocuments;
 
   // Reset to page 1 when filters change
   const handleFilterChange = (filterSetter: (value: string) => void, value: string) => {
@@ -245,25 +300,41 @@ export function DocumentAssignment() {
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Documents</div>
-          <div className="text-[#012F66] dark:text-white text-3xl font-bold">{documents.length}</div>
+          {isLoading ? (
+            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+          ) : (
+            <div className="text-[#012F66] dark:text-white text-3xl font-bold">{totalDocuments}</div>
+          )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Unassigned</div>
-          <div className="text-[#FF0081] text-3xl font-bold">
-            {documents.filter((d) => d.status === 'Unassigned').length}
-          </div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Unassigned (current page)</div>
+          {isLoading ? (
+            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+          ) : (
+            <div className="text-[#FF0081] text-3xl font-bold">
+              {documents.filter((d) => d.status === 'Unassigned').length}
+            </div>
+          )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Assigned</div>
-          <div className="text-[#0292DC] text-3xl font-bold">
-            {documents.filter((d) => d.status === 'Assigned').length}
-          </div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Assigned (current page)</div>
+          {isLoading ? (
+            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+          ) : (
+            <div className="text-[#0292DC] text-3xl font-bold">
+              {documents.filter((d) => d.status === 'Assigned').length}
+            </div>
+          )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">In Progress</div>
-          <div className="text-[#FFC018] text-3xl font-bold">
-            {documents.filter((d) => d.status === 'In Progress').length}
-          </div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">In Progress (current page)</div>
+          {isLoading ? (
+            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+          ) : (
+            <div className="text-[#FFC018] text-3xl font-bold">
+              {documents.filter((d) => d.status === 'In Progress').length}
+            </div>
+          )}
         </div>
       </div>
 
@@ -271,6 +342,12 @@ export function DocumentAssignment() {
       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
+            {isLoading && (
+              <div className="flex items-center gap-2 text-[#80989A] dark:text-[#a0a0a0]">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Loading documents...</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-[#80989A]" />
               <span className="text-[#012F66] dark:text-white">Filters</span>
@@ -286,11 +363,11 @@ export function DocumentAssignment() {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="Unassigned">Unassigned</SelectItem>
-                <SelectItem value="Assigned">Assigned</SelectItem>
-                <SelectItem value="In Progress">In Progress</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
+                <SelectItem value="All">All Status</SelectItem>
+                <SelectItem value="0">Unassigned</SelectItem>
+                <SelectItem value="1">Assigned</SelectItem>
+                <SelectItem value="2">In Progress</SelectItem>
+                <SelectItem value="3">Completed</SelectItem>
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={(value) => handleFilterChange(setTypeFilter, value)}>
@@ -298,7 +375,7 @@ export function DocumentAssignment() {
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="All">All Types</SelectItem>
                 <SelectItem value="Invoice">Invoice</SelectItem>
                 <SelectItem value="Purchase Order">Purchase Order</SelectItem>
                 <SelectItem value="Receipt">Receipt</SelectItem>
@@ -310,12 +387,51 @@ export function DocumentAssignment() {
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
+                <SelectItem value="All">All Priority</SelectItem>
                 <SelectItem value="High">High</SelectItem>
                 <SelectItem value="Medium">Medium</SelectItem>
                 <SelectItem value="Low">Low</SelectItem>
               </SelectContent>
             </Select>
+            <div className="flex items-center gap-2">
+              <span className="text-[#80989A] dark:text-[#a0a0a0] text-sm">Show:</span>
+              <Select
+                value={itemsPerPage.toString()}
+                onValueChange={(value) => {
+                  const newPageSize = Number(value);
+                  setItemsPerPage(newPageSize);
+                  setCurrentPage(1); // Reset to first page when changing page size
+                }}
+              >
+                <SelectTrigger className="w-20 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5</SelectItem>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+              {(searchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All') && (
+                <Button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setDebouncedSearchQuery("");
+                    setStatusFilter("All");
+                    setTypeFilter("All");
+                    setPriorityFilter("All");
+                    setCurrentPage(1);
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white text-xs mb-4 cursor-pointer"
+                >
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Reset
+                </Button>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {selectedDocuments.size > 0 && (
@@ -384,7 +500,45 @@ export function DocumentAssignment() {
               </tr>
             </thead>
             <tbody>
-              {paginatedDocuments.map((doc) => (
+              {isLoading ? (
+                // Loading skeleton rows
+                Array.from({ length: itemsPerPage }, (_, index) => (
+                  <tr
+                    key={`loading-${index}`}
+                    className="border-b border-[#E5E7EB] dark:border-[#3a3a3a]"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-32"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-12"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-16"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24"></div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                // Actual document data
+                paginatedDocuments.map((doc) => (
                 <tr key={doc.id} className="hover:bg-[#F9FAFB] dark:hover:bg-[#3a3a3a] border-b border-[#E5E7EB] dark:border-[#3a3a3a]">
                   <td className="px-6 py-4">
                     <Checkbox
@@ -416,23 +570,103 @@ export function DocumentAssignment() {
                   </td>
                   <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.assignedTo || '-'}</td>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
+        
+        {/* No Data Found State */}
+        {!isLoading && documents.length === 0 && !hasApiError && (
+          <div className="flex flex-col items-center justify-center py-16 px-6">
+            <div className="w-24 h-24 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-6">
+              <FileText className="w-12 h-12 text-[#80989A] dark:text-[#a0a0a0]" />
+            </div>
+            <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
+              No Documents Found
+            </h3>
+            <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-6 max-w-md">
+              {debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All'
+                ? "No documents match your current filters. Try adjusting your search criteria or reset the filters."
+                : "No documents have been uploaded yet."
+              }
+            </p>
+            {(debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All') && (
+              <Button
+                onClick={() => {
+                  setSearchQuery("");
+                  setDebouncedSearchQuery("");
+                  setStatusFilter("All");
+                  setTypeFilter("All");
+                  setPriorityFilter("All");
+                  setCurrentPage(1);
+                }}
+                variant="outline"
+                className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reset Filters
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* API Error State */}
+        {!isLoading && hasApiError && (
+          <div className="flex flex-col items-center justify-center py-16 px-6">
+            <div className="w-24 h-24 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-6">
+              <AlertCircle className="w-12 h-12 text-red-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
+              Failed to Load Documents
+            </h3>
+            <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-6 max-w-md">
+              There was an error loading the document data. Please check your connection and try again.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                onClick={loadDocuments}
+                variant="outline"
+                className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+              {(debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All') && (
+                <Button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setDebouncedSearchQuery("");
+                    setStatusFilter("All");
+                    setTypeFilter("All");
+                    setPriorityFilter("All");
+                    setCurrentPage(1);
+                    loadDocuments();
+                  }}
+                  variant="outline"
+                  className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Reset Filters
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
         
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between p-4 border-t border-[#E5E7EB] dark:border-[#3a3a3a]">
             <div className="text-[#80989A] dark:text-[#a0a0a0]">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredDocuments.length)} of {filteredDocuments.length} documents
+              Showing {startIndex + 1} to {endIndex} of {totalDocuments} documents
+              {isLoading && <span className="ml-2">(Loading...)</span>}
             </div>
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
-                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    onClick={() => !isLoading && setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    className={currentPage === 1 || isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                   />
                 </PaginationItem>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
@@ -445,9 +679,9 @@ export function DocumentAssignment() {
                     return (
                       <PaginationItem key={page}>
                         <PaginationLink
-                          onClick={() => setCurrentPage(page)}
+                          onClick={() => !isLoading && setCurrentPage(page)}
                           isActive={currentPage === page}
-                          className="cursor-pointer"
+                          className={isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         >
                           {page}
                         </PaginationLink>
@@ -464,8 +698,8 @@ export function DocumentAssignment() {
                 })}
                 <PaginationItem>
                   <PaginationNext
-                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    onClick={() => !isLoading && setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    className={currentPage === totalPages || isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                   />
                 </PaginationItem>
               </PaginationContent>
