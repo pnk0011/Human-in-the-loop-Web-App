@@ -17,6 +17,7 @@ import {
 import { Users, ChevronUp, ChevronDown, Filter, Loader2, FileText, AlertCircle, RefreshCw } from 'lucide-react';
 import { toast } from "sonner";
 import { documentAPI, Document, GetDocumentsRequest } from '../services/documentAPI';
+import { userAPI } from '../services/userAPI';
 
 // Document interface is imported from documentAPI service
 
@@ -24,8 +25,8 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'Reviewer' | 'QC';
-  currentLoad: number;
+  role: 'Admin' | 'Reviewer' | 'QC';
+  currentLoad: number | string;
 }
 
 type SortField = 'documentName' | 'confidence' | 'priority' | 'uploadDate';
@@ -33,13 +34,7 @@ type SortDirection = 'asc' | 'desc';
 
 // Mock documents removed - now using real API data
 
-const mockUsers: User[] = [
-  { id: '1', name: 'Jane Smith', email: 'jane.smith@medpro.com', role: 'Reviewer', currentLoad: 12 },
-  { id: '2', name: 'John Doe', email: 'john.doe@medpro.com', role: 'Reviewer', currentLoad: 8 },
-  { id: '3', name: 'Mike Johnson', email: 'mike.johnson@medpro.com', role: 'Reviewer', currentLoad: 15 },
-  { id: '4', name: 'Sarah Wilson', email: 'sarah.wilson@medpro.com', role: 'QC', currentLoad: 5 },
-  { id: '5', name: 'Tom Brown', email: 'tom.brown@medpro.com', role: 'Reviewer', currentLoad: 10 },
-];
+// Mock users removed - now using real API data
 
 export function DocumentAssignment() {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -60,6 +55,8 @@ export function DocumentAssignment() {
   const [currentPageFromAPI, setCurrentPageFromAPI] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [hasApiError, setHasApiError] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
   // Debounce search query
   useEffect(() => {
@@ -191,13 +188,40 @@ export function DocumentAssignment() {
     );
   };
 
+  const loadUsers = async () => {
+    setIsLoadingUsers(true);
+    try {
+      // Fetch all users (no pagination for dropdown)
+      const response = await userAPI.getUsers(1, 1000); // Get up to 1000 users
+      if (response.status === 'success' && response.users) {
+        // Convert API response to match component expectations
+        const formattedUsers = response.users.map(user => ({
+          id: user.email, // Use email as ID
+          name: `${user.first_name} ${user.last_name}`,
+          email: user.email,
+          role: user.role,
+          currentLoad: 'N/A', // API doesn't provide current load
+        }));
+        setUsers(formattedUsers);
+      } else {
+        console.error('Failed to load users:', response.message);
+        setUsers([]);
+      }
+    } catch (error: any) {
+      console.error('Failed to load users:', error);
+      setUsers([]);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
   const handleAssign = () => {
     if (!selectedUser) {
       toast.error('Please select a user');
       return;
     }
 
-    const user = mockUsers.find((u) => u.id === selectedUser);
+    const user = users.find((u) => u.id === selectedUser);
     if (!user) return;
 
     setDocuments((prev) =>
@@ -438,8 +462,11 @@ export function DocumentAssignment() {
               <>
                 <span className="text-[#80989A] dark:text-[#a0a0a0]">{selectedDocuments.size} selected</span>
                 <Button
-                  onClick={() => setIsAssignDialogOpen(true)}
-                  className="bg-[#0292DC] hover:bg-[#012F66] text-white"
+                  onClick={() => {
+                    loadUsers();
+                    setIsAssignDialogOpen(true);
+                  }}
+                  className="bg-[#0292DC] hover:bg-[#012F66] text-white cursor-pointer"
                 >
                   <Users className="w-4 h-4 mr-2" />
                   Assign to Reviewer
@@ -720,42 +747,54 @@ export function DocumentAssignment() {
           <div className="space-y-4">
             <div>
               <label className="text-[#012F66] dark:text-white mb-2 block">Select Reviewer</label>
-              <Select value={selectedUser} onValueChange={setSelectedUser}>
-                <SelectTrigger className="bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
-                  <SelectValue placeholder="Choose a reviewer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mockUsers.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      <div className="flex items-center justify-between w-full">
-                        <div>
-                          <div className="text-[#012F66]">{user.name}</div>
-                          <div className="text-[#80989A]">{user.email}</div>
+              {isLoadingUsers ? (
+                <div className="flex items-center gap-2 p-3 border border-[#E5E7EB] dark:border-[#3a3a3a] rounded-md">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#80989A]" />
+                  <span className="text-[#80989A] dark:text-[#a0a0a0]">Loading reviewers...</span>
+                </div>
+              ) : (
+                <Select value={selectedUser} onValueChange={setSelectedUser}>
+                  <SelectTrigger className="bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                    <SelectValue placeholder="Choose a reviewer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.filter(user => user.role === 'Reviewer').map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <div>
+                            <div className="text-[#012F66]">{user.name}</div>
+                            <div className="text-[#80989A]">{user.email}</div>
+                          </div>
+                          <div className="ml-4">
+                            <Badge className="bg-[#0292DC] text-white">
+                              {user.role}
+                            </Badge>
+                            <span className="text-[#80989A] ml-2">({user.currentLoad})</span>
+                          </div>
                         </div>
-                        <div className="ml-4">
-                          <Badge className={user.role === 'QC' ? 'bg-[#FFC018] text-white' : 'bg-[#0292DC] text-white'}>
-                            {user.role}
-                          </Badge>
-                          <span className="text-[#80989A] ml-2">({user.currentLoad} docs)</span>
-                        </div>
+                      </SelectItem>
+                    ))}
+                    {users.filter(user => user.role === 'Reviewer').length === 0 && (
+                      <div className="p-3 text-[#80989A] dark:text-[#a0a0a0] text-center">
+                        No reviewers found
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => setIsAssignDialogOpen(false)}
-              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white"
+              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               onClick={handleAssign}
-              className="bg-[#0292DC] hover:bg-[#012F66] text-white"
+              className="bg-[#0292DC] hover:bg-[#012F66] text-white cursor-pointer"
             >
               Assign Documents
             </Button>
