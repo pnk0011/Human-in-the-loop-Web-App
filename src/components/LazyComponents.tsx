@@ -8,6 +8,7 @@ const ValidationScreen = lazy(() => import('./ValidationScreen').then(module => 
 const AdminDashboard = lazy(() => import('./AdminDashboard').then(module => ({ default: module.AdminDashboard })));
 const QCDashboard = lazy(() => import('./QCDashboard').then(module => ({ default: module.QCDashboard })));
 const QCValidationScreen = lazy(() => import('./QCValidationScreen').then(module => ({ default: module.QCValidationScreen })));
+const ReviewerDashboard = lazy(() => import('./ReviewerDashboard').then(module => ({ default: module.ReviewerDashboard })));
 
 // Loading fallback component
 const LoadingFallback = ({ text = "Loading..." }: { text?: string }) => (
@@ -35,6 +36,7 @@ export const SuspenseValidationScreen = withSuspense(ValidationScreen, "Loading 
 export const SuspenseAdminDashboard = withSuspense(AdminDashboard, "Loading admin dashboard...");
 export const SuspenseQCDashboard = withSuspense(QCDashboard, "Loading QC dashboard...");
 export const SuspenseQCValidationScreen = withSuspense(QCValidationScreen, "Loading QC validation screen...");
+export const SuspenseReviewerDashboard = withSuspense(ReviewerDashboard, "Loading reviewer dashboard...");
 
 // Route-based lazy loading
 export const LazyComponents = {
@@ -44,4 +46,5 @@ export const LazyComponents = {
   AdminDashboard: SuspenseAdminDashboard,
   QCDashboard: SuspenseQCDashboard,
   QCValidationScreen: SuspenseQCValidationScreen,
+  ReviewerDashboard: SuspenseReviewerDashboard,
 };

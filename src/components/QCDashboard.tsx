@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { QCHeader } from "./AppHeader";
 import { Button } from "./ui/button";
 import { DashboardStats } from "./DashboardStats";
@@ -11,7 +11,9 @@ import {
   SelectValue,
 } from "./ui/select";
 import { QCWorkHistory } from "./QCWorkHistory";
-import { ChevronUp, ChevronDown, FileText } from "lucide-react";
+import { ChevronUp, ChevronDown, FileText, Loader2 } from "lucide-react";
+import { documentOperationsAPI, GetQCDocumentsRequest, QCDocument } from "../services/documentOperationsAPI";
+import { useAuth } from "../contexts/AuthContext";
 
 interface QCDashboardProps {
   onValidateClick: (item: any) => void;
@@ -35,6 +37,7 @@ export function QCDashboard({
   theme,
   onToggleTheme,
 }: QCDashboardProps) {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("Current Queue");
   const [documentType, setDocumentType] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -47,6 +50,53 @@ export function QCDashboard({
   const [sortDirection, setSortDirection] =
     useState<SortDirection>("asc");
   const itemsPerPage = 5;
+  const [apiDocuments, setApiDocuments] = useState<QCDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Load API data for QC documents
+  useEffect(() => {
+    const loadApiData = async () => {
+      if (user?.email) {
+        setIsLoading(true);
+        try {
+          const params: GetQCDocumentsRequest = {
+            quality_control: user.email,
+            page: 1,
+            limit: 25,
+            doc_type_name: documentType !== 'all' ? documentType : 'All',
+            priority: priorityFilter !== 'all' ? priorityFilter : 'All',
+            status: statusFilter !== 'all' ? statusFilter : 'All',
+            reviewer: reviewerFilter !== 'all' ? reviewerFilter : 'All',
+          };
+          
+          const response = await documentOperationsAPI.getQCDocuments(params);
+          if (response.status === 'success' && response.documents) {
+            setApiDocuments(response.documents);
+          }
+        } catch (error) {
+          console.error('Failed to load QC documents:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadApiData();
+  }, [user?.email, documentType, priorityFilter, statusFilter, reviewerFilter]);
+
+  // Convert API documents to original QC queue format
+  const convertApiDocumentsToQCQueue = () => {
+    return apiDocuments.map((doc, index) => ({
+      id: doc.doc_handle_id || `DOC-${index + 1}`,
+      document: doc.file_name,
+      type: doc.doc_type_name || 'Unknown',
+      reviewer: doc.reviewer_assigned || 'Unknown Reviewer',
+      reviewedDate: doc.qc_update_dt?.split(' ')[0] || new Date().toISOString().split('T')[0],
+      fieldsReviewed: doc.distinct_entity_type_count,
+      priority: doc.priority as 'High' | 'Medium' | 'Low',
+      status: 'Pending QC', // Default status for QC queue
+    }));
+  };
 
   // Sample data - documents that have been reviewed by reviewers
   const qcQueue = [
@@ -132,7 +182,10 @@ export function QCDashboard({
     },
   ];
 
-  const filteredQueue = qcQueue.filter((item) => {
+  // Use API documents if available, otherwise use mock data
+  const dataSource = apiDocuments.length > 0 ? convertApiDocumentsToQCQueue() : qcQueue;
+  
+  const filteredQueue = dataSource.filter((item) => {
     const matchesType =
       documentType === "all" ||
       item.type
@@ -458,7 +511,44 @@ export function QCDashboard({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#E5E7EB] dark:divide-[#3a3a3a]">
-                      {paginatedQueue.map((item) => (
+                      {isLoading ? (
+                        // Loading skeleton rows
+                        Array.from({ length: 5 }, (_, index) => (
+                          <tr
+                            key={`loading-${index}`}
+                            className="hover:bg-[#F9FAFB]/50 dark:hover:bg-[#3a3a3a]/50 transition-colors"
+                          >
+                            <td className="px-6 py-5">
+                              <div className="flex items-center gap-3">
+                                <div className="flex-shrink-0 w-10 h-10 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-lg animate-pulse"></div>
+                                <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-32"></div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24"></div>
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="h-8 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-16"></div>
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16"></div>
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-20"></div>
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="h-8 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16 ml-auto"></div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        paginatedQueue.map((item) => (
                         <tr
                           key={item.id}
                           className="hover:bg-[#F9FAFB]/50 dark:hover:bg-[#3a3a3a]/50 transition-colors"
@@ -524,7 +614,8 @@ export function QCDashboard({
                             </Button>
                           </td>
                         </tr>
-                      ))}
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>

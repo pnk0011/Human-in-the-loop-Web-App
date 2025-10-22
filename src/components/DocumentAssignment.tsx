@@ -18,6 +18,7 @@ import { Users, ChevronUp, ChevronDown, Filter, Loader2, FileText, AlertCircle, 
 import { toast } from "sonner";
 import { documentAPI, Document, GetDocumentsRequest } from '../services/documentAPI';
 import { userAPI } from '../services/userAPI';
+import { documentOperationsAPI, AssignReviewerRequest } from '../services/documentOperationsAPI';
 
 // Document interface is imported from documentAPI service
 
@@ -57,6 +58,7 @@ export function DocumentAssignment() {
   const [hasApiError, setHasApiError] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   // Debounce search query
   useEffect(() => {
@@ -91,13 +93,13 @@ export function DocumentAssignment() {
         // Convert API response to match component expectations
         const formattedDocuments = response.documents.map(doc => ({
           ...doc,
-          id: doc.doc_handle_id, // Use doc_handle_id as ID
+          id: `${doc.file_name}_${doc.doc_handle_id}`, // Use combination of file name and doc_handle_id as unique ID
           documentName: doc.file_name,
           documentType: doc.doc_type_name || 'Unknown',
           fieldsCount: doc.distinct_entity_type_count,
           confidence: Math.round(doc.avg_confidence_percentage),
           priority: doc.priority,
-          uploadDate: doc.latest_update_datetime.split(' ')[0], // Extract date part
+          uploadDate: doc.latest_update_datetime ? doc.latest_update_datetime.split(' ')[0] : new Date().toISOString().split('T')[0], // Extract date part
           status: getStatusFromApi(doc.status),
           assignedTo: doc.reviewer_assigned || undefined,
         }));
@@ -200,6 +202,7 @@ export function DocumentAssignment() {
           name: `${user.first_name} ${user.last_name}`,
           email: user.email,
           role: user.role,
+          quality_control: user.quality_control,
           currentLoad: 'N/A', // API doesn't provide current load
         }));
         setUsers(formattedUsers);
@@ -215,27 +218,68 @@ export function DocumentAssignment() {
     }
   };
 
-  const handleAssign = () => {
+  const handleAssign = async () => {
     if (!selectedUser) {
       toast.error('Please select a user');
       return;
     }
 
     const user = users.find((u) => u.id === selectedUser);
-    if (!user) return;
+    if (!user) {
+      toast.error('Selected user not found');
+      return;
+    }
 
-    setDocuments((prev) =>
-      prev.map((doc) =>
-        selectedDocuments.has(doc.id)
-          ? { ...doc, status: 'Assigned' as const, assignedTo: user.name }
-          : doc
-      )
-    );
+    setIsAssigning(true);
+    try {
+      // Get file names from selected documents
+      const fileNames = Array.from(selectedDocuments).map(docId => {
+        const doc = documents.find(d => d.id === docId);
+        return doc?.documentName || docId;
+      });
 
-    toast.success(`${selectedDocuments.size} document(s) assigned to ${user.name}`);
-    setSelectedDocuments(new Set());
-    setIsAssignDialogOpen(false);
-    setSelectedUser('');
+
+      
+      console.log('Available users:', users);
+
+      const assignRequest: AssignReviewerRequest = {
+        file_names: fileNames,
+        reviewer: user.email,
+        qc_assigned: user?.quality_control,
+        status: '1'
+      };
+      
+      console.log('Assign request:', assignRequest);
+
+      const response = await documentOperationsAPI.assignReviewer(assignRequest);
+      
+      if (response.message) {
+        toast.success(response.message);
+        
+        // Update local state to reflect the assignment
+        setDocuments((prev) =>
+          prev.map((doc) =>
+            selectedDocuments.has(doc.id)
+              ? { ...doc, status: 'Assigned' as const, assignedTo: user.name }
+              : doc
+          )
+        );
+        
+        setSelectedDocuments(new Set());
+        setIsAssignDialogOpen(false);
+        setSelectedUser('');
+        
+        // Reload documents to get updated status from API
+        loadDocuments();
+      } else {
+        toast.error('Failed to assign documents');
+      }
+    } catch (error: any) {
+      console.error('Failed to assign documents:', error);
+      toast.error(error.message || 'Failed to assign documents');
+    } finally {
+      setIsAssigning(false);
+    }
   };
 
   const handleBulkUnassign = () => {
@@ -794,9 +838,17 @@ export function DocumentAssignment() {
             </Button>
             <Button
               onClick={handleAssign}
-              className="bg-[#0292DC] hover:bg-[#012F66] text-white cursor-pointer"
+              disabled={isAssigning}
+              className="bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50 cursor-pointer"
             >
-              Assign Documents
+              {isAssigning ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Assigning...
+                </>
+              ) : (
+                'Assign Documents'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

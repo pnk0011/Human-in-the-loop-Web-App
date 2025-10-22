@@ -13,8 +13,8 @@ interface QueueItem {
   priority: 'High' | 'Medium' | 'Low';
   age: string;
   assignedTo: string;
-  fieldsCount: number;
-  status: 'New' | 'In Progress' | 'Pending Review' | 'On Hold';
+  fieldsCount?: number; // Make optional since API might not provide this
+  status?: 'New' | 'In Progress' | 'Pending Review' | 'On Hold' | 'Completed' | 'Reassigned'; // Make optional
   extractedValue?: string;
   fieldDescription?: string;
   expectedFormat?: string;
@@ -22,6 +22,7 @@ interface QueueItem {
 
 interface ValidationQueueProps {
   onValidateClick?: (item: QueueItem) => void;
+  apiDocuments?: QueueItem[]; // Optional API documents to override mock data
 }
 
 const mockData: QueueItem[] = [
@@ -105,7 +106,7 @@ const mockData: QueueItem[] = [
 type SortField = 'document' | 'confidence' | 'priority' | 'age';
 type SortDirection = 'asc' | 'desc';
 
-export function ValidationQueue({ onValidateClick }: ValidationQueueProps = {}) {
+export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQueueProps = {}) {
   const [documentType, setDocumentType] = useState('all');
   const [confidenceRange, setConfidenceRange] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -114,8 +115,11 @@ export function ValidationQueue({ onValidateClick }: ValidationQueueProps = {}) 
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
+  // Use API documents if provided, otherwise use mock data
+  const dataSource = apiDocuments && apiDocuments.length > 0 ? apiDocuments : mockData;
+  
   // Filter to show only documents assigned to the current user
-  const filteredData = mockData.filter(item => item.assignedTo === 'You');
+  const filteredData = dataSource.filter(item => item.assignedTo === 'You' || item.assignedTo === 'Reviewer');
   
   const totalItems = filteredData.length;
   const itemsPerPage = 5;
@@ -358,6 +362,8 @@ export function ValidationQueue({ onValidateClick }: ValidationQueueProps = {}) 
                       item.status === 'New' ? 'bg-[#0292DC]/10 text-[#0292DC]' :
                       item.status === 'In Progress' ? 'bg-[#FFC018]/10 text-[#FFC018]' :
                       item.status === 'Pending Review' ? 'bg-[#80989A]/10 text-[#80989A]' :
+                      item.status === 'Completed' ? 'bg-[#0292DC]/10 text-[#0292DC]' :
+                      item.status === 'Reassigned' ? 'bg-[#F59E0B]/20 text-[#D97706]' :
                       'bg-[#FF0081]/10 text-[#FF0081]'
                     }>
                       {item.status}

@@ -52,6 +52,7 @@ interface ValidationDocument {
   documentType: string;
   priority: "High" | "Medium" | "Low";
   fields: ExtractedField[];
+  documentImage?: string; // URL to the document image
 }
 
 interface FieldValidation {
@@ -312,97 +313,155 @@ export function ValidationScreen({
                   transition: "transform 0.2s",
                 }}
               >
-                {/* Sample Invoice Document */}
-                <div className="w-[600px] p-12 relative">
-                  <div className="text-center mb-8">
-                    <h2 className="text-[#012F66] mb-4">
-                      INVOICE
-                    </h2>
-                  </div>
-
-                  <div className="mb-8">
-                    <p className="text-[#012F66]">
-                      Acme Corporation
-                    </p>
-                    <p className="text-[#012F66]">
-                      Invoice #: INV-2024-0947
-                    </p>
-                    <p className="text-[#012F66]">
-                      Policy #: POL-2024-5678
-                    </p>
-                    <p className="text-[#012F66]">
-                      123 Business Street
-                    </p>
-                    <p className="text-[#012F66]">
-                      New York, NY 10001
-                    </p>
-                    <p className="text-[#012F66] mt-2">
-                      Date: March 15, 2024
-                    </p>
-                    <p className="text-[#012F66]">
-                      Due Date: April 15, 2024
-                    </p>
-                    <p className="text-[#012F66]">
-                      Effective Date: January 1, 2025
-                    </p>
-                  </div>
-
-                  <div className="mb-8">
-                    <p className="text-[#012F66]">Bill To:</p>
-                    <p className="text-[#012F66]">
-                      ABC Company Ltd
-                    </p>
-                    <p className="text-[#012F66]">
-                      456 Client Avenue
-                    </p>
-                    <p className="text-[#012F66]">
-                      Los Angeles, CA 90001
-                    </p>
-                  </div>
-
-                  <div className="mb-4">
-                    <p className="text-[#012F66]">
-                      Total Amount Due: $12,847.50
-                    </p>
-                  </div>
-
-                  {/* AI Extraction Highlight Boxes - Show all fields */}
-                  {document.fields.map((field) => (
-                    <div
-                      key={field.id}
-                      className={`absolute border-2 rounded transition-all ${
-                        selectedFieldId === field.id
-                          ? "border-[#FF0081] bg-[#FF0081]"
-                          : "border-[#0292DC] bg-[#0292DC]"
-                      }`}
-                      style={{
-                        left: `${field.location.x}px`,
-                        top: `${field.location.y}px`,
-                        width: `${field.location.width}px`,
-                        height: `${field.location.height}px`,
-                        opacity:
-                          selectedFieldId === field.id
-                            ? highlightOpacity
-                            : highlightOpacity * 0.4,
-                        pointerEvents: "none",
-                      }}
-                    />
-                  ))}
-
-                  {/* Label for selected field */}
-                  {selectedField && (
-                    <div
-                      className="absolute bg-[#FF0081] text-white px-2 py-1 rounded text-xs"
-                      style={{
-                        left: `${selectedField.location.x}px`,
-                        top: `${selectedField.location.y - 20}px`,
-                        fontSize: "11px",
-                      }}
-                    >
-                      {selectedField.fieldName}
+                {document.documentImage ? (
+                  /* Real Document Image from API */
+                  <div className="relative">
+                    {/* Check if it's a PDF document */}
+                    {document.documentImage.includes('.pdf') ? (
+                      /* PDF Document - Try iframe first, then fallback to download link */
+                      <div className="space-y-4">
+                        {/* Primary: Try iframe */}
+                        <iframe
+                          src={document.documentImage}
+                          className="w-full h-full min-h-[600px] border border-gray-300 dark:border-gray-600 rounded"
+                          style={{ maxHeight: '80vh' }}
+                          title={`PDF Document: ${document.documentName}`}
+                          onLoad={() => {
+                            console.log('PDF document loaded successfully in iframe:', document.documentImage);
+                          }}
+                          onError={(e) => {
+                            console.error('Failed to load PDF document in iframe:', document.documentImage);
+                            console.log('Falling back to download link');
+                            // Hide iframe and show download link
+                            e.currentTarget.style.display = 'none';
+                            const fallbackElement = e.currentTarget.nextElementSibling;
+                            if (fallbackElement) {
+                              fallbackElement.classList.remove('hidden');
+                            }
+                          }}
+                        />
+                        
+                        {/* Fallback: Download link when iframe fails */}
+                        <div className="hidden flex flex-col items-center justify-center p-8 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-800 rounded-full flex items-center justify-center mb-4">
+                            <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                            PDF Document Available
+                          </h3>
+                          <p className="text-blue-600 dark:text-blue-300 text-center mb-4 max-w-md">
+                            The PDF document cannot be displayed inline due to security restrictions. Click the button below to download and view the document.
+                          </p>
+                          <a
+                            href={document.documentImage}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors cursor-pointer"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Download PDF
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Image Document - Use img tag */
+                      <img
+                        src={document.documentImage}
+                        alt={document.documentName}
+                        className="max-w-full h-auto border border-gray-300 dark:border-gray-600 rounded"
+                        style={{ maxHeight: '80vh' }}
+                        crossOrigin="anonymous"
+                        onLoad={() => {
+                          console.log('Document image loaded successfully:', document.documentImage);
+                        }}
+                        onError={(e) => {
+                          console.error('Failed to load document image:', document.documentImage);
+                          console.error('Image error event:', e);
+                          // Hide the image and show error message
+                          e.currentTarget.style.display = 'none';
+                          const errorElement = e.currentTarget.nextElementSibling;
+                          if (errorElement) {
+                            errorElement.classList.remove('hidden');
+                          }
+                        }}
+                      />
+                    )}
+                    
+                    {/* Error Message (hidden by default) */}
+                    <div className="hidden flex flex-col items-center justify-center p-12 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                      <div className="w-16 h-16 bg-red-100 dark:bg-red-800 rounded-full flex items-center justify-center mb-4">
+                        <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+                        Document Failed to Load
+                      </h3>
+                      <p className="text-red-600 dark:text-red-300 text-center mb-4 max-w-md">
+                        Unable to load the document from the provided URL. This may be due to network issues, access restrictions, or CORS policy limitations.
+                      </p>
+                      <div className="text-sm text-red-500 dark:text-red-400 bg-red-100 dark:bg-red-800 px-3 py-2 rounded font-mono break-all max-w-md">
+                        {document.documentImage}
+                      </div>
                     </div>
-                  )}
-                </div>
+
+                    {/* AI Extraction Highlight Boxes - Show all fields */}
+                    {document.fields.map((field) => (
+                      <div
+                        key={field.id}
+                        className={`absolute border-2 rounded transition-all ${
+                          selectedFieldId === field.id
+                            ? "border-[#FF0081] bg-[#FF0081]"
+                            : "border-[#0292DC] bg-[#0292DC]"
+                        }`}
+                        style={{
+                          left: `${field.location.x}px`,
+                          top: `${field.location.y}px`,
+                          width: `${field.location.width}px`,
+                          height: `${field.location.height}px`,
+                          opacity:
+                            selectedFieldId === field.id
+                              ? highlightOpacity
+                              : highlightOpacity * 0.4,
+                          pointerEvents: "none",
+                        }}
+                      />
+                    ))}
+
+                    {/* Label for selected field */}
+                    {selectedField && (
+                      <div
+                        className="absolute bg-[#FF0081] text-white px-2 py-1 rounded text-xs"
+                        style={{
+                          left: `${selectedField.location.x}px`,
+                          top: `${selectedField.location.y - 20}px`,
+                          fontSize: "11px",
+                        }}
+                      >
+                        {selectedField.fieldName}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Error Message when no image URL provided */
+                  <div className="flex flex-col items-center justify-center p-12 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                    <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-800 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+                      No Document Available
+                    </h3>
+                    <p className="text-yellow-600 dark:text-yellow-300 text-center mb-4 max-w-md">
+                      No document URL was provided by the API. The document may not have been processed yet or there may be an issue with the document processing.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

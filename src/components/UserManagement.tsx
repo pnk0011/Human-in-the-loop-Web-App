@@ -73,9 +73,9 @@ export function UserManagement() {
   }, [searchQuery]);
 
   // Load stats on component mount
-  useEffect(() => {
-    loadStats();
-  }, []);
+  // useEffect(() => {
+  //   loadStats();
+  // }, []);
 
   // Load users on component mount and when filters change
   useEffect(() => {
