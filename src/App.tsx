@@ -103,11 +103,11 @@ const AppContent = React.memo(function AppContent() {
     setTheme((prev) => (prev === "light" ? "dark" : "light"));
   }, []);
 
-  const handleValidateClick = useCallback((item: any) => {
-    withLoading(async () => {
+  const handleValidateClick = useCallback(async (item: any) => {
+    return withLoading(async () => {
       // Try to load real API data first, fallback to mock data
       let document: ValidationDocument;
-      
+    
       try {
         // Import the API service
         const { documentOperationsAPI } = await import('./services/documentOperationsAPI');
@@ -204,11 +204,11 @@ const AppContent = React.memo(function AppContent() {
     });
   }, [withLoading]);
 
-  const handleQCValidateClick = useCallback((item: any) => {
-    withLoading(async () => {
+  const handleQCValidateClick = useCallback(async (item: any) => {
+    return withLoading(async () => {
       // Try to load real QC API data first, fallback to mock data
       let qcDocument: QCValidationDocument;
-      
+    
       try {
         // Import the API service
         const { documentOperationsAPI } = await import('./services/documentOperationsAPI');
@@ -541,9 +541,11 @@ const AppContent = React.memo(function AppContent() {
 
   const handleLogout = useCallback(() => {
     logout();
+    // Reset all view states to ensure clean state after logout
     setCurrentView("dashboard");
     setSelectedDocument(null);
     setSelectedQCDocument(null);
+    setIsReadOnlyView(false);
   }, [logout]);
 
   // Memoized values for performance
@@ -583,6 +585,7 @@ const AppContent = React.memo(function AppContent() {
               queueCount={qcQueueCount}
               onBack={handleBackToDashboard}
               onSubmit={handleSubmitQCReview}
+              onLogout={handleLogout}
               theme={currentTheme}
               onToggleTheme={toggleTheme}
               isReadOnly={isReadOnlyView}
@@ -593,6 +596,7 @@ const AppContent = React.memo(function AppContent() {
               queueCount={qcQueueCount}
               onBack={handleBackToDashboard}
               onSubmit={handleSubmitQCReview}
+              onLogout={handleLogout}
               theme={currentTheme}
               onToggleTheme={toggleTheme}
             />
@@ -612,6 +616,7 @@ const AppContent = React.memo(function AppContent() {
               queueCount={queueCount}
               onBack={handleBackToDashboard}
               onSubmit={handleSubmitValidation}
+              onLogout={handleLogout}
               theme={currentTheme}
               onToggleTheme={toggleTheme}
             />
@@ -621,6 +626,7 @@ const AppContent = React.memo(function AppContent() {
               queueCount={queueCount}
               onBack={handleBackToDashboard}
               onSubmit={handleSubmitValidation}
+              onLogout={handleLogout}
               theme={currentTheme}
               onToggleTheme={toggleTheme}
               isReadOnly={isReadOnlyView}
@@ -640,6 +646,7 @@ const AppContent = React.memo(function AppContent() {
             queueCount={queueCount}
             onBack={handleBackToDashboard}
             onSubmit={handleSubmitValidation}
+            onLogout={handleLogout}
             theme={currentTheme}
             onToggleTheme={toggleTheme}
             isReadOnly={isReadOnlyView}
@@ -650,6 +657,7 @@ const AppContent = React.memo(function AppContent() {
             queueCount={queueCount}
             onBack={handleBackToDashboard}
             onSubmit={handleSubmitValidation}
+            onLogout={handleLogout}
             theme={currentTheme}
             onToggleTheme={toggleTheme}
           />

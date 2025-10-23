@@ -16,7 +16,7 @@ import { documentOperationsAPI, GetQCDocumentsRequest, QCDocument } from "../ser
 import { useAuth } from "../contexts/AuthContext";
 
 interface QCDashboardProps {
-  onValidateClick: (item: any) => void;
+  onValidateClick: (item: any) => Promise<void>;
   onViewHistoryClick?: (doc: any) => void;
   onLogout: () => void;
   theme?: "light" | "dark";
@@ -52,6 +52,20 @@ export function QCDashboard({
   const itemsPerPage = 5;
   const [apiDocuments, setApiDocuments] = useState<QCDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
+
+  // Handle validate click with per-item loading state
+  const handleValidateClick = async (item: any) => {
+    setLoadingItemId(item.id);
+    try {
+      await onValidateClick(item);
+    } finally {
+      // Add a small delay to make loading state more visible
+      setTimeout(() => {
+        setLoadingItemId(null);
+      }, 100);
+    }
+  };
 
   // Load API data for QC documents
   useEffect(() => {
@@ -87,7 +101,7 @@ export function QCDashboard({
   // Convert API documents to original QC queue format
   const convertApiDocumentsToQCQueue = () => {
     return apiDocuments.map((doc, index) => ({
-      id: doc.doc_handle_id || `DOC-${index + 1}`,
+      id: `${doc.file_name}_${doc.doc_handle_id}` || `DOC-${index + 1}`,
       document: doc.file_name,
       type: doc.doc_type_name || 'Unknown',
       reviewer: doc.reviewer_assigned || 'Unknown Reviewer',
@@ -605,12 +619,18 @@ export function QCDashboard({
                           </td>
                           <td className="px-6 py-5 text-right">
                             <Button
-                              onClick={() =>
-                                onValidateClick(item)
-                              }
-                              className="bg-[#0292DC] hover:bg-[#012F66] text-white transition-colors"
+                              onClick={() => handleValidateClick(item)}
+                              disabled={loadingItemId === item.id}
+                              className="bg-[#0292DC] hover:bg-[#012F66] text-white transition-colors disabled:opacity-50 cursor-pointer"
                             >
-                              Review
+                              {loadingItemId === item.id ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Loading...
+                                </>
+                              ) : (
+                                'Review'
+                              )}
                             </Button>
                           </td>
                         </tr>

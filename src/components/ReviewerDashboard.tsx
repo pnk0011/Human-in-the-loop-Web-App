@@ -25,7 +25,7 @@ interface QueueItem {
 }
 
 interface ReviewerDashboardProps {
-  onValidateClick?: (item: QueueItem) => void;
+  onValidateClick?: (item: QueueItem) => Promise<void>;
   onViewHistoryClick?: (doc: any) => void;
   onLogout?: () => void;
   theme?: 'light' | 'dark';
@@ -78,7 +78,7 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
   // Convert API documents to QueueItem format for compatibility
   const convertApiDocumentsToQueueItems = (): QueueItem[] => {
     return apiDocuments.map((doc, index) => ({
-      id: doc.doc_handle_id || `doc-${index}`,
+      id: `${doc.file_name}_${doc.doc_handle_id}` || `doc-${index}`,
       document: doc.file_name,
       type: doc.doc_type_name || 'Unknown',
       field: `${doc.distinct_entity_type_count} fields`, // Use field count as field info
@@ -111,9 +111,9 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
   };
 
   // Handle validation click with API integration
-  const handleValidateClick = (item: QueueItem) => {
+  const handleValidateClick = async (item: QueueItem) => {
     if (onValidateClick) {
-      onValidateClick(item);
+      await onValidateClick(item);
     } else {
       // Default behavior - log for debugging
       console.log('Opening document for validation:', item);

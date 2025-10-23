@@ -71,18 +71,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
           const parsedUser = JSON.parse(savedUser);
           
-          // Validate token with auth API
-          const validation = await authAPI.validateToken();
+          // Set user immediately from localStorage to avoid blank page
+          setUser(parsedUser);
           
-          if (validation.valid && validation.user) {
-            setUser(validation.user);
-          } else {
-            // Token is invalid, clear storage
-            localStorage.removeItem('user');
-            localStorage.removeItem('accessToken');
+          // Try to validate token with auth API (but don't clear user if it fails)
+          try {
+            const validation = await authAPI.validateToken();
+            
+            if (validation.valid && validation.user) {
+              // Update user with fresh data from API if validation succeeds
+              setUser(validation.user);
+            }
+            // If validation fails, keep the user from localStorage to avoid blank page
+          } catch (validationError) {
+            console.warn('Token validation failed, keeping user from localStorage:', validationError);
+            // Don't clear user data - keep them logged in with localStorage data
           }
         } catch (error) {
-          console.error('Failed to validate token:', error);
+          console.error('Failed to parse saved user:', error);
           localStorage.removeItem('user');
         }
       }
@@ -92,6 +98,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
+    console.log('🔐 AuthContext login started:', { email });
     setIsLoading(true);
     setLoginError(null);
 
@@ -118,6 +125,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('accessToken', `token_${response.user.email}_${Date.now()}`);
+        console.log('✅ User set in context, isAuthenticated should be true now');
         return true;
       } else {
         console.log('❌ Login failed in AuthContext:', response.error || response.message);
@@ -141,6 +150,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     setUser(null);
+    setLoginError(null);
     // authAPI.logout() already clears localStorage
   }, []);
 

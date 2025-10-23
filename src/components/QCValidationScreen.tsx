@@ -23,6 +23,7 @@ import {
   Sun
 } from 'lucide-react';
 import logo from 'figma:asset/d37108ff06015dcbcdb272cec41a1cfc0b3b3dfd.png';
+import { PDFViewer } from './PDFViewer';
 
 interface ExtractedField {
   id: string;
@@ -70,18 +71,18 @@ interface QCValidationScreenProps {
   queueCount: number;
   onBack: () => void;
   onSubmit: (decisions: QCDecision[]) => void;
+  onLogout?: () => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
   isReadOnly?: boolean;
 }
 
-export function QCValidationScreen({ document, queueCount, onBack, onSubmit, theme, onToggleTheme, isReadOnly = false }: QCValidationScreenProps) {
+export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onLogout, theme, onToggleTheme, isReadOnly = false }: QCValidationScreenProps) {
   const [zoom, setZoom] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages] = useState(3);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedFieldId, setSelectedFieldId] = useState<string>(document.fields[0]?.id || '');
-  const [highlightOpacity, setHighlightOpacity] = useState(0.3);
 
   // Track QC decisions for each field
   const [qcDecisions, setQcDecisions] = useState<Record<string, QCDecision>>(
@@ -201,7 +202,7 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, the
     <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a] flex flex-col">
       <ValidationHeader 
         onBack={onBack}
-        onLogout={onBack}
+        onLogout={onLogout}
         theme={theme}
         onToggleTheme={onToggleTheme}
         title="QC Portal"
@@ -232,55 +233,12 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, the
                   <div className="relative">
                     {/* Check if it's a PDF document */}
                     {document.documentImage.includes('.pdf') ? (
-                      /* PDF Document - Try iframe first, then fallback to download link */
-                      <div className="space-y-4">
-                        {/* Primary: Try iframe */}
-                        <iframe
-                          src={document.documentImage}
-                          className="w-full h-full min-h-[600px] border border-gray-300 dark:border-gray-600 rounded"
-                          style={{ maxHeight: '80vh' }}
-                          title={`PDF Document: ${document.documentName}`}
-                          onLoad={() => {
-                            console.log('QC PDF document loaded successfully in iframe:', document.documentImage);
-                          }}
-                          onError={(e) => {
-                            console.error('Failed to load QC PDF document in iframe:', document.documentImage);
-                            console.log('QC Falling back to download link');
-                            // Hide iframe and show download link
-                            e.currentTarget.style.display = 'none';
-                            const fallbackElement = e.currentTarget.nextElementSibling;
-                            if (fallbackElement) {
-                              fallbackElement.classList.remove('hidden');
-                            }
-                          }}
-                        />
-                        
-                        {/* Fallback: Download link when iframe fails */}
-                        <div className="hidden flex flex-col items-center justify-center p-8 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-800 rounded-full flex items-center justify-center mb-4">
-                            <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                          </div>
-                          <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
-                            PDF Document Available
-                          </h3>
-                          <p className="text-blue-600 dark:text-blue-300 text-center mb-4 max-w-md">
-                            The PDF document cannot be displayed inline due to security restrictions. Click the button below to download and view the document.
-                          </p>
-                          <a
-                            href={document.documentImage}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors cursor-pointer"
-                          >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Download PDF
-                          </a>
-                        </div>
-                      </div>
+                      /* PDF Document - Use PDFViewer component with blob approach */
+                      <PDFViewer 
+                        url={document.documentImage}
+                        fileName={document.documentName}
+                        className="h-full"
+                      />
                     ) : (
                       /* Image Document - Use img tag */
                       <img
@@ -323,39 +281,6 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, the
                       </div>
                     </div>
 
-                    {/* AI Extraction Highlight Boxes */}
-                    {document.fields.map((field) => (
-                      <div
-                        key={field.id}
-                        className={`absolute border-2 rounded transition-all ${
-                          selectedFieldId === field.id
-                            ? 'border-[#FF0081] bg-[#FF0081]'
-                            : 'border-[#0292DC] bg-[#0292DC]'
-                        }`}
-                        style={{
-                          left: `${field.location.x}px`,
-                          top: `${field.location.y}px`,
-                          width: `${field.location.width}px`,
-                          height: `${field.location.height}px`,
-                          opacity: selectedFieldId === field.id ? highlightOpacity : highlightOpacity * 0.4,
-                          pointerEvents: 'none'
-                        }}
-                      />
-                    ))}
-                    
-                    {/* Label for selected field */}
-                    {selectedField && (
-                      <div 
-                        className="absolute bg-[#FF0081] text-white px-2 py-1 rounded text-xs"
-                        style={{
-                          left: `${selectedField.location.x}px`,
-                          top: `${selectedField.location.y - 20}px`,
-                          fontSize: '11px'
-                        }}
-                      >
-                        {selectedField.fieldName}
-                      </div>
-                    )}
                   </div>
                 ) : (
                   /* Error Message when no image URL provided */
@@ -398,17 +323,6 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, the
                 >
                   <ZoomIn className="w-4 h-4" />
                 </Button>
-                <div className="mx-4 h-6 w-px bg-[#D0D5DD]" />
-                <span className="text-[#80989A]">Highlight Opacity:</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={highlightOpacity}
-                  onChange={(e) => setHighlightOpacity(parseFloat(e.target.value))}
-                  className="w-24 cursor-pointer"
-                />
               </div>
 
               <div className="flex items-center gap-2">

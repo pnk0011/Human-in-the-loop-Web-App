@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { ChevronUp, ChevronDown, FileText } from 'lucide-react';
+import { ChevronUp, ChevronDown, FileText, Loader2 } from 'lucide-react';
 
 interface QueueItem {
   id: string;
@@ -21,7 +21,7 @@ interface QueueItem {
 }
 
 interface ValidationQueueProps {
-  onValidateClick?: (item: QueueItem) => void;
+  onValidateClick?: (item: QueueItem) => Promise<void>;
   apiDocuments?: QueueItem[]; // Optional API documents to override mock data
 }
 
@@ -112,8 +112,22 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [ageFilter, setAgeFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  // Handle validate click with per-item loading state
+  const handleValidateClick = async (item: QueueItem) => {
+    setLoadingItemId(item.id);
+    try {
+      await onValidateClick?.(item);
+    } finally {
+      // Add a small delay to make loading state more visible
+      setTimeout(() => {
+        setLoadingItemId(null);
+      }, 100);
+    }
+  };
 
   // Use API documents if provided, otherwise use mock data
   const dataSource = apiDocuments && apiDocuments.length > 0 ? apiDocuments : mockData;
@@ -371,10 +385,18 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                   </td>
                   <td className="px-6 py-5 text-right">
                     <Button
-                      onClick={() => onValidateClick?.(item)}
-                      className="bg-[#0292DC] hover:bg-[#012F66] text-white transition-colors"
+                      onClick={() => handleValidateClick(item)}
+                      disabled={loadingItemId === item.id}
+                      className="bg-[#0292DC] hover:bg-[#012F66] text-white transition-colors disabled:opacity-50 cursor-pointer"
                     >
-                      Validate
+                      {loadingItemId === item.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        'Validate'
+                      )}
                     </Button>
                   </td>
                 </tr>

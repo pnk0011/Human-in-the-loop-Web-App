@@ -131,9 +131,7 @@ export class AuthAPI {
           qualityControl: null
         };
         
-        // Store user data in localStorage for session management
-        localStorage.setItem('user', JSON.stringify(adminUser));
-        localStorage.setItem('accessToken', `token_${adminUser.email}_${Date.now()}`);
+        // Don't store user data here - let AuthContext handle it
         
         return {
           status: 'success',
@@ -166,9 +164,7 @@ export class AuthAPI {
       if (data.status === 'success' && data.user) {
         console.log('✅ Login successful:', data.user);
         
-        // Store user data in localStorage for session management
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('accessToken', `token_${data.user.email}_${Date.now()}`);
+        // Don't store user data here - let AuthContext handle it
         
         return {
           status: 'success',
