@@ -223,12 +223,12 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
         }}
       />
 
-      <div className="flex-1 flex gap-6 p-6">
+      <div className="flex-1 flex gap-1 p-2">
         {/* Document Viewer */}
-        <div className={`${isFullscreen ? 'fixed inset-0 z-50 p-6 bg-[#F5F7FA]' : 'flex-1'}`}>
+        <div className={`${isFullscreen ? 'fixed inset-0 z-50 p-2 bg-[#F5F7FA]' : 'flex-1'}`}>
           <div className="bg-[#E5E7EB] rounded-lg h-full flex flex-col">
             {/* Document Display */}
-            <div className="flex-1 relative overflow-auto flex items-center justify-center p-8">
+            <div className="flex-1 relative overflow-auto flex items-center justify-center p-1">
               <div 
                 className="bg-white shadow-lg relative"
                 style={{ 
@@ -246,7 +246,7 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
                       <PDFViewer 
                         url={document.documentImage}
                         fileName={document.documentName}
-                        className="h-full"
+                        className="h-full w-full"
                       />
                     ) : (
                       /* Image Document - Use img tag */
@@ -373,7 +373,7 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
         </div>
 
         {/* Right Panel */}
-        <div className="w-[450px] flex flex-col gap-4">
+        <div className="w-[350px] flex flex-col gap-4">
           {/* Reviewer Info */}
           <div className="bg-[#0292DC]/10 border border-[#0292DC] rounded-lg p-4">
             <div className="flex items-center justify-between">

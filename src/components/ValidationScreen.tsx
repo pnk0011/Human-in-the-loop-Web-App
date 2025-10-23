@@ -306,14 +306,14 @@ export function ValidationScreen({
         subtitle={document.documentType}
       />
 
-      <div className="flex-1 flex gap-6 p-6">
+      <div className="flex-1 flex gap-1 p-2">
         {/* Document Viewer */}
         <div
-          className={`${isFullscreen ? "fixed inset-0 z-50 p-6 bg-[#F5F7FA] dark:bg-[#1a1a1a]" : "flex-1"}`}
+          className={`${isFullscreen ? "fixed inset-0 z-50 p-2 bg-[#F5F7FA] dark:bg-[#1a1a1a]" : "flex-1"}`}
         >
           <div className="bg-[#E5E7EB] dark:bg-[#2a2a2a] rounded-lg h-full flex flex-col">
             {/* Document Display */}
-            <div className="flex-1 relative overflow-auto flex items-center justify-center p-8">
+            <div className="flex-1 relative overflow-auto flex items-center justify-center p-1">
               <div
                 className="bg-white shadow-lg relative"
                 style={{
@@ -331,7 +331,7 @@ export function ValidationScreen({
                       <PDFViewer 
                         url={document.documentImage}
                         fileName={document.documentName}
-                        className="h-full"
+                        className="h-full w-full"
                       />
                     ) : (
                       /* Image Document - Use img tag */
@@ -422,35 +422,6 @@ export function ValidationScreen({
               </div>
 
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.max(1, p - 1))
-                  }
-                  disabled={currentPage === 1}
-                  className="border-[#D0D5DD] dark:border-[#4a4a4a]"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Previous
-                </Button>
-                <span className="text-[#012F66] dark:text-white">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage((p) =>
-                      Math.min(totalPages, p + 1),
-                    )
-                  }
-                  disabled={currentPage === totalPages}
-                  className="border-[#D0D5DD] dark:border-[#4a4a4a]"
-                >
-                  Next
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
                 <div className="mx-2 h-6 w-px bg-[#D0D5DD] dark:bg-[#4a4a4a]" />
                 <Button
                   variant="outline"
@@ -466,7 +437,7 @@ export function ValidationScreen({
         </div>
 
         {/* Right Panel */}
-        <div className="w-[450px] flex flex-col gap-4">
+        <div className="w-[350px] flex flex-col gap-4">
           {/* Fields List */}
           <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-4 border-[#E5E7EB] dark:border-[#3a3a3a]">
             <h3 className="text-[#012F66] dark:text-white mb-3">
