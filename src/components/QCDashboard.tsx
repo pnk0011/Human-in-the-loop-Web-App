@@ -108,8 +108,40 @@ export function QCDashboard({
       reviewedDate: doc.qc_update_dt?.split(' ')[0] || new Date().toISOString().split('T')[0],
       fieldsReviewed: doc.distinct_entity_type_count,
       priority: doc.priority as 'High' | 'Medium' | 'Low',
-      status: 'Pending QC', // Default status for QC queue
+      status: getQCStatusFromApiResponse(doc.status),
     }));
+  };
+
+  // Helper function to convert API status to QC status display
+  const getQCStatusFromApiResponse = (status: string): string => {
+    switch (status) {
+      case '1':
+        return 'Completed';
+      case '3':
+        return 'QC Pending';
+      case '2':
+        return 'Reviewer Assigned';
+      case '4':
+        return 'Reviewer Reassigned';
+      default:
+        return 'QC Pending'; // Default fallback
+    }
+  };
+
+  // Helper function to get status badge color
+  const getQCStatusBadgeColor = (status: string): string => {
+    switch (status) {
+      case 'Completed':
+        return 'bg-green-600 text-white';
+      case 'QC Pending':
+        return 'bg-[#FFC018] text-white';
+      case 'Reviewer Assigned':
+        return 'bg-[#0292DC] text-white';
+      case 'Reviewer Reassigned':
+        return 'bg-[#F59E0B] text-white';
+      default:
+        return 'bg-[#0292DC]/10 text-[#0292DC]';
+    }
   };
 
   // Sample data - documents that have been reviewed by reviewers
@@ -197,7 +229,8 @@ export function QCDashboard({
   ];
 
   // Use API documents if available, otherwise use mock data
-  const dataSource = apiDocuments.length > 0 ? convertApiDocumentsToQCQueue() : qcQueue;
+  // Use only API data, no fallback to dummy data
+  const dataSource = convertApiDocumentsToQCQueue();
   
   const filteredQueue = dataSource.filter((item) => {
     const matchesType =
@@ -270,10 +303,10 @@ export function QCDashboard({
   };
 
   const stats = [
-    { label: "Pending QC Review", value: qcQueue.length },
-    { label: "Approved Today", value: 12 },
-    { label: "Sent Back", value: 3 },
-    { label: "Avg Accuracy", value: "89%" },
+    { label: "Pending QC Review", value: filteredQueue.length },
+    { label: "Approved Today", value: 0 }, // API doesn't provide this data yet
+    { label: "Sent Back", value: 0 }, // API doesn't provide this data yet
+    { label: "Avg Accuracy", value: "N/A" }, // API doesn't provide this data yet
   ];
 
   return (
@@ -561,6 +594,35 @@ export function QCDashboard({
                             </td>
                           </tr>
                         ))
+                      ) : paginatedQueue.length === 0 ? (
+                        // Empty state when no documents found
+                        <tr>
+                          <td colSpan={7} className="px-6 py-16 text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
+                                <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
+                              </div>
+                              <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
+                                No Documents Found
+                              </h3>
+                              <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-4 max-w-md">
+                                {apiDocuments.length === 0 
+                                  ? "No documents found matching your filters."
+                                  : "No documents match your current filters. Try adjusting your search criteria or reset the filters."
+                                }
+                              </p>
+                              {(documentType !== 'all' || priorityFilter !== 'all' || statusFilter !== 'all' || reviewerFilter !== 'all') && (
+                                <Button
+                                  onClick={resetFilters}
+                                  variant="outline"
+                                  className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
+                                >
+                                  Reset Filters
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
                       ) : (
                         paginatedQueue.map((item) => (
                         <tr
@@ -613,7 +675,7 @@ export function QCDashboard({
                             </span>
                           </td>
                           <td className="px-6 py-5">
-                            <Badge className="bg-[#0292DC]/10 text-[#0292DC]">
+                            <Badge className={getQCStatusBadgeColor(item.status)}>
                               {item.status}
                             </Badge>
                           </td>
@@ -640,11 +702,6 @@ export function QCDashboard({
                   </table>
                 </div>
 
-                {filteredQueue.length === 0 && (
-                  <div className="text-center py-12 text-[#80989A] dark:text-[#a0a0a0]">
-                    No documents found matching your filters.
-                  </div>
-                )}
 
                 {/* Pagination */}
                 {filteredQueue.length > 0 && (

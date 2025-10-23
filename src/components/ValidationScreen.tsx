@@ -68,7 +68,7 @@ interface ValidationScreenProps {
   document: ValidationDocument;
   queueCount: number;
   onBack: () => void;
-  onSubmit: (validations: FieldValidation[]) => void;
+  onSubmit: (validations: FieldValidation[]) => Promise<void>;
   onLogout?: () => void;
   theme?: "light" | "dark";
   onToggleTheme?: () => void;
@@ -208,7 +208,7 @@ export function ValidationScreen({
     }));
   };
 
-  const handleSubmitAll = () => {
+  const handleSubmitAll = async () => {
     const validations = Object.values(fieldValidations);
 
     // Check if all fields have been validated
@@ -250,7 +250,14 @@ export function ValidationScreen({
       }
     }
 
-    onSubmit(validations as FieldValidation[]);
+    // Set loading state and submit
+    setIsSubmitting(true);
+    try {
+      await onSubmit(validations as FieldValidation[]);
+    } finally {
+      // Reset loading state after submission
+      setIsSubmitting(false);
+    }
   };
 
   const getConfidenceColor = (confidence: number) => {

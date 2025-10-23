@@ -246,7 +246,7 @@ export function DocumentAssignment() {
         file_names: fileNames,
         reviewer: user.email,
         qc_assigned: user?.quality_control,
-        status: '1'
+        status: '2'
       };
       
       console.log('Assign request:', assignRequest);

@@ -457,10 +457,10 @@ const AppContent = React.memo(function AppContent() {
     });
   }, [withLoading]);
 
-  const handleSubmitValidation = useCallback((
+  const handleSubmitValidation = useCallback(async (
     validations: FieldValidation[],
   ) => {
-    withLoading(async () => {
+    return withLoading(async () => {
       try {
         // Try to submit to API if we have a selected document
         if (selectedDocument) {
@@ -499,8 +499,8 @@ const AppContent = React.memo(function AppContent() {
     });
   }, [withLoading, selectedDocument]);
 
-  const handleSubmitQCReview = useCallback((decisions: QCDecision[]) => {
-    withLoading(async () => {
+  const handleSubmitQCReview = useCallback(async (decisions: QCDecision[]) => {
+    return withLoading(async () => {
       try {
         // Try to submit to QC API if we have a selected QC document
         if (selectedQCDocument) {

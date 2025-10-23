@@ -129,8 +129,8 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
     }
   };
 
-  // Use API documents if provided, otherwise use mock data
-  const dataSource = apiDocuments && apiDocuments.length > 0 ? apiDocuments : mockData;
+  // Use only API documents, no fallback to dummy data
+  const dataSource = apiDocuments || [];
   
   // Filter to show only documents assigned to the current user
   const filteredData = dataSource.filter(item => item.assignedTo === 'You' || item.assignedTo === 'Reviewer');
@@ -336,7 +336,73 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E7EB] dark:divide-[#3a3a3a]">
-              {filteredData.map((item) => (
+              {dataSource.length === 0 && (!apiDocuments || apiDocuments.length === 0) ? (
+                // Loading skeleton rows when no API data is available yet
+                Array.from({ length: 5 }, (_, index) => (
+                  <tr
+                    key={`loading-${index}`}
+                    className="hover:bg-[#F9FAFB]/50 dark:hover:bg-[#3a3a3a]/50 transition-colors"
+                  >
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-shrink-0 w-10 h-10 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-lg animate-pulse"></div>
+                        <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-32"></div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-12"></div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16"></div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16"></div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16"></div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-20"></div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="h-8 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16 ml-auto"></div>
+                    </td>
+                  </tr>
+                ))
+              ) : filteredData.length === 0 ? (
+                // Empty state when no documents found after API data is loaded
+                <tr>
+                  <td colSpan={8} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
+                        <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
+                        No Documents Found
+                      </h3>
+                      <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-4 max-w-md">
+                        {dataSource.length === 0 
+                          ? "No documents have been assigned for validation yet."
+                          : "No documents match your current filters. Try adjusting your search criteria or reset the filters."
+                        }
+                      </p>
+                      {dataSource.length > 0 && (
+                        <Button
+                          onClick={resetFilters}
+                          variant="outline"
+                          className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
+                        >
+                          Reset Filters
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredData.map((item) => (
                 <tr key={item.id} className="hover:bg-[#F9FAFB]/50 dark:hover:bg-[#3a3a3a]/50 transition-colors">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
@@ -400,7 +466,8 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                     </Button>
                   </td>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>

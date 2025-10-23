@@ -23,6 +23,7 @@ import {
   Sun
 } from 'lucide-react';
 import logo from 'figma:asset/d37108ff06015dcbcdb272cec41a1cfc0b3b3dfd.png';
+import { LoadingSpinner } from './LoadingComponents';
 import { PDFViewer } from './PDFViewer';
 
 interface ExtractedField {
@@ -70,7 +71,7 @@ interface QCValidationScreenProps {
   document: ValidationDocument;
   queueCount: number;
   onBack: () => void;
-  onSubmit: (decisions: QCDecision[]) => void;
+  onSubmit: (decisions: QCDecision[]) => Promise<void>;
   onLogout?: () => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
@@ -81,6 +82,7 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
   const [zoom, setZoom] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages] = useState(3);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedFieldId, setSelectedFieldId] = useState<string>(document.fields[0]?.id || '');
 
@@ -155,7 +157,7 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
     }));
   };
 
-  const handleSubmitAll = () => {
+  const handleSubmitAll = async () => {
     const decisions = Object.values(qcDecisions);
     
     // Check if all fields have been reviewed
@@ -165,7 +167,14 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
       return;
     }
 
-    onSubmit(decisions as QCDecision[]);
+    // Set loading state and submit
+    setIsSubmitting(true);
+    try {
+      await onSubmit(decisions as QCDecision[]);
+    } finally {
+      // Reset loading state after submission
+      setIsSubmitting(false);
+    }
   };
 
   const getReviewedFieldsCount = () => {
@@ -528,11 +537,17 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
           {/* Submit Button */}
           <Button
             onClick={handleSubmitAll}
-            disabled={getReviewedFieldsCount() === 0}
+            disabled={getReviewedFieldsCount() === 0 || isSubmitting}
             className="w-full bg-[#0292DC] hover:bg-[#012F66] text-white"
           >
-            Submit QC Review ({getReviewedFieldsCount()}/{document.fields.length})
-            <span className="ml-2 text-xs opacity-70">(⌘Enter)</span>
+            {isSubmitting ? (
+              <LoadingSpinner size="sm" text="Submitting..." />
+            ) : (
+              <>
+                Submit QC Review ({getReviewedFieldsCount()}/{document.fields.length})
+                <span className="ml-2 text-xs opacity-70">(⌘Enter)</span>
+              </>
+            )}
           </Button>
         </div>
       </div>
