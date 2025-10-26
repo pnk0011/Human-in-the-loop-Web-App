@@ -138,6 +138,11 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
   const totalItems = filteredData.length;
   const itemsPerPage = 5;
 
+  // Calculate pagination
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, filteredData.length);
+  const paginatedData = filteredData.slice(startIndex, endIndex);
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -402,7 +407,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                   </td>
                 </tr>
               ) : (
-                filteredData.map((item) => (
+                paginatedData.map((item) => (
                 <tr key={item.id} className="hover:bg-[#F9FAFB]/50 dark:hover:bg-[#3a3a3a]/50 transition-colors">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
@@ -475,14 +480,14 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
         {/* Pagination */}
         <div className="px-6 py-4 border-t border-[#E5E7EB] dark:border-[#3a3a3a] flex items-center justify-between">
           <div className="text-[#80989A] dark:text-[#a0a0a0]">
-            Showing {Math.min(1, totalItems)}-{Math.min(itemsPerPage, totalItems)} of {totalItems} items
+            {totalItems > 0 ? `Showing ${startIndex + 1}-${endIndex} of ${totalItems} items` : 'No items'}
           </div>
           <div className="flex gap-2">
             <Button
               variant="outline"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => p - 1)}
-              className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white disabled:opacity-50"
+              className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white disabled:opacity-50 cursor-pointer"
             >
               Previous
             </Button>
@@ -491,11 +496,11 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                 key={page}
                 variant={currentPage === page ? 'default' : 'outline'}
                 onClick={() => setCurrentPage(page)}
-                className={
+                className={`${
                   currentPage === page
                     ? 'bg-[#0292DC] hover:bg-[#012F66] text-white'
                     : 'border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white'
-                }
+                } cursor-pointer`}
               >
                 {page}
               </Button>
@@ -504,7 +509,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
               variant="outline"
               disabled={currentPage >= Math.ceil(totalItems / itemsPerPage)}
               onClick={() => setCurrentPage((p) => p + 1)}
-              className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white disabled:opacity-50"
+              className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white disabled:opacity-50 cursor-pointer"
             >
               Next
             </Button>

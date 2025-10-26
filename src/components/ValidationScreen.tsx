@@ -320,6 +320,10 @@ export function ValidationScreen({
                   transform: `scale(${zoom / 100})`,
                   transformOrigin: "center",
                   transition: "transform 0.2s",
+                  width: '100%',
+                  height: '100%',
+                  maxWidth: '100%',
+                  maxHeight: '100%',
                 }}
               >
                 {document.documentImage ? (
@@ -443,7 +447,7 @@ export function ValidationScreen({
             <h3 className="text-[#012F66] dark:text-white mb-3">
               Fields to Validate ({document.fields.length})
             </h3>
-            <ScrollArea className="h-[200px]">
+            <ScrollArea className="h-[400px]">
               <div className="space-y-2 pr-4">
                 {document.fields.map((field, index) => (
                   <div
@@ -493,7 +497,7 @@ export function ValidationScreen({
           </div>
 
           {/* Field Information */}
-          <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+          {/* <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
             <h3 className="text-[#012F66] dark:text-white mb-2">
               {selectedField.fieldName}
             </h3>
@@ -505,7 +509,7 @@ export function ValidationScreen({
                 Format: {selectedField.expectedFormat}
               </p>
             )}
-          </div>
+          </div> */}
 
           {/* AI Extraction */}
           <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">

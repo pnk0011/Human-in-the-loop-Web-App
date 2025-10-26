@@ -8,8 +8,6 @@ import {
   ZoomIn, 
   ZoomOut, 
   Maximize, 
-  ChevronLeft, 
-  ChevronRight, 
   Check, 
   Edit3, 
   X,
@@ -80,8 +78,6 @@ interface QCValidationScreenProps {
 
 export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onLogout, theme, onToggleTheme, isReadOnly = false }: QCValidationScreenProps) {
   const [zoom, setZoom] = useState(100);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages] = useState(3);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedFieldId, setSelectedFieldId] = useState<string>(document.fields[0]?.id || '');
@@ -234,7 +230,11 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
                 style={{ 
                   transform: `scale(${zoom / 100})`,
                   transformOrigin: 'center',
-                  transition: 'transform 0.2s'
+                  transition: 'transform 0.2s',
+                  width: '100%',
+                  height: '100%',
+                  maxWidth: '100%',
+                  maxHeight: '100%',
                 }}
               >
                 {document.documentImage ? (
@@ -338,30 +338,6 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="border-[#D0D5DD]"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Previous
-                </Button>
-                <span className="text-[#012F66]">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="border-[#D0D5DD]"
-                >
-                  Next
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-                <div className="mx-2 h-6 w-px bg-[#D0D5DD]" />
-                <Button
-                  variant="outline"
-                  size="sm"
                   onClick={() => setIsFullscreen(!isFullscreen)}
                   className="border-[#D0D5DD]"
                 >
@@ -427,10 +403,10 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
           </div>
 
           {/* Field Information */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          {/* <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-[#012F66] mb-2">{selectedField.fieldName}</h3>
             <p className="text-[#80989A] mb-4">{selectedField.fieldDescription}</p>
-          </div>
+          </div> */}
 
           {/* AI Extraction */}
           <div className="bg-white rounded-lg shadow-sm p-6">

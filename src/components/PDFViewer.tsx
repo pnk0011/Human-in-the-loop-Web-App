@@ -24,7 +24,7 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
   }, [url]);
 
   return (
-    <div className={`flex flex-col bg-white rounded-lg border w-full ${className}`}>
+    <div className={`flex flex-col bg-white border w-full min-w-full ${className}`} style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%' }}>
       {/* PDF Controls */}
       <div className="flex items-center justify-between p-2 border-b bg-gray-50">
         <div className="flex items-center gap-2">
@@ -56,7 +56,7 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
       </div>
 
       {/* PDF Content */}
-      <div className="flex-1 bg-gray-100 w-full">
+      <div className="flex-1 bg-gray-100 w-full min-w-full" style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%' }}>
         <embed
           src={url}
           type="application/pdf"
