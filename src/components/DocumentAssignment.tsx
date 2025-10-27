@@ -408,8 +408,8 @@ export function DocumentAssignment() {
 
       {/* Filters and Actions */}
       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+          <div className="flex flex-wrap items-center gap-4">
             {isLoading && (
               <div className="flex items-center gap-2 text-[#80989A] dark:text-[#a0a0a0]">
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -424,10 +424,10 @@ export function DocumentAssignment() {
               placeholder="Search documents..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-64 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              className="w-full md:w-64 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
             />
             <Select value={statusFilter} onValueChange={(value) => handleFilterChange(setStatusFilter, value)}>
-              <SelectTrigger className="w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+              <SelectTrigger className="w-full md:w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -439,7 +439,7 @@ export function DocumentAssignment() {
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={(value) => handleFilterChange(setTypeFilter, value)}>
-              <SelectTrigger className="w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+              <SelectTrigger className="w-full md:w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
@@ -451,7 +451,7 @@ export function DocumentAssignment() {
               </SelectContent>
             </Select>
             <Select value={priorityFilter} onValueChange={(value) => handleFilterChange(setPriorityFilter, value)}>
-              <SelectTrigger className="w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+              <SelectTrigger className="w-full md:w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
@@ -468,7 +468,7 @@ export function DocumentAssignment() {
                 onValueChange={(value) => {
                   const newPageSize = Number(value);
                   setItemsPerPage(newPageSize);
-                  setCurrentPage(1); // Reset to first page when changing page size
+                  setCurrentPage(1);
                 }}
               >
                 <SelectTrigger className="w-20 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
@@ -481,25 +481,25 @@ export function DocumentAssignment() {
                   <SelectItem value="50">50</SelectItem>
                 </SelectContent>
               </Select>
-              {(searchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All') && (
-                <Button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setDebouncedSearchQuery("");
-                    setStatusFilter("All");
-                    setTypeFilter("All");
-                    setPriorityFilter("All");
-                    setCurrentPage(1);
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white text-xs mb-4 cursor-pointer"
-                >
-                  <RefreshCw className="w-3 h-3 mr-1" />
-                  Reset
-                </Button>
-              )}
             </div>
+            {(searchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All') && (
+              <Button
+                onClick={() => {
+                  setSearchQuery("");
+                  setDebouncedSearchQuery("");
+                  setStatusFilter("All");
+                  setTypeFilter("All");
+                  setPriorityFilter("All");
+                  setCurrentPage(1);
+                }}
+                variant="outline"
+                size="sm"
+                className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white text-xs cursor-pointer"
+              >
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Reset
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {selectedDocuments.size > 0 && (
@@ -514,13 +514,6 @@ export function DocumentAssignment() {
                 >
                   <Users className="w-4 h-4 mr-2" />
                   Assign to Reviewer
-                </Button>
-                <Button
-                  onClick={handleBulkUnassign}
-                  variant="outline"
-                  className="border-[#FF0081] dark:border-[#FF0081] text-[#FF0081] hover:bg-[#FF0081] hover:text-white"
-                >
-                  Unassign
                 </Button>
               </>
             )}

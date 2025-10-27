@@ -765,7 +765,7 @@ export function UserManagement() {
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
       >
-        <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a]">
+        <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#012F66] dark:text-white">
               Create New User
@@ -774,7 +774,7 @@ export function UserManagement() {
               Add a new reviewer or QC specialist to the system.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 pb-2">
             <div>
               <Label htmlFor="firstName" className="text-[#012F66] dark:text-white">
                 First Name *
@@ -916,21 +916,21 @@ export function UserManagement() {
               </Select>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="sm:flex-row sm:justify-end sm:gap-3">
             <Button
               variant="outline"
               onClick={() => {
                 setIsCreateDialogOpen(false);
                 resetForm();
               }}
-              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
+              className="w-full sm:w-auto border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               onClick={handleCreateUser}
               disabled={isCreating}
-              className="bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50 cursor-pointer"
+              className="w-full sm:w-auto bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50 cursor-pointer"
             >
               {isCreating ? (
                 <>
@@ -950,7 +950,7 @@ export function UserManagement() {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
       >
-        <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a]">
+        <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#012F66] dark:text-white">
               Edit User
@@ -959,7 +959,7 @@ export function UserManagement() {
               Update user information and permissions.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 pb-2">
             <div>
               <Label
                 htmlFor="edit-firstName"
@@ -1095,7 +1095,7 @@ export function UserManagement() {
               </Select>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="sm:flex-row sm:justify-end sm:gap-3">
             <Button
               variant="outline"
               onClick={() => {
@@ -1103,14 +1103,14 @@ export function UserManagement() {
                 setEditingUser(null);
                 resetForm();
               }}
-              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
+              className="w-full sm:w-auto border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               onClick={handleEditUser}
               disabled={isUpdating}
-              className="bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50 cursor-pointer"
+              className="w-full sm:w-auto bg-[#0292DC] hover:bg-[#012F66] text-white disabled:opacity-50 cursor-pointer"
             >
               {isUpdating ? (
                 <>
@@ -1168,21 +1168,21 @@ export function UserManagement() {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="sm:flex-row sm:justify-end sm:gap-3">
             <Button
               variant="outline"
               onClick={() => {
                 setIsDeleteDialogOpen(false);
                 setUserToDelete(null);
               }}
-              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
+              className="w-full sm:w-auto border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               onClick={handleDeleteUser}
               disabled={isDeleting}
-              className="bg-[#FF0081] hover:bg-[#FF0081]/90 text-white disabled:opacity-50 cursor-pointer"
+              className="w-full sm:w-auto bg-[#FF0081] hover:bg-[#FF0081]/90 text-white disabled:opacity-50 cursor-pointer"
             >
               {isDeleting ? (
                 <>
