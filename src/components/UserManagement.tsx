@@ -765,8 +765,8 @@ export function UserManagement() {
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
       >
-        <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-[#012F66] dark:text-white">
               Create New User
             </DialogTitle>
@@ -774,7 +774,7 @@ export function UserManagement() {
               Add a new reviewer or QC specialist to the system.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pb-2">
+          <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 -mr-2"  style={{maxHeight: '500px'}}>
             <div>
               <Label htmlFor="firstName" className="text-[#012F66] dark:text-white">
                 First Name *
@@ -916,8 +916,8 @@ export function UserManagement() {
               </Select>
             </div>
           </div>
-          <DialogFooter className="sm:flex-row sm:justify-end sm:gap-3">
-            <Button
+          <DialogFooter className="flex-shrink-0 sm:flex-row sm:justify-end sm:gap-3 mt-4 border-t border-[#E5E7EB] dark:border-[#3a3a3a] pt-4">
+            {/* <Button
               variant="outline"
               onClick={() => {
                 setIsCreateDialogOpen(false);
@@ -926,7 +926,7 @@ export function UserManagement() {
               className="w-full sm:w-auto border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
             >
               Cancel
-            </Button>
+            </Button> */}
             <Button
               onClick={handleCreateUser}
               disabled={isCreating}
@@ -950,8 +950,8 @@ export function UserManagement() {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
       >
-        <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-[#012F66] dark:text-white">
               Edit User
             </DialogTitle>
@@ -959,7 +959,7 @@ export function UserManagement() {
               Update user information and permissions.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pb-2">
+          <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 -mr-2" style={{maxHeight: '500px'}}>
             <div>
               <Label
                 htmlFor="edit-firstName"
@@ -1095,8 +1095,8 @@ export function UserManagement() {
               </Select>
             </div>
           </div>
-          <DialogFooter className="sm:flex-row sm:justify-end sm:gap-3">
-            <Button
+          <DialogFooter className="flex-shrink-0 sm:flex-row sm:justify-end sm:gap-3 mt-4 border-t border-[#E5E7EB] dark:border-[#3a3a3a] pt-4">
+            {/* <Button
               variant="outline"
               onClick={() => {
                 setIsEditDialogOpen(false);
@@ -1106,7 +1106,7 @@ export function UserManagement() {
               className="w-full sm:w-auto border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white cursor-pointer"
             >
               Cancel
-            </Button>
+            </Button> */}
             <Button
               onClick={handleEditUser}
               disabled={isUpdating}
