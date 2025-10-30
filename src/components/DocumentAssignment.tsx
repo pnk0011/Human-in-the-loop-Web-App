@@ -59,6 +59,9 @@ export function DocumentAssignment() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
+  
+  // Loading state for reviewers
+  const [isLoadingAllReviewers, setIsLoadingAllReviewers] = useState(false);
 
   // Debounce search query
   useEffect(() => {
@@ -190,14 +193,34 @@ export function DocumentAssignment() {
     );
   };
 
-  const loadUsers = async () => {
-    setIsLoadingUsers(true);
+  const loadAllUsers = async () => {
+    setIsLoadingAllReviewers(true);
+    
     try {
-      // Fetch all users (no pagination for dropdown)
-      const response = await userAPI.getUsers(1, 1000); // Get up to 1000 users
-      if (response.status === 'success' && response.users) {
+      // First, fetch page 1 to get total pages
+      const firstPageResponse = await userAPI.getUsers(1, 10);
+      
+      if (firstPageResponse.status === 'success' && firstPageResponse.users && firstPageResponse.pagination) {
+        const totalPages = firstPageResponse.pagination.total_pages;
+        const allUsers = [...firstPageResponse.users];
+        
+        // Fetch remaining pages
+        const pagePromises: Promise<any>[] = [];
+        for (let page = 2; page <= totalPages; page++) {
+          pagePromises.push(userAPI.getUsers(page, 10));
+        }
+        
+        const remainingPagesResponses = await Promise.all(pagePromises);
+        
+        // Combine all users
+        remainingPagesResponses.forEach(response => {
+          if (response.status === 'success' && response.users) {
+            allUsers.push(...response.users);
+          }
+        });
+        
         // Convert API response to match component expectations
-        const formattedUsers = response.users.map(user => ({
+        const formattedUsers = allUsers.map(user => ({
           id: user.email, // Use email as ID
           name: `${user.first_name} ${user.last_name}`,
           email: user.email,
@@ -205,19 +228,19 @@ export function DocumentAssignment() {
           quality_control: user.quality_control,
           currentLoad: 'N/A', // API doesn't provide current load
         }));
+        
         setUsers(formattedUsers);
       } else {
-        console.error('Failed to load users:', response.message);
+        console.error('Failed to load users:', firstPageResponse.message);
         setUsers([]);
       }
     } catch (error: any) {
       console.error('Failed to load users:', error);
       setUsers([]);
     } finally {
-      setIsLoadingUsers(false);
+      setIsLoadingAllReviewers(false);
     }
   };
-
   const handleAssign = async () => {
     if (!selectedUser) {
       toast.error('Please select a user');
@@ -507,7 +530,7 @@ export function DocumentAssignment() {
                 <span className="text-[#80989A] dark:text-[#a0a0a0]">{selectedDocuments.size} selected</span>
                 <Button
                   onClick={() => {
-                    loadUsers();
+                    loadAllUsers();
                     setIsAssignDialogOpen(true);
                   }}
                   className="bg-[#0292DC] hover:bg-[#012F66] text-white cursor-pointer"
@@ -784,10 +807,10 @@ export function DocumentAssignment() {
           <div className="space-y-4">
             <div>
               <label className="text-[#012F66] dark:text-white mb-2 block">Select Reviewer</label>
-              {isLoadingUsers ? (
+              {isLoadingAllReviewers ? (
                 <div className="flex items-center gap-2 p-3 border border-[#E5E7EB] dark:border-[#3a3a3a] rounded-md">
                   <Loader2 className="w-4 h-4 animate-spin text-[#80989A]" />
-                  <span className="text-[#80989A] dark:text-[#a0a0a0]">Loading reviewers...</span>
+                  <span className="text-[#80989A] dark:text-[#a0a0a0]">Loading all reviewers...</span>
                 </div>
               ) : (
                 <Select value={selectedUser} onValueChange={setSelectedUser}>
@@ -811,7 +834,8 @@ export function DocumentAssignment() {
                         </div>
                       </SelectItem>
                     ))}
-                    {users.filter(user => user.role === 'Reviewer').length === 0 && (
+                    
+                    {users.filter(user => user.role === 'Reviewer').length === 0 && !isLoadingAllReviewers && (
                       <div className="p-3 text-[#80989A] dark:text-[#a0a0a0] text-center">
                         No reviewers found
                       </div>

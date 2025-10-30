@@ -1,4 +1,5 @@
-const API_BASE_URL = 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
+// Get API base URL from environment variable
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
 
 // Assign Reviewer API Interfaces
 export interface AssignReviewerRequest {

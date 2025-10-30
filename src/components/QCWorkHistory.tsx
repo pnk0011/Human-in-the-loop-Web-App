@@ -31,42 +31,8 @@ interface QCWorkHistoryProps {
   onViewClick: (doc: QCCompletedDocument) => void;
 }
 
-// Generate mock QC completed documents
-const generateMockQCHistory = (): QCCompletedDocument[] => {
-  const types = ['Invoice', 'Policy Document', 'Claim Form', 'Medical Record'];
-  const reviewers = ['Jane Smith', 'John Doe', 'Mike Johnson', 'Sarah Wilson', 'Tom Brown'];
-  const documents: QCCompletedDocument[] = [];
-  
-  for (let i = 1; i <= 42; i++) {
-    const fieldsCount = Math.floor(Math.random() * 8) + 5;
-    const approvedCount = Math.floor(fieldsCount * (0.6 + Math.random() * 0.3));
-    const sentBackCount = fieldsCount - approvedCount;
-    
-    const reviewedDate = new Date(2024, 2, Math.floor(Math.random() * 28) + 1, Math.floor(Math.random() * 24));
-    const completedDate = new Date(reviewedDate.getTime() + Math.random() * 2 * 24 * 60 * 60 * 1000);
-    
-    documents.push({
-      id: String(i),
-      documentName: `DOC-2024-${String(i).padStart(4, '0')}`,
-      documentType: types[Math.floor(Math.random() * types.length)],
-      reviewer: reviewers[Math.floor(Math.random() * reviewers.length)],
-      reviewedDate: reviewedDate.toISOString(),
-      completedDate: completedDate.toISOString(),
-      fieldsCount,
-      approvedCount,
-      sentBackCount,
-      passRate: Math.floor((approvedCount / fieldsCount) * 100),
-    });
-  }
-  
-  // Sort by date descending (most recent first)
-  return documents.sort((a, b) => new Date(b.completedDate).getTime() - new Date(a.completedDate).getTime());
-};
-
-const mockQCHistory = generateMockQCHistory();
-
 export function QCWorkHistory({ onViewClick }: QCWorkHistoryProps) {
-  const [documents] = useState<QCCompletedDocument[]>(mockQCHistory);
+  const [documents] = useState<QCCompletedDocument[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [reviewerFilter, setReviewerFilter] = useState('all');
@@ -155,7 +121,7 @@ export function QCWorkHistory({ onViewClick }: QCWorkHistoryProps) {
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Avg. Pass Rate</div>
           <div className="text-green-600 text-3xl font-bold">
-            {Math.round(documents.reduce((sum, doc) => sum + doc.passRate, 0) / documents.length)}%
+            {documents.length > 0 ? Math.round(documents.reduce((sum, doc) => sum + doc.passRate, 0) / documents.length) : 0}%
           </div>
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
@@ -234,56 +200,74 @@ export function QCWorkHistory({ onViewClick }: QCWorkHistoryProps) {
               </tr>
             </thead>
             <tbody>
-              {paginatedDocuments.map((doc) => (
-                <tr key={doc.id} className="hover:bg-[#F9FAFB] dark:hover:bg-[#3a3a3a] border-b border-[#E5E7EB] dark:border-[#4a4a4a]">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-[#80989A]" />
-                      <span className="text-[#012F66] dark:text-white">{doc.documentName}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge className={getTypeBadgeColor(doc.documentType)}>
-                      {doc.documentType}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">
-                    {doc.reviewer}
-                  </td>
-                  <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">
-                    {new Date(doc.completedDate).toLocaleDateString()} {new Date(doc.completedDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </td>
-                  <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.fieldsCount}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3 text-sm">
-                      <div className="flex items-center gap-1">
-                        <CheckCircle2 className="w-4 h-4 text-green-600" />
-                        <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.approvedCount}</span>
+              {documents.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
+                        <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
                       </div>
-                      {doc.sentBackCount > 0 && (
-                        <div className="flex items-center gap-1">
-                          <XCircle className="w-4 h-4 text-[#FF0081]" />
-                          <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.sentBackCount}</span>
-                        </div>
-                      )}
+                      <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
+                        No Documents Found
+                      </h3>
+                      <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-4 max-w-md">
+                        No completed QC reviews found in your work history yet.
+                      </p>
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={getPassRateColor(doc.passRate)}>{doc.passRate}%</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onViewClick(doc)}
-                      className="text-[#0292DC] hover:bg-[#0292DC]/10"
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Button>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                paginatedDocuments.map((doc) => (
+                  <tr key={doc.id} className="hover:bg-[#F9FAFB] dark:hover:bg-[#3a3a3a] border-b border-[#E5E7EB] dark:border-[#4a4a4a]">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-[#80989A]" />
+                        <span className="text-[#012F66] dark:text-white">{doc.documentName}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Badge className={getTypeBadgeColor(doc.documentType)}>
+                        {doc.documentType}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">
+                      {doc.reviewer}
+                    </td>
+                    <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">
+                      {new Date(doc.completedDate).toLocaleDateString()} {new Date(doc.completedDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.fieldsCount}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="flex items-center gap-1">
+                          <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.approvedCount}</span>
+                        </div>
+                        {doc.sentBackCount > 0 && (
+                          <div className="flex items-center gap-1">
+                            <XCircle className="w-4 h-4 text-[#FF0081]" />
+                            <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.sentBackCount}</span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={getPassRateColor(doc.passRate)}>{doc.passRate}%</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onViewClick(doc)}
+                        className="text-[#0292DC] hover:bg-[#0292DC]/10"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

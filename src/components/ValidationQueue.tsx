@@ -447,7 +447,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                       item.status === 'New' ? 'bg-[#0292DC]/10 text-[#0292DC]' :
                       item.status === 'In Progress' ? 'bg-[#FFC018]/10 text-[#FFC018]' :
                       item.status === 'Pending Review' ? 'bg-[#80989A]/10 text-[#80989A]' :
-                      item.status === 'Completed' ? 'bg-[#0292DC]/10 text-[#0292DC]' :
+                      item.status === 'Completed' ? 'bg-green-600 text-white' :
                       item.status === 'Reassigned' ? 'bg-[#F59E0B]/20 text-[#D97706]' :
                       'bg-[#FF0081]/10 text-[#FF0081]'
                     }>
@@ -457,7 +457,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                   <td className="px-6 py-5 text-right">
                     <Button
                       onClick={() => handleValidateClick(item)}
-                      disabled={loadingItemId === item.id}
+                      disabled={loadingItemId === item.id || item.status === 'Completed'}
                       className="bg-[#0292DC] hover:bg-[#012F66] text-white transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       {loadingItemId === item.id ? (

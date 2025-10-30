@@ -1,5 +1,8 @@
 import data from '../data.json';
 
+// Get API base URL from environment variable
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
+
 export interface User {
   id: string;
   name: string;
@@ -141,7 +144,7 @@ export class AuthAPI {
       }
 
       // For other users, call the real login API
-      const response = await fetch('https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/login', {
+      const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

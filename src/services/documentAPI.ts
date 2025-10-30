@@ -34,7 +34,8 @@ export interface GetDocumentsRequest {
 }
 
 class DocumentAPI {
-  private baseURL = 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
+  // Get API base URL from environment variable
+  private baseURL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
 
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;

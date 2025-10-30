@@ -682,7 +682,7 @@ export function QCDashboard({
                           <td className="px-6 py-5 text-right">
                             <Button
                               onClick={() => handleValidateClick(item)}
-                              disabled={loadingItemId === item.id}
+                              disabled={loadingItemId === item.id || item.status === 'Completed'}
                               className="bg-[#0292DC] hover:bg-[#012F66] text-white transition-colors disabled:opacity-50 cursor-pointer"
                             >
                               {loadingItemId === item.id ? (

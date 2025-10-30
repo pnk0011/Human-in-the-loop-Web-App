@@ -774,7 +774,7 @@ export function UserManagement() {
               Add a new reviewer or QC specialist to the system.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 -mr-2"  style={{maxHeight: '500px'}}>
+          <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 -mr-2"  style={{maxHeight: '300px'}}>
             <div>
               <Label htmlFor="firstName" className="text-[#012F66] dark:text-white">
                 First Name *
@@ -959,7 +959,7 @@ export function UserManagement() {
               Update user information and permissions.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 -mr-2" style={{maxHeight: '500px'}}>
+          <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 -mr-2" style={{maxHeight: '300px'}}>
             <div>
               <Label
                 htmlFor="edit-firstName"

@@ -1,3 +1,6 @@
+// Get API base URL from environment variable
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
+
 export interface CreateUserRequest {
   firstName: string;
   lastName: string;
@@ -104,10 +107,8 @@ class UserAPI {
     };
 
     try {
-      // For now, we'll use the external API endpoint for user creation
-      // You can modify this to use your actual API base URL
-      const baseURL = 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
-      const url = `${baseURL}${endpoint}`;
+      // Use the API base URL from environment variable
+      const url = `${API_BASE_URL}${endpoint}`;
       
       const response = await fetch(url, config);
       const data = await response.json();
