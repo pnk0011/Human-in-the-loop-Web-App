@@ -38,3 +38,37 @@ QUALITY CONTROL
 https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/get-reviewer-assignedto-qc?qc_user=qc@medpro.com"		UI	
 5	"Add DocumentId filter
 https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/get-all-unique-document-id?quality_control=qc@medpro.com"		UI	
+
+
+doc_type_name
+Large Claim Review Form                                           
+Actuarial/UW/Pricing Tools                                        
+Reinsurance                                                       
+Indication/Quote                                                  
+Endorsement                                                       
+Green Card                                                        
+Finance Agreement                                                 
+Policy Form                                                       
+Additional Risk                                                   
+Reporting Endorsement                                             
+zDup - Loss Run                                                   
+Loss Run                                                          
+zDup - Stat Notice/Non-Renewal                                    
+Expiration/Effective/Retro Date                                   
+Return Mail                                                       
+Policy                                                            
+Assessments                                                       
+Invoice                                                           
+Application                                                       
+Stat Notice/Non-Renewal                                           
+zDup - Broker of Record (BOR)                                     
+Address (not practice loc)                                        
+zDup - Actuarial/UW/Pricing Tools                                 
+zDup - Indication/Quote                                           
+Cash Application                                                  
+Processing Form                                                   
+Referral/Documentation                                            
+Coverage                                                          
+Broker of Record (BOR)                                            
+Fund Documentation                                                
+Cancellation                                                      
