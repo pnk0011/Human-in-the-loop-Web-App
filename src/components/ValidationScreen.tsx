@@ -26,6 +26,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  Download,
 } from "lucide-react";
 import logo from "figma:asset/d37108ff06015dcbcdb272cec41a1cfc0b3b3dfd.png";
 import { LoadingSpinner, LoadingOverlay } from "./LoadingComponents";
@@ -164,6 +165,18 @@ export function ValidationScreen({
 
   const handleZoomOut = () => {
     setZoom((prev) => Math.max(prev - 25, 25));
+  };
+
+  const handleDownloadDocument = () => {
+    if (document.documentImage) {
+      const link = window.document.createElement('a');
+      link.href = document.documentImage;
+      link.download = document.documentName || 'document';
+      link.target = '_blank';
+      window.document.body.appendChild(link);
+      link.click();
+      window.document.body.removeChild(link);
+    }
   };
 
   const handleActionChange = (
@@ -374,9 +387,16 @@ export function ValidationScreen({
                       <p className="text-red-600 dark:text-red-300 text-center mb-4 max-w-md">
                         Unable to load the document from the provided URL. This may be due to network issues, access restrictions, or CORS policy limitations.
                       </p>
-                      <div className="text-sm text-red-500 dark:text-red-400 bg-red-100 dark:bg-red-800 px-3 py-2 rounded font-mono break-all max-w-md">
+                      {/* <div className="text-sm text-red-500 dark:text-red-400 bg-red-100 dark:bg-red-800 px-3 py-2 rounded font-mono break-all max-w-md mb-4">
                         {document.documentImage}
-                      </div>
+                      </div> */}
+                      <Button
+                        onClick={handleDownloadDocument}
+                        className="bg-[#0292DC] hover:bg-[#012F66] text-white"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download Document
+                      </Button>
                     </div>
 
                   </div>

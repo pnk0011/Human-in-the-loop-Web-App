@@ -1,6 +1,6 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Button } from './ui/button';
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, AlertCircle } from 'lucide-react';
 
 interface PDFViewerProps {
   url: string;
@@ -9,19 +9,73 @@ interface PDFViewerProps {
 }
 
 export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
+  const [hasError, setHasError] = useState(false);
+
   const downloadPDF = useCallback(() => {
-    const link = document.createElement('a');
+    const link = window.document.createElement('a');
     link.href = url;
     link.download = fileName || 'document.pdf';
     link.target = '_blank';
-    document.body.appendChild(link);
+    window.document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    window.document.body.removeChild(link);
   }, [url, fileName]);
 
   const openInNewTab = useCallback(() => {
     window.open(url, '_blank');
   }, [url]);
+
+  // Check if embed failed to load after a timeout
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      // If after 3 seconds, check if embed loaded content
+      const embedElement = window.document.querySelector(`embed[src="${url}"]`);
+      if (embedElement) {
+        // Check if embed has dimensions (loaded successfully)
+        const hasContent = embedElement.clientHeight > 0 && embedElement.clientWidth > 0;
+        if (!hasContent) {
+          setHasError(true);
+        }
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [url]);
+
+  if (hasError) {
+    return (
+      <div className={`flex flex-col bg-white border w-full min-w-full ${className}`} style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%' }}>
+        <div className="flex flex-col items-center justify-center p-12 bg-red-50 dark:bg-red-900/20 h-full">
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-800 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+            PDF Failed to Load
+          </h3>
+          <p className="text-red-600 dark:text-red-300 text-center mb-4 max-w-md">
+            Unable to load the PDF document. Please try downloading it instead.
+          </p>
+          <div className="flex gap-3">
+            <Button
+              onClick={openInNewTab}
+              variant="outline"
+              className="border-[#0292DC] text-[#0292DC] hover:bg-[#0292DC]/10"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Open in New Tab
+            </Button>
+            <Button
+              onClick={downloadPDF}
+              className="bg-[#0292DC] hover:bg-[#012F66] text-white"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download Document
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex flex-col bg-white border w-full min-w-full ${className}`} style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%' }}>
@@ -38,7 +92,7 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
             onClick={openInNewTab}
             variant="outline"
             size="sm"
-            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            className="border-blue-200 text-blue-700 hover:bg-blue-50 cursor-pointer"
           >
             <FileText className="w-4 h-4 mr-1" />
             Open
@@ -47,7 +101,7 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
             onClick={downloadPDF}
             variant="outline"
             size="sm"
-            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            className="border-blue-200 text-blue-700 hover:bg-blue-50 cursor-pointer"
           >
             <Download className="w-4 h-4 mr-1" />
             Download
