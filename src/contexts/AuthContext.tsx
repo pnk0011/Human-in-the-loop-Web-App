@@ -19,7 +19,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   loginError: string | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, pwd: string) => Promise<boolean>;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
   hasRole: (role: UserRole) => boolean;
@@ -62,7 +62,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Load user from localStorage on mount and validate token
   useEffect(() => {
     const initializeAuth = async () => {
       const savedUser = localStorage.getItem('user');
@@ -74,7 +73,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // Set user immediately from localStorage to avoid blank page
           setUser(parsedUser);
           
-          // Try to validate token with auth API (but don't clear user if it fails)
           try {
             const validation = await authAPI.validateToken();
             
@@ -97,13 +95,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initializeAuth();
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, pwd: string) => {
     console.log('🔐 AuthContext login started:', { email });
     setIsLoading(true);
     setLoginError(null);
 
     try {
-      const loginRequest: LoginRequest = { email, password };
+      const loginRequest: LoginRequest = { email, pwd };
       const response: LoginResponse = await authAPI.login(loginRequest);
 
       console.log('🔍 AuthContext received response:', response);

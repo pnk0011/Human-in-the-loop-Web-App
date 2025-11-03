@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { ChevronUp, ChevronDown, FileText, Loader2 } from 'lucide-react';
+import { documentAPI } from '../services/documentAPI';
 
 interface QueueItem {
   id: string;
@@ -18,11 +19,13 @@ interface QueueItem {
   extractedValue?: string;
   fieldDescription?: string;
   expectedFormat?: string;
+  doc_handle_id?: string; // Add doc_handle_id for display in Document ID column
 }
 
 interface ValidationQueueProps {
   onValidateClick?: (item: QueueItem) => Promise<void>;
   apiDocuments?: QueueItem[]; // Optional API documents to override mock data
+  reviewerEmail?: string; // Optional reviewer email for filtering document IDs
 }
 
 const mockData: QueueItem[] = [
@@ -106,15 +109,49 @@ const mockData: QueueItem[] = [
 type SortField = 'document' | 'confidence' | 'priority' | 'age';
 type SortDirection = 'asc' | 'desc';
 
-export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQueueProps = {}) {
+export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail }: ValidationQueueProps = {}) {
   const [documentType, setDocumentType] = useState('all');
-  const [confidenceRange, setConfidenceRange] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [ageFilter, setAgeFilter] = useState('all');
+  const [docIdFilter, setDocIdFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [uniqueDocIds, setUniqueDocIds] = useState<string[]>([]);
+  const [isLoadingDocIds, setIsLoadingDocIds] = useState(false);
+
+  // Load unique document IDs on component mount
+  useEffect(() => {
+    const loadUniqueDocIds = async () => {
+      setIsLoadingDocIds(true);
+      try {
+        const response = await documentAPI.getUniqueDocumentIds(reviewerEmail);
+        console.log('Unique document IDs API response:', response);
+        
+        // Check for different possible response structures
+        if (response.status === 'success') {
+          // Try different possible field names
+          const docIds = response.doc_handle_ids || [];
+          console.log('Extracted document IDs:', docIds);
+          setUniqueDocIds(Array.isArray(docIds) ? docIds : []);
+        } else {
+          console.error('API returned non-success status:', response.status);
+        }
+      } catch (error) {
+        console.error('Failed to load unique document IDs:', error);
+      } finally {
+        setIsLoadingDocIds(false);
+      }
+    };
+    
+    loadUniqueDocIds();
+  }, [reviewerEmail]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [documentType, priorityFilter, docIdFilter]);
 
   // Handle validate click with per-item loading state
   const handleValidateClick = async (item: QueueItem) => {
@@ -132,8 +169,24 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
   // Use only API documents, no fallback to dummy data
   const dataSource = apiDocuments || [];
   
-  // Filter to show only documents assigned to the current user
-  const filteredData = dataSource.filter(item => item.assignedTo === 'You' || item.assignedTo === 'Reviewer');
+  // Filter to show only documents assigned to the current user and apply other filters
+  let filteredData = dataSource.filter(item => item.assignedTo === 'You' || item.assignedTo === 'Reviewer');
+  
+  // Exclude completed documents
+  filteredData = filteredData.filter(item => item.status !== 'Completed');
+  
+  // Apply filters
+  if (documentType !== 'all') {
+    filteredData = filteredData.filter(item => item.type === documentType);
+  }
+  
+  if (priorityFilter !== 'all') {
+    filteredData = filteredData.filter(item => item.priority.toLowerCase() === priorityFilter.toLowerCase());
+  }
+  
+  if (docIdFilter !== 'all') {
+    filteredData = filteredData.filter(item => item.doc_handle_id === docIdFilter);
+  }
   
   const totalItems = filteredData.length;
   const itemsPerPage = 5;
@@ -174,7 +227,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
       case 'Medium':
         return 'text-[#FFC018]';
       case 'Low':
-        return 'text-[#80989A]';
+        return 'text-[#0292DC]';
       default:
         return 'text-[#80989A]';
     }
@@ -187,9 +240,9 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
 
   const resetFilters = () => {
     setDocumentType('all');
-    setConfidenceRange('all');
     setPriorityFilter('all');
     setAgeFilter('all');
+    setDocIdFilter('all');
   };
 
   return (
@@ -197,42 +250,54 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
       {/* Filters */}
       <div className="bg-white dark:bg-[#2a2a2a] p-6 rounded-lg shadow-sm border border-[#E5E7EB] dark:border-[#3a3a3a]">
         <h3 className="text-[#012F66] dark:text-white mb-4">Filter Documents</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-          <div>
+        <div className="flex flex-wrap gap-4 mb-4">
+          <div className="w-full md:w-auto md:min-w-[150px]">
             <label className="block text-[#012F66] dark:text-white mb-2">Document Type</label>
             <Select value={documentType} onValueChange={setDocumentType}>
-              <SelectTrigger className="bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
+              <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="invoice">Invoice</SelectItem>
-                <SelectItem value="po">Purchase Order</SelectItem>
-                <SelectItem value="receipt">Receipt</SelectItem>
-                <SelectItem value="contract">Contract</SelectItem>
+                <SelectItem value="Large Claim Review Form">Large Claim Review Form</SelectItem>
+                <SelectItem value="Actuarial/UW/Pricing Tools">Actuarial/UW/Pricing Tools</SelectItem>
+                <SelectItem value="Reinsurance">Reinsurance</SelectItem>
+                <SelectItem value="Indication/Quote">Indication/Quote</SelectItem>
+                <SelectItem value="Endorsement">Endorsement</SelectItem>
+                <SelectItem value="Green Card">Green Card</SelectItem>
+                <SelectItem value="Finance Agreement">Finance Agreement</SelectItem>
+                <SelectItem value="Policy Form">Policy Form</SelectItem>
+                <SelectItem value="Additional Risk">Additional Risk</SelectItem>
+                <SelectItem value="Reporting Endorsement">Reporting Endorsement</SelectItem>
+                <SelectItem value="zDup - Loss Run">zDup - Loss Run</SelectItem>
+                <SelectItem value="Loss Run">Loss Run</SelectItem>
+                <SelectItem value="zDup - Stat Notice/Non-Renewal">zDup - Stat Notice/Non-Renewal</SelectItem>
+                <SelectItem value="Expiration/Effective/Retro Date">Expiration/Effective/Retro Date</SelectItem>
+                <SelectItem value="Return Mail">Return Mail</SelectItem>
+                <SelectItem value="Policy">Policy</SelectItem>
+                <SelectItem value="Assessments">Assessments</SelectItem>
+                <SelectItem value="Invoice">Invoice</SelectItem>
+                <SelectItem value="Application">Application</SelectItem>
+                <SelectItem value="Stat Notice/Non-Renewal">Stat Notice/Non-Renewal</SelectItem>
+                <SelectItem value="zDup - Broker of Record (BOR)">zDup - Broker of Record (BOR)</SelectItem>
+                <SelectItem value="Address (not practice loc)">Address (not practice loc)</SelectItem>
+                <SelectItem value="zDup - Actuarial/UW/Pricing Tools">zDup - Actuarial/UW/Pricing Tools</SelectItem>
+                <SelectItem value="zDup - Indication/Quote">zDup - Indication/Quote</SelectItem>
+                <SelectItem value="Cash Application">Cash Application</SelectItem>
+                <SelectItem value="Processing Form">Processing Form</SelectItem>
+                <SelectItem value="Referral/Documentation">Referral/Documentation</SelectItem>
+                <SelectItem value="Coverage">Coverage</SelectItem>
+                <SelectItem value="Broker of Record (BOR)">Broker of Record (BOR)</SelectItem>
+                <SelectItem value="Fund Documentation">Fund Documentation</SelectItem>
+                <SelectItem value="Cancellation">Cancellation</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div>
-            <label className="block text-[#012F66] dark:text-white mb-2">Confidence Range</label>
-            <Select value={confidenceRange} onValueChange={setConfidenceRange}>
-              <SelectTrigger className="bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
-                <SelectValue placeholder="All Ranges" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Ranges</SelectItem>
-                <SelectItem value="high">70-100%</SelectItem>
-                <SelectItem value="medium">50-69%</SelectItem>
-                <SelectItem value="low">0-49%</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
+          <div className="w-full md:w-auto md:min-w-[150px]">
             <label className="block text-[#012F66] dark:text-white mb-2">Priority</label>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
+              <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
                 <SelectValue placeholder="All Priorities" />
               </SelectTrigger>
               <SelectContent>
@@ -244,10 +309,10 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
             </Select>
           </div>
 
-          <div>
+          {/* <div className="w-full md:w-auto md:min-w-[150px]">
             <label className="block text-[#012F66] dark:text-white mb-2">Age</label>
             <Select value={ageFilter} onValueChange={setAgeFilter}>
-              <SelectTrigger className="bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
+              <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
                 <SelectValue placeholder="All Ages" />
               </SelectTrigger>
               <SelectContent>
@@ -257,6 +322,23 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                 <SelectItem value="old">More than 3 days</SelectItem>
               </SelectContent>
             </Select>
+          </div> */}
+
+          <div className="w-full md:w-auto md:min-w-[150px]">
+            <label className="block text-[#012F66] dark:text-white mb-2">Document ID</label>
+            <Select value={docIdFilter} onValueChange={setDocIdFilter}>
+              <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white" disabled={isLoadingDocIds}>
+                <SelectValue placeholder={isLoadingDocIds ? "Loading IDs..." : "All Document IDs"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Document IDs</SelectItem>
+                {uniqueDocIds.map((docId) => (
+                  <SelectItem key={docId} value={docId}>
+                    {docId}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -264,12 +346,9 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
           <Button
             variant="outline"
             onClick={resetFilters}
-            className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white hover:bg-[#F9FAFB] dark:hover:bg-[#3a3a3a]"
+            className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white hover:bg-[#F9FAFB] dark:hover:bg-[#3a3a3a] cursor-pointer"
           >
             Reset Filters
-          </Button>
-          <Button className="bg-[#0292DC] hover:bg-[#012F66] text-white">
-            Apply Filters
           </Button>
         </div>
       </div>
@@ -287,14 +366,14 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
               <p className="text-white/80">Review and validate AI-extracted data</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          {/* <div className="flex gap-2">
             <Button
               variant="outline"
               className="border-white/30 text-white hover:bg-white/10 bg-white/5"
             >
               Export List
             </Button>
-          </div>
+          </div> */}
         </div>
 
         {/* Table */}
@@ -302,21 +381,23 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
           <table className="w-full">
             <thead className="bg-[#F9FAFB] dark:bg-[#1a1a1a] border-b border-[#E5E7EB] dark:border-[#3a3a3a]">
               <tr>
+              <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Document ID</th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                   <button
                     onClick={() => handleSort('document')}
                     className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                   >
-                    DOCUMENT <SortIcon field="document" />
+                    Filename <SortIcon field="document" />
                   </button>
                 </th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">FILE TYPE</th>
+                
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">File Type</th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                   <button
                     onClick={() => handleSort('confidence')}
                     className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                   >
-                    AVG CONFIDENCE <SortIcon field="confidence" />
+                    Avg. Confidence <SortIcon field="confidence" />
                   </button>
                 </th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
@@ -324,7 +405,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                     onClick={() => handleSort('priority')}
                     className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                   >
-                    PRIORITY <SortIcon field="priority" />
+                    Priority <SortIcon field="priority" />
                   </button>
                 </th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
@@ -332,12 +413,12 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                     onClick={() => handleSort('age')}
                     className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                   >
-                    AGE <SortIcon field="age" />
+                    Age <SortIcon field="age" />
                   </button>
                 </th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">FIELDS TO REVIEW</th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">STATUS</th>
-                <th className="px-6 py-4 text-right text-[#012F66] dark:text-white">ACTION</th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Fields to Review</th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Status</th>
+                <th className="px-6 py-4 text-right text-[#012F66] dark:text-white">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E7EB] dark:divide-[#3a3a3a]">
@@ -353,6 +434,9 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                         <div className="flex-shrink-0 w-10 h-10 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-lg animate-pulse"></div>
                         <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-32"></div>
                       </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24"></div>
                     </td>
                     <td className="px-6 py-5">
                       <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
@@ -380,7 +464,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
               ) : filteredData.length === 0 ? (
                 // Empty state when no documents found after API data is loaded
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center">
+                  <td colSpan={9} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
                         <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
@@ -409,6 +493,9 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
               ) : (
                 paginatedData.map((item) => (
                 <tr key={item.id} className="hover:bg-[#F9FAFB]/50 dark:hover:bg-[#3a3a3a]/50 transition-colors">
+                    <td className="px-6 py-5">
+                    <div className="text-[#80989A] dark:text-[#a0a0a0] font-mono">{item.doc_handle_id || '-'}</div>
+                  </td>
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
                       <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-[#0292DC]/10 to-[#012F66]/10 rounded-lg flex items-center justify-center">
@@ -419,6 +506,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                       </div>
                     </div>
                   </td>
+                
                   <td className="px-6 py-5">
                     <span className="text-[#80989A] dark:text-[#a0a0a0]">{item.type}</span>
                   </td>
@@ -428,8 +516,8 @@ export function ValidationQueue({ onValidateClick, apiDocuments }: ValidationQue
                     </Badge>
                   </td>
                   <td className="px-6 py-5">
-                    <span className={`flex items-center gap-2 ${getPriorityColor(item.priority)}`}>
-                      <span className="w-2.5 h-2.5 rounded-full bg-current"></span>
+                    <span className={`flex items-center gap-1 ${getPriorityColor(item.priority)}`}>
+                      <span className="w-2 h-2 rounded-full bg-current"></span>
                       {item.priority}
                     </span>
                   </td>

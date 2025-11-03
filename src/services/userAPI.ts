@@ -6,7 +6,7 @@ export interface CreateUserRequest {
   lastName: string;
   email: string;
   role: 'Admin' | 'Reviewer' | 'QC';
-  password: string;
+  'password': string;
   qualityControl?: string;
 }
 
@@ -57,6 +57,12 @@ export interface UserResponse {
 export interface UsersListResponse {
   status: string;
   message: string;
+  stats?: {
+    total_users: number;
+    active_users: number;
+    reviewer_count: number;
+    qc_count: number;
+  };
   pagination?: {
     page: number;
     limit: number;
@@ -88,14 +94,14 @@ class UserAPI {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const token = this.getAuthToken();
+    const tdata = this.getAuthToken();
     
     const defaultHeaders: HeadersInit = {
       'Content-Type': 'application/json',
     };
 
-    if (token) {
-      defaultHeaders['Authorization'] = `Bearer ${token}`;
+    if (tdata) {
+      defaultHeaders['Authorization'] = `Bearer ${tdata}`;
     }
 
     const config: RequestInit = {

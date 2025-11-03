@@ -22,6 +22,7 @@ interface QueueItem {
   extractedValue?: string;
   fieldDescription?: string;
   expectedFormat?: string;
+  doc_handle_id?: string; // Add doc_handle_id for display in Document ID column
 }
 
 interface ReviewerDashboardProps {
@@ -38,6 +39,12 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
   const { loading: dashboardLoading, withLoading } = useLoading({ delay: 300 });
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [apiDocuments, setApiDocuments] = useState<ReviewerDocument[]>([]);
+  const [stats, setStats] = useState<{
+    Assigned_documents: number;
+    Assigned_files: number;
+    Critical_files: number;
+    Completed_today: number;
+  } | undefined>();
 
   // Load API data for real documents
   useEffect(() => {
@@ -54,8 +61,13 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
           };
           
           const response = await documentOperationsAPI.getReviewerDocuments(params);
-          if (response.status === 'success' && response.documents) {
-            setApiDocuments(response.documents);
+          if (response.status === 'success') {
+            if (response.files) {
+              setApiDocuments(response.files);
+            }
+            if (response.stats) {
+              setStats(response.stats);
+            }
           }
         } catch (error) {
           console.error('Failed to load API documents:', error);
@@ -91,6 +103,7 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
       extractedValue: 'See document', // Dummy value
       fieldDescription: 'Review document fields', // Dummy value
       expectedFormat: 'Various formats', // Dummy value
+      doc_handle_id: doc.doc_handle_id, // Add doc_handle_id for display in table
     }));
   };
 
@@ -132,11 +145,12 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
           </>
         ) : activeTab === 'Current Queue' ? (
           <>
-            <DashboardStats />
+            <DashboardStats stats={stats} />
             <ValidationQueue 
               onValidateClick={handleValidateClick}
               // Pass API documents converted to QueueItem format
               apiDocuments={convertApiDocumentsToQueueItems()}
+              reviewerEmail={user?.email}
             />
           </>
         ) : activeTab === 'Work History' ? (

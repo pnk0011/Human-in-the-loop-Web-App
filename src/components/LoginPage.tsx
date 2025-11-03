@@ -21,7 +21,7 @@ interface LoginPageProps {
 
 export function LoginPage({ theme, onToggleTheme }: LoginPageProps) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [pwd, setPassword] = useState('');
   const [resetEmail, setResetEmail] = useState('');
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetSent, setResetSent] = useState(false);
@@ -32,11 +32,11 @@ export function LoginPage({ theme, onToggleTheme }: LoginPageProps) {
     e.preventDefault();
     clearLoginError();
     
-    if (!email || !password) {
+    if (!email || !pwd) {
       return;
     }
 
-    await login(email, password);
+    await login(email, pwd);
   };
 
   const handleResetPassword = (e: React.FormEvent) => {
@@ -109,8 +109,8 @@ export function LoginPage({ theme, onToggleTheme }: LoginPageProps) {
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-[#012F66] dark:text-white">
+              {/* <div className="flex items-center justify-between">
+                <Label htmlFor="pwd" className="text-[#012F66] dark:text-white">
                   Password
                 </Label>
                 <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
@@ -119,7 +119,7 @@ export function LoginPage({ theme, onToggleTheme }: LoginPageProps) {
                       type="button"
                       className="text-[#0292DC] hover:underline cursor-pointer"
                     >
-                      Forgot password?
+                      Forgot pwd?
                     </button>
                   </DialogTrigger>
                   <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a]">
@@ -128,7 +128,7 @@ export function LoginPage({ theme, onToggleTheme }: LoginPageProps) {
                         Reset Password
                       </DialogTitle>
                       <DialogDescription className="text-[#80989A] dark:text-[#a0a0a0]">
-                        Enter your email address and we'll send you a link to reset your password.
+                        Enter your email address and we'll send you a link to reset your pwd.
                       </DialogDescription>
                     </DialogHeader>
                     {!resetSent ? (
@@ -188,18 +188,18 @@ export function LoginPage({ theme, onToggleTheme }: LoginPageProps) {
                           Reset link sent!
                         </p>
                         <p className="text-[#80989A] dark:text-[#a0a0a0]">
-                          Check your email for instructions to reset your password.
+                          Check your email for instructions to reset your pwd.
                         </p>
                       </div>
                     )}
                   </DialogContent>
                 </Dialog>
-              </div>
+              </div> */}
               <Input
-                id="password"
+                id="pwd"
                 type="password"
                 placeholder="••••••••"
-                value={password}
+                value={pwd}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="border-[#D0D5DD] dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white dark:placeholder:text-[#80989A]"

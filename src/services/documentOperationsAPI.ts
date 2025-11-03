@@ -30,6 +30,7 @@ export interface GetReviewerDocumentsRequest {
   priority?: string;
   status?: string;
   search?: string; // For searching by file name
+  doc_handle_id?: string;
 }
 
 export interface ReviewerDocument {
@@ -49,13 +50,19 @@ export interface ReviewerDocument {
 export interface GetReviewerDocumentsResponse {
   status: string;
   message: string;
+  stats?: {
+    Assigned_documents: number;
+    Assigned_files: number;
+    Critical_files: number;
+    Completed_today: number;
+  };
   pagination?: {
     page: number;
     limit: number;
-    total_records: number;
+    total_records_filtered: number;
     total_pages: number;
   };
-  documents?: ReviewerDocument[];
+  files?: ReviewerDocument[];
   error?: string;
 }
 
@@ -117,6 +124,7 @@ export interface GetQCDocumentsRequest {
   priority?: string;
   status?: string;
   reviewer?: string;
+  doc_handle_id?: string;
 }
 
 export interface QCDocument {
@@ -126,7 +134,7 @@ export interface QCDocument {
   distinct_entity_type_count: number;
   avg_confidence_percentage: number;
   priority: string;
-  qc_update_dt: string;
+  qc_completed_dt: string | null;
   reviewer_assigned: string;
   qc_assigned: string;
   status: string;
@@ -136,13 +144,26 @@ export interface QCDocument {
 export interface GetQCDocumentsResponse {
   status: string;
   message: string;
-  pagination: {
+  pagination?: {
     page: number;
     limit: number;
     total_records: number;
     total_pages: number;
   };
-  documents: QCDocument[];
+  stats?: {
+    "Assigned Documents": number;
+    "Assigned_files": number;
+    "Critical_files": number;
+    "Completed_today": number;
+  };
+  files?: QCDocument[];
+}
+
+export interface ReviewerAssignedToQCResponse {
+  status: string;
+  message: string;
+  reviewers?: string[];
+  error?: string;
 }
 
 export interface QCOpenFileRequest {
@@ -258,6 +279,11 @@ class DocumentOperationsAPI {
       if (params.search) {
         query.append('file_name', params.search);
       }
+      
+      // Add doc_handle_id parameter if provided
+      if (params.doc_handle_id) {
+        query.append('doc_handle_id', params.doc_handle_id);
+      }
 
       const queryString = query.toString();
       const endpoint = `/get-all-reviewer-documents?${queryString}`;
@@ -272,11 +298,11 @@ class DocumentOperationsAPI {
       return {
         status: 'error',
         message: error.message || 'Failed to fetch reviewer documents',
-        documents: [],
+        files: [],
         pagination: {
           page: params.page || 1,
           limit: params.limit || 25,
-          total_records: 0,
+          total_records_filtered: 0,
           total_pages: 0,
         },
       };
@@ -329,6 +355,11 @@ class DocumentOperationsAPI {
       status: params.status || 'All',
       reviewer: params.reviewer || 'All',
     });
+    
+    // Add doc_handle_id if provided
+    if (params.doc_handle_id) {
+      queryParams.append('doc_handle_id', params.doc_handle_id);
+    }
 
     return this.makeRequest<GetQCDocumentsResponse>(`/get-all-qc-documents?${queryParams}`, {
       method: 'GET',
@@ -347,6 +378,28 @@ class DocumentOperationsAPI {
       method: 'PUT',
       body: JSON.stringify(params),
     });
+  }
+
+  // Get reviewers assigned to QC user
+  async getReviewersAssignedToQC(qcUser: string): Promise<ReviewerAssignedToQCResponse> {
+    try {
+      const queryParams = new URLSearchParams({
+        qc_user: qcUser,
+      });
+
+      const response = await this.makeRequest<ReviewerAssignedToQCResponse>(`/get-reviewer-assignedto-qc?${queryParams}`, {
+        method: 'GET',
+      });
+      return response;
+    } catch (error: any) {
+      console.error('Get reviewers assigned to QC API call failed:', error);
+      return {
+        status: 'error',
+        message: error.message || 'Failed to fetch reviewers',
+        reviewers: [],
+        error: error.message || 'Unknown error occurred'
+      };
+    }
   }
 }
 

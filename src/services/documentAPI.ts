@@ -5,22 +5,28 @@ export interface Document {
   distinct_entity_type_count: number;
   avg_confidence_percentage: number;
   priority: 'High' | 'Medium' | 'Low';
-  latest_update_datetime: string;
+  latest_update_datetime: string | null;
   reviewer_assigned: string | null;
   qc_assigned: string | null;
-  status: string;
+  status: string | null;
 }
 
 export interface DocumentsListResponse {
   status: string;
   message: string;
+  stats?: {
+    "Total Documents": number;
+    "Total Files": number;
+    "Assigned Files": number;
+    "Completed Files": number;
+  };
   pagination?: {
     page: number;
     limit: number;
     total_records: number;
     total_pages: number;
   };
-  documents?: Document[];
+  files?: Document[];
   error?: string;
 }
 
@@ -31,6 +37,16 @@ export interface GetDocumentsRequest {
   doc_type_name?: string;
   priority?: string;
   status?: string;
+  doc_handle_id?: string;
+}
+
+export interface UniqueDocumentIdsResponse {
+  status: string;
+  message: string;
+  doc_handle_ids?: string[];
+  count?: number; // Alternative field name
+  data?: string[]; // Alternative field name for document IDs
+  error?: string;
 }
 
 class DocumentAPI {
@@ -72,6 +88,7 @@ class DocumentAPI {
       if (params.doc_type_name) queryParams.append('doc_type_name', params.doc_type_name);
       if (params.priority) queryParams.append('priority', params.priority);
       if (params.status) queryParams.append('status', params.status);
+      if (params.doc_handle_id) queryParams.append('doc_handle_id', params.doc_handle_id);
 
       const endpoint = `/get-all-documents?${queryParams.toString()}`;
       const response = await this.makeRequest<DocumentsListResponse>(endpoint, {
@@ -91,7 +108,48 @@ class DocumentAPI {
           total_records: 0,
           total_pages: 0,
         },
-        documents: [],
+        files: [],
+        error: error.message || 'Unknown error occurred'
+      };
+    }
+  }
+
+  async getUniqueDocumentIds(reviewer?: string, quality_control?: string): Promise<UniqueDocumentIdsResponse> {
+    try {
+      // Build URL with optional reviewer or quality_control query parameter
+      let url = `${this.baseURL}/get-all-unique-document-id`;
+      const params: string[] = [];
+      if (reviewer) {
+        params.push(`reviewer=${encodeURIComponent(reviewer)}`);
+      }
+      if (quality_control) {
+        params.push(`quality_control=${encodeURIComponent(quality_control)}`);
+      }
+      if (params.length > 0) {
+        url += `?${params.join('&')}`;
+      }
+      console.log('Fetching unique document IDs from:', url);
+      
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        method: 'GET',
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Unique document IDs raw response:', data);
+      return data;
+    } catch (error: any) {
+      console.error('Get unique document IDs API call failed:', error);
+      return {
+        status: 'error',
+        message: 'Failed to fetch unique document IDs',
+        doc_handle_ids: [],
         error: error.message || 'Unknown error occurred'
       };
     }

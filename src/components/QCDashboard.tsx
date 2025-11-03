@@ -13,6 +13,7 @@ import {
 import { QCWorkHistory } from "./QCWorkHistory";
 import { ChevronUp, ChevronDown, FileText, Loader2 } from "lucide-react";
 import { documentOperationsAPI, GetQCDocumentsRequest, QCDocument } from "../services/documentOperationsAPI";
+import { documentAPI } from "../services/documentAPI";
 import { useAuth } from "../contexts/AuthContext";
 
 interface QCDashboardProps {
@@ -43,6 +44,7 @@ export function QCDashboard({
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [reviewerFilter, setReviewerFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [docIdFilter, setDocIdFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField | null>(
     null,
@@ -53,6 +55,16 @@ export function QCDashboard({
   const [apiDocuments, setApiDocuments] = useState<QCDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
+  const [stats, setStats] = useState<{
+    "Assigned Documents": number;
+    "Assigned_files": number;
+    "Critical_files": number;
+    "Completed_today": number;
+  } | undefined>();
+  const [uniqueDocIds, setUniqueDocIds] = useState<string[]>([]);
+  const [isLoadingDocIds, setIsLoadingDocIds] = useState(false);
+  const [reviewers, setReviewers] = useState<string[]>([]);
+  const [isLoadingReviewers, setIsLoadingReviewers] = useState(false);
 
   // Handle validate click with per-item loading state
   const handleValidateClick = async (item: any) => {
@@ -66,6 +78,64 @@ export function QCDashboard({
       }, 100);
     }
   };
+
+  // Load unique document IDs for QC user
+  useEffect(() => {
+    const loadUniqueDocIds = async () => {
+      if (user?.email) {
+        setIsLoadingDocIds(true);
+        try {
+          const response = await documentAPI.getUniqueDocumentIds(undefined, user.email);
+          console.log('QC Unique document IDs API response:', response);
+          
+          if (response.status === 'success') {
+            const docIds = response.doc_handle_ids || response.data || [];
+            console.log('Extracted QC document IDs:', docIds);
+            setUniqueDocIds(Array.isArray(docIds) ? docIds : []);
+          } else {
+            console.error('API returned non-success status:', response.status);
+          }
+        } catch (error) {
+          console.error('Failed to load QC unique document IDs:', error);
+        } finally {
+          setIsLoadingDocIds(false);
+        }
+      }
+    };
+    
+    loadUniqueDocIds();
+  }, [user?.email]);
+
+  // Load reviewers assigned to QC user
+  useEffect(() => {
+    const loadReviewers = async () => {
+      if (user?.email) {
+        setIsLoadingReviewers(true);
+        try {
+          const response = await documentOperationsAPI.getReviewersAssignedToQC(user.email);
+          console.log('QC Reviewers API response:', response);
+          
+          if (response.status === 'success' && response.reviewers) {
+            console.log('Extracted QC reviewers:', response.reviewers);
+            setReviewers(Array.isArray(response.reviewers) ? response.reviewers : []);
+          } else {
+            console.error('API returned non-success status:', response.status);
+          }
+        } catch (error) {
+          console.error('Failed to load QC reviewers:', error);
+        } finally {
+          setIsLoadingReviewers(false);
+        }
+      }
+    };
+    
+    loadReviewers();
+  }, [user?.email]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [documentType, priorityFilter, reviewerFilter, statusFilter, docIdFilter]);
 
   // Load API data for QC documents
   useEffect(() => {
@@ -81,11 +151,17 @@ export function QCDashboard({
             priority: priorityFilter !== 'all' ? priorityFilter : 'All',
             status: statusFilter !== 'all' ? statusFilter : 'All',
             reviewer: reviewerFilter !== 'all' ? reviewerFilter : 'All',
+            doc_handle_id: docIdFilter !== 'all' ? docIdFilter : undefined,
           };
           
           const response = await documentOperationsAPI.getQCDocuments(params);
-          if (response.status === 'success' && response.documents) {
-            setApiDocuments(response.documents);
+          if (response.status === 'success') {
+            if (response.files) {
+              setApiDocuments(response.files);
+            }
+            if (response.stats) {
+              setStats(response.stats);
+            }
           }
         } catch (error) {
           console.error('Failed to load QC documents:', error);
@@ -96,16 +172,17 @@ export function QCDashboard({
     };
 
     loadApiData();
-  }, [user?.email, documentType, priorityFilter, statusFilter, reviewerFilter]);
+  }, [user?.email, documentType, priorityFilter, statusFilter, reviewerFilter, docIdFilter]);
 
   // Convert API documents to original QC queue format
   const convertApiDocumentsToQCQueue = () => {
     return apiDocuments.map((doc, index) => ({
       id: `${doc.file_name}_${doc.doc_handle_id}` || `DOC-${index + 1}`,
+      doc_handle_id: doc.doc_handle_id, // Add doc_handle_id for display
       document: doc.file_name,
       type: doc.doc_type_name || 'Unknown',
       reviewer: doc.reviewer_assigned || 'Unknown Reviewer',
-      reviewedDate: doc.qc_update_dt?.split(' ')[0] || new Date().toISOString().split('T')[0],
+      reviewedDate: doc.qc_completed_dt?.split(' ')[0] || new Date().toISOString().split('T')[0],
       fieldsReviewed: doc.distinct_entity_type_count,
       priority: doc.priority as 'High' | 'Medium' | 'Low',
       status: getQCStatusFromApiResponse(doc.status),
@@ -244,12 +321,15 @@ export function QCDashboard({
       reviewerFilter === "all" || item.reviewer === reviewerFilter;
     const matchesStatus =
       statusFilter === "all" || item.status === statusFilter;
+    const matchesDocId =
+      docIdFilter === "all" || (item as any).doc_handle_id === docIdFilter;
 
     return (
       matchesType &&
       matchesPriority &&
       matchesReviewer &&
-      matchesStatus
+      matchesStatus &&
+      matchesDocId
     );
   });
 
@@ -286,6 +366,7 @@ export function QCDashboard({
     setPriorityFilter("all");
     setReviewerFilter("all");
     setStatusFilter("all");
+    setDocIdFilter("all");
     setCurrentPage(1);
   };
 
@@ -302,13 +383,6 @@ export function QCDashboard({
     }
   };
 
-  const stats = [
-    { label: "Pending QC Review", value: filteredQueue.length },
-    { label: "Approved Today", value: 0 }, // API doesn't provide this data yet
-    { label: "Sent Back", value: 0 }, // API doesn't provide this data yet
-    { label: "Avg Accuracy", value: "N/A" }, // API doesn't provide this data yet
-  ];
-
   return (
     <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a]">
       <QCHeader 
@@ -324,7 +398,12 @@ export function QCDashboard({
         {activeTab === "Current Queue" ? (
           <>
             {/* Stats */}
-            <DashboardStats stats={stats} />
+            <DashboardStats stats={stats ? {
+              Assigned_documents: stats["Assigned Documents"],
+              Assigned_files: stats["Assigned_files"],
+              Critical_files: stats["Critical_files"],
+              Completed_today: stats["Completed_today"],
+            } : undefined} />
 
             <div className="space-y-6 mt-6">
               {/* Filters */}
@@ -332,8 +411,8 @@ export function QCDashboard({
                 <h3 className="text-[#012F66] dark:text-white mb-4">
                   Filter Documents
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                  <div>
+                <div className="flex flex-wrap gap-4 mb-4">
+                  <div className="w-full md:w-auto md:min-w-[150px]">
                     <label className="block text-[#012F66] dark:text-white mb-2">
                       Document Type
                     </label>
@@ -341,33 +420,49 @@ export function QCDashboard({
                       value={documentType}
                       onValueChange={setDocumentType}
                     >
-                      <SelectTrigger className="bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
+                      <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
                         <SelectValue placeholder="All Types" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">
                           All Types
                         </SelectItem>
-                        <SelectItem value="medicare claim">
-                          Medicare Claim
-                        </SelectItem>
-                        <SelectItem value="invoice">
-                          Invoice
-                        </SelectItem>
-                        <SelectItem value="policy">
-                          Policy Amendment
-                        </SelectItem>
-                        <SelectItem value="authorization">
-                          Authorization Form
-                        </SelectItem>
-                        <SelectItem value="claim">
-                          Claim Adjustment
-                        </SelectItem>
+                        <SelectItem value="Large Claim Review Form">Large Claim Review Form</SelectItem>
+                        <SelectItem value="Actuarial/UW/Pricing Tools">Actuarial/UW/Pricing Tools</SelectItem>
+                        <SelectItem value="Reinsurance">Reinsurance</SelectItem>
+                        <SelectItem value="Indication/Quote">Indication/Quote</SelectItem>
+                        <SelectItem value="Endorsement">Endorsement</SelectItem>
+                        <SelectItem value="Green Card">Green Card</SelectItem>
+                        <SelectItem value="Finance Agreement">Finance Agreement</SelectItem>
+                        <SelectItem value="Policy Form">Policy Form</SelectItem>
+                        <SelectItem value="Additional Risk">Additional Risk</SelectItem>
+                        <SelectItem value="Reporting Endorsement">Reporting Endorsement</SelectItem>
+                        <SelectItem value="zDup - Loss Run">zDup - Loss Run</SelectItem>
+                        <SelectItem value="Loss Run">Loss Run</SelectItem>
+                        <SelectItem value="zDup - Stat Notice/Non-Renewal">zDup - Stat Notice/Non-Renewal</SelectItem>
+                        <SelectItem value="Expiration/Effective/Retro Date">Expiration/Effective/Retro Date</SelectItem>
+                        <SelectItem value="Return Mail">Return Mail</SelectItem>
+                        <SelectItem value="Policy">Policy</SelectItem>
+                        <SelectItem value="Assessments">Assessments</SelectItem>
+                        <SelectItem value="Invoice">Invoice</SelectItem>
+                        <SelectItem value="Application">Application</SelectItem>
+                        <SelectItem value="Stat Notice/Non-Renewal">Stat Notice/Non-Renewal</SelectItem>
+                        <SelectItem value="zDup - Broker of Record (BOR)">zDup - Broker of Record (BOR)</SelectItem>
+                        <SelectItem value="Address (not practice loc)">Address (not practice loc)</SelectItem>
+                        <SelectItem value="zDup - Actuarial/UW/Pricing Tools">zDup - Actuarial/UW/Pricing Tools</SelectItem>
+                        <SelectItem value="zDup - Indication/Quote">zDup - Indication/Quote</SelectItem>
+                        <SelectItem value="Cash Application">Cash Application</SelectItem>
+                        <SelectItem value="Processing Form">Processing Form</SelectItem>
+                        <SelectItem value="Referral/Documentation">Referral/Documentation</SelectItem>
+                        <SelectItem value="Coverage">Coverage</SelectItem>
+                        <SelectItem value="Broker of Record (BOR)">Broker of Record (BOR)</SelectItem>
+                        <SelectItem value="Fund Documentation">Fund Documentation</SelectItem>
+                        <SelectItem value="Cancellation">Cancellation</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div>
+                  <div className="w-full md:w-auto md:min-w-[150px]">
                     <label className="block text-[#012F66] dark:text-white mb-2">
                       Priority
                     </label>
@@ -375,7 +470,7 @@ export function QCDashboard({
                       value={priorityFilter}
                       onValueChange={setPriorityFilter}
                     >
-                      <SelectTrigger className="bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
+                      <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
                         <SelectValue placeholder="All Priorities" />
                       </SelectTrigger>
                       <SelectContent>
@@ -393,7 +488,7 @@ export function QCDashboard({
                     </Select>
                   </div>
 
-                  <div>
+                  <div className="w-full md:w-auto md:min-w-[150px]">
                     <label className="block text-[#012F66] dark:text-white mb-2">
                       Reviewer
                     </label>
@@ -401,27 +496,23 @@ export function QCDashboard({
                       value={reviewerFilter}
                       onValueChange={setReviewerFilter}
                     >
-                      <SelectTrigger className="bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
-                        <SelectValue placeholder="All Reviewers" />
+                      <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white" disabled={isLoadingReviewers}>
+                        <SelectValue placeholder={isLoadingReviewers ? "Loading Reviewers..." : "All Reviewers"} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">
                           All Reviewers
                         </SelectItem>
-                        <SelectItem value="John Doe">
-                          John Doe
-                        </SelectItem>
-                        <SelectItem value="Sarah Smith">
-                          Sarah Smith
-                        </SelectItem>
-                        <SelectItem value="Mike Johnson">
-                          Mike Johnson
-                        </SelectItem>
+                        {reviewers.map((reviewer) => (
+                          <SelectItem key={reviewer} value={reviewer}>
+                            {reviewer}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div>
+                  <div className="w-full md:w-auto md:min-w-[150px]">
                     <label className="block text-[#012F66] dark:text-white mb-2">
                       Status
                     </label>
@@ -429,7 +520,7 @@ export function QCDashboard({
                       value={statusFilter}
                       onValueChange={setStatusFilter}
                     >
-                      <SelectTrigger className="bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
+                      <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
                         <SelectValue placeholder="All Statuses" />
                       </SelectTrigger>
                       <SelectContent>
@@ -451,18 +542,39 @@ export function QCDashboard({
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="w-full md:w-auto md:min-w-[150px]">
+                    <label className="block text-[#012F66] dark:text-white mb-2">
+                      Document ID
+                    </label>
+                    <Select
+                      value={docIdFilter}
+                      onValueChange={setDocIdFilter}
+                    >
+                      <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white" disabled={isLoadingDocIds}>
+                        <SelectValue placeholder={isLoadingDocIds ? "Loading IDs..." : "All Document IDs"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">
+                          All Document IDs
+                        </SelectItem>
+                        {uniqueDocIds.map((docId) => (
+                          <SelectItem key={docId} value={docId}>
+                            {docId}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
                     onClick={resetFilters}
-                    className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white hover:bg-[#F9FAFB] dark:hover:bg-[#3a3a3a]"
+                    className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white hover:bg-[#F9FAFB] dark:hover:bg-[#3a3a3a] cursor-pointer"
                   >
                     Reset Filters
-                  </Button>
-                  <Button className="bg-[#0292DC] hover:bg-[#012F66] text-white">
-                    Apply Filters
                   </Button>
                 </div>
               </div>
@@ -484,14 +596,6 @@ export function QCDashboard({
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="border-white/30 text-white hover:bg-white/10 bg-white/5"
-                    >
-                      Export List
-                    </Button>
-                  </div>
                 </div>
 
                 {/* Table */}
@@ -500,18 +604,21 @@ export function QCDashboard({
                     <thead className="bg-[#F9FAFB] dark:bg-[#1a1a1a] border-b border-[#E5E7EB] dark:border-[#3a3a3a]">
                       <tr>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                          Document ID
+                        </th>
+                        <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                           <button
                             onClick={() =>
                               handleSort("document")
                             }
                             className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            DOCUMENT{" "}
+                            Filename{" "}
                             <SortIcon field="document" />
                           </button>
                         </th>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                          FILE TYPE
+                          File Type
                         </th>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                           <button
@@ -520,7 +627,7 @@ export function QCDashboard({
                             }
                             className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            REVIEWER{" "}
+                            Reviewer{" "}
                             <SortIcon field="reviewer" />
                           </button>
                         </th>
@@ -531,12 +638,12 @@ export function QCDashboard({
                             }
                             className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            REVIEWED DATE{" "}
+                            Reviewed Date{" "}
                             <SortIcon field="reviewedDate" />
                           </button>
                         </th>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                          FIELDS
+                          Fields
                         </th>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                           <button
@@ -545,15 +652,15 @@ export function QCDashboard({
                             }
                             className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            PRIORITY{" "}
+                            Priority{" "}
                             <SortIcon field="priority" />
                           </button>
                         </th>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                          STATUS
+                          Status
                         </th>
                         <th className="px-6 py-4 text-right text-[#012F66] dark:text-white">
-                          ACTION
+                          Action
                         </th>
                       </tr>
                     </thead>
@@ -565,6 +672,9 @@ export function QCDashboard({
                             key={`loading-${index}`}
                             className="hover:bg-[#F9FAFB]/50 dark:hover:bg-[#3a3a3a]/50 transition-colors"
                           >
+                            <td className="px-6 py-5">
+                              <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24 font-mono"></div>
+                            </td>
                             <td className="px-6 py-5">
                               <div className="flex items-center gap-3">
                                 <div className="flex-shrink-0 w-10 h-10 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-lg animate-pulse"></div>
@@ -597,7 +707,7 @@ export function QCDashboard({
                       ) : paginatedQueue.length === 0 ? (
                         // Empty state when no documents found
                         <tr>
-                          <td colSpan={7} className="px-6 py-16 text-center">
+                          <td colSpan={9} className="px-6 py-16 text-center">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
                                 <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
@@ -611,7 +721,7 @@ export function QCDashboard({
                                   : "No documents match your current filters. Try adjusting your search criteria or reset the filters."
                                 }
                               </p>
-                              {(documentType !== 'all' || priorityFilter !== 'all' || statusFilter !== 'all' || reviewerFilter !== 'all') && (
+                              {(documentType !== 'all' || priorityFilter !== 'all' || statusFilter !== 'all' || reviewerFilter !== 'all' || docIdFilter !== 'all') && (
                                 <Button
                                   onClick={resetFilters}
                                   variant="outline"
@@ -629,6 +739,11 @@ export function QCDashboard({
                           key={item.id}
                           className="hover:bg-[#F9FAFB]/50 dark:hover:bg-[#3a3a3a]/50 transition-colors"
                         >
+                          <td className="px-6 py-5">
+                            <div className="text-[#80989A] dark:text-[#a0a0a0] font-mono">
+                              {(item as any).doc_handle_id || '-'}
+                            </div>
+                          </td>
                           <td className="px-6 py-5">
                             <div className="flex items-center gap-3">
                               <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-[#0292DC]/10 to-[#012F66]/10 rounded-lg flex items-center justify-center">
@@ -718,7 +833,7 @@ export function QCDashboard({
                         onClick={() =>
                           setCurrentPage((p) => p - 1)
                         }
-                        className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white disabled:opacity-50"
+                        className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white disabled:opacity-50 cursor-pointer"
                       >
                         Previous
                       </Button>
@@ -740,8 +855,8 @@ export function QCDashboard({
                           onClick={() => setCurrentPage(page)}
                           className={
                             currentPage === page
-                              ? "bg-[#0292DC] hover:bg-[#012F66] text-white"
-                              : "border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white"
+                              ? "bg-[#0292DC] hover:bg-[#012F66] text-white cursor-pointer"
+                              : "border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white cursor-pointer"
                           }
                         >
                           {page}
@@ -756,7 +871,7 @@ export function QCDashboard({
                         onClick={() =>
                           setCurrentPage((p) => p + 1)
                         }
-                        className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white disabled:opacity-50"
+                        className="border-[#D0D5DD] dark:border-[#4a4a4a] text-[#012F66] dark:text-white disabled:opacity-50 cursor-pointer"
                       >
                         Next
                       </Button>

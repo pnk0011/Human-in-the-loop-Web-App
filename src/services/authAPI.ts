@@ -1,5 +1,3 @@
-import data from '../data.json';
-
 // Get API base URL from environment variable
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
 
@@ -7,7 +5,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  password: string;
+  pwd: string;
   role: 'Admin' | 'Reviewer' | 'QC';
   permissions: string[];
   createdAt: string;
@@ -17,7 +15,7 @@ export interface User {
 
 export interface LoginRequest {
   email: string;
-  password: string;
+  pwd: string;
 }
 
 export interface LoginResponse {
@@ -48,7 +46,7 @@ export interface LoginAttempt {
 export interface Session {
   id: string;
   userId: string;
-  token: string;
+  tdata: string;
   createdAt: string;
   expiresAt: string;
   isActive: boolean;
@@ -57,7 +55,7 @@ export interface Session {
 // Simulate API delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Generate a simple token (in real app, use JWT)
+// Generate a simple tdata (in real app, use JWT)
 const generateToken = (userId: string): string => {
   return `token_${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
@@ -68,25 +66,19 @@ const isValidEmail = (email: string): boolean => {
   return emailRegex.test(email);
 };
 
-// Hash password (in real app, use proper hashing like bcrypt)
-const hashPassword = (password: string): string => {
+// Hash pwd (in real app, use proper hashing like bcrypt)
+const hashPassword = (pwd: string): string => {
   // Simple hash for demo purposes - in production use bcrypt
-  return btoa(password + '_salt');
+  return btoa(pwd + '_salt');
 };
 
-// Verify password
-const verifyPassword = (password: string, hashedPassword: string): boolean => {
-  return hashPassword(password) === hashedPassword;
+// Verify pwd
+const verifyPassword = (pwd: string, hashedPassword: string): boolean => {
+  return hashPassword(pwd) === hashedPassword;
 };
 
 export class AuthAPI {
   private static instance: AuthAPI;
-  private users: User[] = data.users.map(user => ({
-    ...user,
-    role: user.role as 'Admin' | 'Reviewer' | 'QC'
-  }));
-  private loginAttempts: LoginAttempt[] = data.loginAttempts;
-  private sessions: Session[] = data.sessions;
 
   static getInstance(): AuthAPI {
     if (!AuthAPI.instance) {
@@ -97,16 +89,15 @@ export class AuthAPI {
 
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     try {
-      const { email, password } = credentials;
-      console.log('🔐 Login attempt:', { email, password });
+      const { email, pwd } = credentials;
 
       // Validate input
-      if (!email || !password) {
-        console.log('❌ Missing email or password');
+      if (!email || !pwd) {
+        console.log('❌ Missing email or pwd');
         return {
           status: 'error',
-          message: 'Email and password are required',
-          error: 'Email and password are required'
+          message: 'Email and pwd are required',
+          error: 'Email and pwd are required'
         };
       }
 
@@ -120,7 +111,7 @@ export class AuthAPI {
       }
 
       // Static admin login bypass
-      if (email.toLowerCase() === 'admin@medpro.com' && password === 'admin123') {
+      if (email.toLowerCase() === 'admin@medpro.com' && pwd === 'admin123') {
         console.log('✅ Static admin login successful');
         
         const adminUser = {
@@ -149,7 +140,7 @@ export class AuthAPI {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, 'password' : pwd }),
       });
 
       const data = await response.json();
@@ -211,9 +202,9 @@ export class AuthAPI {
     try {
       // Check if user data exists in localStorage
       const userData = localStorage.getItem('user');
-      const token = localStorage.getItem('accessToken');
+      const tdata = localStorage.getItem('accessToken');
       
-      if (!userData || !token) {
+      if (!userData || !tdata) {
         return { valid: false };
       }
 
@@ -225,66 +216,6 @@ export class AuthAPI {
     } catch (error) {
       console.error('Token validation error:', error);
       return { valid: false };
-    }
-  }
-
-  async getUsers(): Promise<User[]> {
-    try {
-      await delay(500);
-      return this.users.filter(user => user.isActive);
-    } catch (error) {
-      console.error('Get users error:', error);
-      return [];
-    }
-  }
-
-  async getUserById(id: string): Promise<User | null> {
-    try {
-      await delay(300);
-      return this.users.find(user => user.id === id) || null;
-    } catch (error) {
-      console.error('Get user by ID error:', error);
-      return null;
-    }
-  }
-
-  private recordLoginAttempt(email: string, success: boolean): void {
-    const attempt: LoginAttempt = {
-      id: `attempt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      email,
-      success,
-      timestamp: new Date().toISOString(),
-      ipAddress: '127.0.0.1', // In real app, get from request
-      userAgent: navigator.userAgent
-    };
-
-    this.loginAttempts.push(attempt);
-
-    // Keep only last 100 attempts
-    if (this.loginAttempts.length > 100) {
-      this.loginAttempts = this.loginAttempts.slice(-100);
-    }
-  }
-
-  // Get login attempts for analytics
-  async getLoginAttempts(): Promise<LoginAttempt[]> {
-    try {
-      await delay(300);
-      return [...this.loginAttempts];
-    } catch (error) {
-      console.error('Get login attempts error:', error);
-      return [];
-    }
-  }
-
-  // Get active sessions
-  async getActiveSessions(): Promise<Session[]> {
-    try {
-      await delay(300);
-      return this.sessions.filter(session => session.isActive);
-    } catch (error) {
-      console.error('Get active sessions error:', error);
-      return [];
     }
   }
 }

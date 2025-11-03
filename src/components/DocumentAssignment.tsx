@@ -45,6 +45,7 @@ export function DocumentAssignment() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+  const [docIdFilter, setDocIdFilter] = useState('All');
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,9 +60,19 @@ export function DocumentAssignment() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [stats, setStats] = useState({
+    "Total Documents": 0,
+    "Total Files": 0,
+    "Assigned Files": 0,
+    "Completed Files": 0,
+  });
   
   // Loading state for reviewers
   const [isLoadingAllReviewers, setIsLoadingAllReviewers] = useState(false);
+  
+  // State for unique document IDs
+  const [uniqueDocIds, setUniqueDocIds] = useState<string[]>([]);
+  const [isLoadingDocIds, setIsLoadingDocIds] = useState(false);
 
   // Debounce search query
   useEffect(() => {
@@ -72,10 +83,37 @@ export function DocumentAssignment() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Load unique document IDs on component mount
+  useEffect(() => {
+    const loadUniqueDocIds = async () => {
+      setIsLoadingDocIds(true);
+      try {
+        const response = await documentAPI.getUniqueDocumentIds();
+        console.log('Unique document IDs API response:', response);
+        
+        // Check for different possible response structures
+        if (response.status === 'success') {
+          // Try different possible field names
+          const docIds = response.doc_handle_ids || [];
+          console.log('Extracted document IDs:', docIds);
+          setUniqueDocIds(Array.isArray(docIds) ? docIds : []);
+        } else {
+          console.error('API returned non-success status:', response.status);
+        }
+      } catch (error) {
+        console.error('Failed to load unique document IDs:', error);
+      } finally {
+        setIsLoadingDocIds(false);
+      }
+    };
+    
+    loadUniqueDocIds();
+  }, []);
+
   // Load documents on component mount and when filters change
   useEffect(() => {
     loadDocuments();
-  }, [currentPage, debouncedSearchQuery, statusFilter, typeFilter, priorityFilter, itemsPerPage]);
+  }, [currentPage, debouncedSearchQuery, statusFilter, typeFilter, priorityFilter, docIdFilter, itemsPerPage]);
 
   const loadDocuments = async () => {
     setIsLoading(true);
@@ -88,13 +126,19 @@ export function DocumentAssignment() {
         doc_type_name: typeFilter !== 'All' ? typeFilter : undefined,
         priority: priorityFilter !== 'All' ? priorityFilter : undefined,
         status: statusFilter !== 'All' ? statusFilter : undefined,
+        doc_handle_id: docIdFilter !== 'All' ? docIdFilter : undefined,
       };
 
       const response = await documentAPI.getDocuments(params);
       
-      if (response.status === 'success' && response.documents) {
+      if (response.status === 'success' && response.files) {
+        // Set stats from API response
+        if (response.stats) {
+          setStats(response.stats);
+        }
+        
         // Convert API response to match component expectations
-        const formattedDocuments = response.documents.map(doc => ({
+        const formattedDocuments = response.files.map(doc => ({
           ...doc,
           id: `${doc.file_name}_${doc.doc_handle_id}`, // Use combination of file name and doc_handle_id as unique ID
           documentName: doc.file_name,
@@ -142,7 +186,7 @@ export function DocumentAssignment() {
   };
 
   // Helper function to convert API status to component status
-  const getStatusFromApi = (status: string): 'Unassigned' | 'Assigned' | 'In Progress' | 'Completed' => {
+  const getStatusFromApi = (status: string | null): 'Unassigned' | 'Assigned' | 'In Progress' | 'Completed' => {
     switch (status) {
       case '0':
         return 'Unassigned';
@@ -394,36 +438,36 @@ export function DocumentAssignment() {
           {isLoading ? (
             <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
           ) : (
-            <div className="text-[#012F66] dark:text-white text-3xl font-bold">{totalDocuments}</div>
+            <div className="text-[#012F66] dark:text-white text-3xl font-bold">{stats["Total Documents"]}</div>
           )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Unassigned (current page)</div>
-          {isLoading ? (
-            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
-          ) : (
-            <div className="text-[#FF0081] text-3xl font-bold">
-              {documents.filter((d) => d.status === 'Unassigned').length}
-            </div>
-          )}
-        </div>
-        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Assigned (current page)</div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Files</div>
           {isLoading ? (
             <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
           ) : (
             <div className="text-[#0292DC] text-3xl font-bold">
-              {documents.filter((d) => d.status === 'Assigned').length}
+              {stats["Total Files"]}
             </div>
           )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">In Progress (current page)</div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Assigned Files</div>
           {isLoading ? (
             <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
           ) : (
             <div className="text-[#FFC018] text-3xl font-bold">
-              {documents.filter((d) => d.status === 'In Progress').length}
+              {stats["Assigned Files"]}
+            </div>
+          )}
+        </div>
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Completed Files</div>
+          {isLoading ? (
+            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+          ) : (
+            <div className="text-green-600 text-3xl font-bold">
+              {stats["Completed Files"]}
             </div>
           )}
         </div>
@@ -432,6 +476,7 @@ export function DocumentAssignment() {
       {/* Filters and Actions */}
       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+        <h3 className="text-[#012F66] dark:text-white mb-4">Filter Documents</h3>
           <div className="flex flex-wrap items-center gap-4">
             {isLoading && (
               <div className="flex items-center gap-2 text-[#80989A] dark:text-[#a0a0a0]">
@@ -439,10 +484,10 @@ export function DocumentAssignment() {
                 <span className="text-sm">Loading documents...</span>
               </div>
             )}
-            <div className="flex items-center gap-2">
+            {/* <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-[#80989A]" />
               <span className="text-[#012F66] dark:text-white">Filters</span>
-            </div>
+            </div> */}
             <Input
               placeholder="Search documents..."
               value={searchQuery}
@@ -467,10 +512,37 @@ export function DocumentAssignment() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All Types</SelectItem>
+                <SelectItem value="Large Claim Review Form">Large Claim Review Form</SelectItem>
+                <SelectItem value="Actuarial/UW/Pricing Tools">Actuarial/UW/Pricing Tools</SelectItem>
+                <SelectItem value="Reinsurance">Reinsurance</SelectItem>
+                <SelectItem value="Indication/Quote">Indication/Quote</SelectItem>
+                <SelectItem value="Endorsement">Endorsement</SelectItem>
+                <SelectItem value="Green Card">Green Card</SelectItem>
+                <SelectItem value="Finance Agreement">Finance Agreement</SelectItem>
+                <SelectItem value="Policy Form">Policy Form</SelectItem>
+                <SelectItem value="Additional Risk">Additional Risk</SelectItem>
+                <SelectItem value="Reporting Endorsement">Reporting Endorsement</SelectItem>
+                <SelectItem value="zDup - Loss Run">zDup - Loss Run</SelectItem>
+                <SelectItem value="Loss Run">Loss Run</SelectItem>
+                <SelectItem value="zDup - Stat Notice/Non-Renewal">zDup - Stat Notice/Non-Renewal</SelectItem>
+                <SelectItem value="Expiration/Effective/Retro Date">Expiration/Effective/Retro Date</SelectItem>
+                <SelectItem value="Return Mail">Return Mail</SelectItem>
+                <SelectItem value="Policy">Policy</SelectItem>
+                <SelectItem value="Assessments">Assessments</SelectItem>
                 <SelectItem value="Invoice">Invoice</SelectItem>
-                <SelectItem value="Purchase Order">Purchase Order</SelectItem>
-                <SelectItem value="Receipt">Receipt</SelectItem>
-                <SelectItem value="Contract">Contract</SelectItem>
+                <SelectItem value="Application">Application</SelectItem>
+                <SelectItem value="Stat Notice/Non-Renewal">Stat Notice/Non-Renewal</SelectItem>
+                <SelectItem value="zDup - Broker of Record (BOR)">zDup - Broker of Record (BOR)</SelectItem>
+                <SelectItem value="Address (not practice loc)">Address (not practice loc)</SelectItem>
+                <SelectItem value="zDup - Actuarial/UW/Pricing Tools">zDup - Actuarial/UW/Pricing Tools</SelectItem>
+                <SelectItem value="zDup - Indication/Quote">zDup - Indication/Quote</SelectItem>
+                <SelectItem value="Cash Application">Cash Application</SelectItem>
+                <SelectItem value="Processing Form">Processing Form</SelectItem>
+                <SelectItem value="Referral/Documentation">Referral/Documentation</SelectItem>
+                <SelectItem value="Coverage">Coverage</SelectItem>
+                <SelectItem value="Broker of Record (BOR)">Broker of Record (BOR)</SelectItem>
+                <SelectItem value="Fund Documentation">Fund Documentation</SelectItem>
+                <SelectItem value="Cancellation">Cancellation</SelectItem>
               </SelectContent>
             </Select>
             <Select value={priorityFilter} onValueChange={(value) => handleFilterChange(setPriorityFilter, value)}>
@@ -482,6 +554,19 @@ export function DocumentAssignment() {
                 <SelectItem value="High">High</SelectItem>
                 <SelectItem value="Medium">Medium</SelectItem>
                 <SelectItem value="Low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={docIdFilter} onValueChange={(value) => handleFilterChange(setDocIdFilter, value)}>
+              <SelectTrigger className="w-full md:w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white" disabled={isLoadingDocIds}>
+                <SelectValue placeholder={isLoadingDocIds ? "Loading IDs..." : "Document ID"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Document IDs</SelectItem>
+                {uniqueDocIds.map((docId) => (
+                  <SelectItem key={docId} value={docId}>
+                    {docId}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <div className="flex items-center gap-2">
@@ -505,7 +590,7 @@ export function DocumentAssignment() {
                 </SelectContent>
               </Select>
             </div>
-            {(searchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All') && (
+            {(searchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All' || docIdFilter !== 'All') && (
               <Button
                 onClick={() => {
                   setSearchQuery("");
@@ -513,6 +598,7 @@ export function DocumentAssignment() {
                   setStatusFilter("All");
                   setTypeFilter("All");
                   setPriorityFilter("All");
+                  setDocIdFilter("All");
                   setCurrentPage(1);
                 }}
                 variant="outline"
@@ -556,11 +642,14 @@ export function DocumentAssignment() {
                     onCheckedChange={toggleAll}
                   />
                 </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Document ID
+                </th>
                 <th
                   className="px-6 py-4 text-left text-[#012F66] dark:text-white cursor-pointer hover:bg-[#E5E7EB] dark:hover:bg-[#2a2a2a]"
                   onClick={() => handleSort('documentName')}
                 >
-                  Document {getSortIcon('documentName')}
+                  Filename {getSortIcon('documentName')}
                 </th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Type</th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Fields</th>
@@ -598,6 +687,9 @@ export function DocumentAssignment() {
                       <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
                     </td>
                     <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24"></div>
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-32"></div>
                     </td>
                     <td className="px-6 py-4">
@@ -632,6 +724,9 @@ export function DocumentAssignment() {
                       checked={selectedDocuments.has(doc.id)}
                       onCheckedChange={() => toggleDocument(doc.id)}
                     />
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-[#80989A] dark:text-[#a0a0a0] font-mono">{doc.doc_handle_id}</div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-[#012F66] dark:text-white">{doc.documentName}</div>
@@ -673,12 +768,12 @@ export function DocumentAssignment() {
               No Documents Found
             </h3>
             <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-6 max-w-md">
-              {debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All'
+              {debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All' || docIdFilter !== 'All'
                 ? "No documents match your current filters. Try adjusting your search criteria or reset the filters."
                 : "No documents have been uploaded yet."
               }
             </p>
-            {(debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All') && (
+            {(debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All' || docIdFilter !== 'All') && (
               <Button
                 onClick={() => {
                   setSearchQuery("");
@@ -686,6 +781,7 @@ export function DocumentAssignment() {
                   setStatusFilter("All");
                   setTypeFilter("All");
                   setPriorityFilter("All");
+                  setDocIdFilter("All");
                   setCurrentPage(1);
                 }}
                 variant="outline"
@@ -719,7 +815,7 @@ export function DocumentAssignment() {
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Retry
               </Button>
-              {(debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All') && (
+              {(debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All' || docIdFilter !== 'All') && (
                 <Button
                   onClick={() => {
                     setSearchQuery("");
@@ -727,6 +823,7 @@ export function DocumentAssignment() {
                     setStatusFilter("All");
                     setTypeFilter("All");
                     setPriorityFilter("All");
+                    setDocIdFilter("All");
                     setCurrentPage(1);
                     loadDocuments();
                   }}

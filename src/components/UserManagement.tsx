@@ -104,6 +104,16 @@ export function UserManagement() {
     try {
       const response = await userAPI.getUsers(currentPage, itemsPerPage, debouncedSearchQuery, roleFilter !== 'all' ? roleFilter : undefined, statusFilter !== 'all' ? statusFilter : undefined);
       if (response.status === 'success' && response.users) {
+        // Set stats from API response and map field names
+        if (response.stats) {
+          setStats({
+            total_users: response.stats.total_users,
+            active_users: response.stats.active_users,
+            reviewers_count: response.stats.reviewer_count || 0, // Map API field to component field
+            qc_count: response.stats.qc_count,
+          });
+        }
+        
         // Convert API response to match component expectations
         const formattedUsers = response.users.map(user => ({
           ...user,
@@ -158,7 +168,7 @@ export function UserManagement() {
     firstName: "",
     lastName: "",
     email: "",
-    password: "",
+    pwd: "",
     role: "Reviewer" as "Admin" | "Reviewer" | "QC",
     status: "Active" as "Active" | "Inactive",
     qualityControl: "",
@@ -169,7 +179,7 @@ export function UserManagement() {
       firstName: "",
       lastName: "",
       email: "",
-      password: "",
+      pwd: "",
       role: "Reviewer",
       status: "Active",
       qualityControl: "",
@@ -177,7 +187,7 @@ export function UserManagement() {
   };
 
   const handleCreateUser = async () => {
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.pwd) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -188,7 +198,7 @@ export function UserManagement() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
-        password: formData.password,
+        'password': formData.pwd,
         role: formData.role,
         qualityControl: formData.qualityControl || undefined,
       };
@@ -286,7 +296,7 @@ export function UserManagement() {
       firstName: user.first_name || user.name?.split(' ')[0] || '',
       lastName: user.last_name || user.name?.split(' ').slice(1).join(' ') || '',
       email: user.email,
-      password: '', // Don't populate password for security
+      pwd: '', // Don't populate pwd for security
       role: user.role,
       status: user.status || (user.isActive ? 'Active' : 'Inactive'),
       qualityControl: user.qualityControl || user.quality_control || '',
@@ -834,11 +844,11 @@ export function UserManagement() {
               <Input
                 id="password"
                 type="password"
-                value={formData.password}
+                value={formData.pwd}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    password: e.target.value,
+                    pwd: e.target.value,
                   })
                 }
                 placeholder="Enter password"

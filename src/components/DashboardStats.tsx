@@ -33,37 +33,47 @@ const StatCard = React.memo(function StatCard({ title, value, subtitle, subtitle
   );
 });
 
-export const DashboardStats = React.memo(function DashboardStats() {
+interface DashboardStatsProps {
+  stats?: {
+    Assigned_documents?: number;
+    Assigned_files?: number;
+    Critical_files?: number;
+    Files_completed_today?: number;
+  };
+}
+
+export const DashboardStats = React.memo(function DashboardStats({ stats }: DashboardStatsProps) {
   const statsData = useMemo(() => [
     {
       title: "Assigned Documents",
-      value: "2",
+      value: stats?.Assigned_documents ?? 0,
+      icon: <FileText className="w-6 h-6" />,
+      iconBgColor: "bg-[#FFC018]/10",
+      iconColor: "text-[#FFC018]"
+    },
+    {
+      title: "Assigned Files",
+      value: stats?.Assigned_files ?? 0,
       icon: <FileText className="w-6 h-6" />,
       iconBgColor: "bg-[#0292DC]/10",
       iconColor: "text-[#0292DC]"
     },
     {
       title: "Critical Items",
-      value: "2",
+      value: stats?.Critical_files ?? 0,
       icon: <AlertCircle className="w-6 h-6" />,
       iconBgColor: "bg-[#FF0081]/10",
       iconColor: "text-[#FF0081]"
     },
     {
       title: "Completed Today",
-      value: "12",
+      value: stats?.Files_completed_today ?? 0,
       icon: <CheckCircle2 className="w-6 h-6" />,
       iconBgColor: "bg-[#10B981]/10",
       iconColor: "text-[#10B981]"
     },
-    {
-      title: "Avg. Completion Time",
-      value: "8.4 min",
-      icon: <Clock className="w-6 h-6" />,
-      iconBgColor: "bg-[#FFC018]/10",
-      iconColor: "text-[#FFC018]"
-    }
-  ], []);
+   
+  ], [stats]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
