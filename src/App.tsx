@@ -5,6 +5,7 @@ import { useLoading } from "./hooks/useLoading";
 import { LazyComponents } from "./components/LazyComponents";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { RoleGuard } from "./components/RoleGuard";
+import { Toaster } from "./components/ui/sonner";
 
 interface ExtractedField {
   id: string;
@@ -139,7 +140,7 @@ const AppContent = React.memo(function AppContent() {
           throw new Error('API response failed');
         }
       } catch (error) {
-        console.log('Using fallback mock data for validation:', error);
+        // Using fallback mock data for validation
         
         // Fallback to mock data with original look and feel
         document = {
@@ -248,7 +249,7 @@ const AppContent = React.memo(function AppContent() {
           throw new Error('QC API response failed');
         }
       } catch (error) {
-        console.log('Using fallback mock data for QC validation:', error);
+        // Using fallback mock data for QC validation
         
         // Fallback to mock data with original look and feel
         qcDocument = {
@@ -480,17 +481,16 @@ const AppContent = React.memo(function AppContent() {
           });
 
           if (response.message) {
-            console.log("API submission successful:", response.message);
+            // API submission successful
           } else {
-            console.log("API submission failed, using fallback");
+            // API submission failed, using fallback
           }
         }
       } catch (error) {
-        console.log("API submission failed, using fallback:", error);
+        // API submission failed, using fallback
       }
       
       // Always update UI regardless of API success/failure
-      console.log("All validations submitted:", validations);
       // Decrease queue count
       setQueueCount((prev) => Math.max(0, prev - 1));
       // Return to dashboard
@@ -520,17 +520,16 @@ const AppContent = React.memo(function AppContent() {
           });
 
           if (response.message) {
-            console.log("QC API submission successful:", response.message);
+            // QC API submission successful
           } else {
-            console.log("QC API submission failed, using fallback");
+            // QC API submission failed, using fallback
           }
         }
       } catch (error) {
-        console.log("QC API submission failed, using fallback:", error);
+        // QC API submission failed, using fallback
       }
       
       // Always update UI regardless of API success/failure
-      console.log("QC review submitted:", decisions);
       // Decrease QC queue count
       setQcQueueCount((prev) => Math.max(0, prev - 1));
       // Return to dashboard
@@ -665,6 +664,7 @@ const AppContent = React.memo(function AppContent() {
         
         {isLoading && <LoadingOverlay />}
       </div>
+      <Toaster />
     </ErrorBoundary>
   );
 });

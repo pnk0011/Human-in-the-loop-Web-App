@@ -43,7 +43,7 @@ export function QCDashboard({
   const [documentType, setDocumentType] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [reviewerFilter, setReviewerFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+
   const [docIdFilter, setDocIdFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField | null>(
@@ -65,6 +65,8 @@ export function QCDashboard({
   const [isLoadingDocIds, setIsLoadingDocIds] = useState(false);
   const [reviewers, setReviewers] = useState<string[]>([]);
   const [isLoadingReviewers, setIsLoadingReviewers] = useState(false);
+  const [completedDocuments, setCompletedDocuments] = useState<QCDocument[]>([]);
+  const [isLoadingCompleted, setIsLoadingCompleted] = useState(false);
 
   // Handle validate click with per-item loading state
   const handleValidateClick = async (item: any) => {
@@ -86,17 +88,13 @@ export function QCDashboard({
         setIsLoadingDocIds(true);
         try {
           const response = await documentAPI.getUniqueDocumentIds(undefined, user.email);
-          console.log('QC Unique document IDs API response:', response);
           
           if (response.status === 'success') {
             const docIds = response.doc_handle_ids || response.data || [];
-            console.log('Extracted QC document IDs:', docIds);
             setUniqueDocIds(Array.isArray(docIds) ? docIds : []);
-          } else {
-            console.error('API returned non-success status:', response.status);
           }
         } catch (error) {
-          console.error('Failed to load QC unique document IDs:', error);
+          // Failed to load QC unique document IDs
         } finally {
           setIsLoadingDocIds(false);
         }
@@ -113,16 +111,12 @@ export function QCDashboard({
         setIsLoadingReviewers(true);
         try {
           const response = await documentOperationsAPI.getReviewersAssignedToQC(user.email);
-          console.log('QC Reviewers API response:', response);
           
           if (response.status === 'success' && response.reviewers) {
-            console.log('Extracted QC reviewers:', response.reviewers);
             setReviewers(Array.isArray(response.reviewers) ? response.reviewers : []);
-          } else {
-            console.error('API returned non-success status:', response.status);
           }
         } catch (error) {
-          console.error('Failed to load QC reviewers:', error);
+          // Failed to load QC reviewers
         } finally {
           setIsLoadingReviewers(false);
         }
@@ -135,7 +129,7 @@ export function QCDashboard({
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [documentType, priorityFilter, reviewerFilter, statusFilter, docIdFilter]);
+  }, [documentType, priorityFilter, reviewerFilter, docIdFilter]);
 
   // Load API data for QC documents
   useEffect(() => {
@@ -149,22 +143,25 @@ export function QCDashboard({
             limit: 25,
             doc_type_name: documentType !== 'all' ? documentType : 'All',
             priority: priorityFilter !== 'all' ? priorityFilter : 'All',
-            status: statusFilter !== 'all' ? statusFilter : 'All',
+            status: '3', // Always use status=3 (QC Pending) for QC review queue
             reviewer: reviewerFilter !== 'all' ? reviewerFilter : 'All',
             doc_handle_id: docIdFilter !== 'all' ? docIdFilter : undefined,
           };
           
           const response = await documentOperationsAPI.getQCDocuments(params);
           if (response.status === 'success') {
-            if (response.files) {
-              setApiDocuments(response.files);
-            }
+            // Always set apiDocuments, even if empty array
+            setApiDocuments(response.files || []);
             if (response.stats) {
               setStats(response.stats);
             }
+          } else {
+            // Set empty array if response status is not success
+            setApiDocuments([]);
           }
         } catch (error) {
-          console.error('Failed to load QC documents:', error);
+          // Failed to load QC documents - set empty array
+          setApiDocuments([]);
         } finally {
           setIsLoading(false);
         }
@@ -172,7 +169,53 @@ export function QCDashboard({
     };
 
     loadApiData();
-  }, [user?.email, documentType, priorityFilter, statusFilter, reviewerFilter, docIdFilter]);
+  }, [user?.email, documentType, priorityFilter, reviewerFilter, docIdFilter]);
+
+  // Load completed documents for work history tab (status=1)
+  useEffect(() => {
+    const loadCompletedDocuments = async () => {
+      if (user?.email && activeTab === 'Work History') {
+        setIsLoadingCompleted(true);
+        try {
+          const params: GetQCDocumentsRequest = {
+            quality_control: user.email,
+            page: 1,
+            limit: 100,
+            status: '1', // Fetch records with status=1 (Completed) for QC work history
+          };
+
+          const response = await documentOperationsAPI.getQCDocuments(params);
+          if (response.status === 'success' && response.files) {
+            setCompletedDocuments(response.files);
+          } else {
+            setCompletedDocuments([]);
+          }
+        } catch (error) {
+          setCompletedDocuments([]);
+        } finally {
+          setIsLoadingCompleted(false);
+        }
+      }
+    };
+
+    loadCompletedDocuments();
+  }, [user?.email, activeTab]);
+
+  // Convert completed QCDocuments to QCCompletedDocument format for WorkHistory
+  const convertCompletedDocumentsToWorkHistory = () => {
+    return completedDocuments.map((doc) => ({
+      id: `${doc.file_name}_${doc.doc_handle_id}`,
+      documentName: doc.file_name,
+      documentType: doc.doc_type_name || 'Unknown',
+      reviewer: doc.reviewer_assigned || 'Unknown Reviewer',
+      completedDate: doc.qc_completed_dt?.split(' ')[0] || new Date().toISOString().split('T')[0],
+      reviewedDate: doc.qc_completed_dt?.split(' ')[0] || new Date().toISOString().split('T')[0],
+      fieldsCount: doc.distinct_entity_type_count,
+      approvedCount: 0, // Not available in API response
+      sentBackCount: 0, // Not available in API response
+      passRate: Math.round(doc.avg_confidence_percentage), // Use confidence as pass rate
+    }));
+  };
 
   // Convert API documents to original QC queue format
   const convertApiDocumentsToQCQueue = () => {
@@ -319,8 +362,6 @@ export function QCDashboard({
       priorityFilter === "all" || item.priority === priorityFilter;
     const matchesReviewer =
       reviewerFilter === "all" || item.reviewer === reviewerFilter;
-    const matchesStatus =
-      statusFilter === "all" || item.status === statusFilter;
     const matchesDocId =
       docIdFilter === "all" || (item as any).doc_handle_id === docIdFilter;
 
@@ -328,7 +369,6 @@ export function QCDashboard({
       matchesType &&
       matchesPriority &&
       matchesReviewer &&
-      matchesStatus &&
       matchesDocId
     );
   });
@@ -365,7 +405,6 @@ export function QCDashboard({
     setDocumentType("all");
     setPriorityFilter("all");
     setReviewerFilter("all");
-    setStatusFilter("all");
     setDocIdFilter("all");
     setCurrentPage(1);
   };
@@ -394,7 +433,7 @@ export function QCDashboard({
       />
 
       {/* Main Content */}
-      <main className="p-6 max-w-[1400px] mx-auto">
+      <main className="p-6 w-full">
         {activeTab === "Current Queue" ? (
           <>
             {/* Stats */}
@@ -512,36 +551,7 @@ export function QCDashboard({
                     </Select>
                   </div>
 
-                  <div className="w-full md:w-auto md:min-w-[150px]">
-                    <label className="block text-[#012F66] dark:text-white mb-2">
-                      Status
-                    </label>
-                    <Select
-                      value={statusFilter}
-                      onValueChange={setStatusFilter}
-                    >
-                      <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
-                        <SelectValue placeholder="All Statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">
-                          All Statuses
-                        </SelectItem>
-                        <SelectItem value="Pending QC">
-                          Pending QC
-                        </SelectItem>
-                        <SelectItem value="In Review">
-                          In Review
-                        </SelectItem>
-                        <SelectItem value="Approved">
-                          Approved
-                        </SelectItem>
-                        <SelectItem value="Sent Back">
-                          Sent Back
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+
 
                   <div className="w-full md:w-auto md:min-w-[150px]">
                     <label className="block text-[#012F66] dark:text-white mb-2">
@@ -708,7 +718,7 @@ export function QCDashboard({
                         // Empty state when no documents found
                         <tr>
                           <td colSpan={9} className="px-6 py-16 text-center">
-                            <div className="flex flex-col items-center justify-center">
+                            <div className="flex flex-col items-center justify-center" style={{ padding: '20px' }}>
                               <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
                                 <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
                               </div>
@@ -716,12 +726,12 @@ export function QCDashboard({
                                 No Documents Found
                               </h3>
                               <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-4 max-w-md">
-                                {apiDocuments.length === 0 
-                                  ? "No documents found matching your filters."
+                                {apiDocuments.length === 0 && !isLoading
+                                  ? "No documents found. Try adjusting your filters or check back later."
                                   : "No documents match your current filters. Try adjusting your search criteria or reset the filters."
                                 }
                               </p>
-                              {(documentType !== 'all' || priorityFilter !== 'all' || statusFilter !== 'all' || reviewerFilter !== 'all' || docIdFilter !== 'all') && (
+                              {(documentType !== 'all' || priorityFilter !== 'all' || reviewerFilter !== 'all' || docIdFilter !== 'all' || (apiDocuments.length === 0 && !isLoading)) && (
                                 <Button
                                   onClick={resetFilters}
                                   variant="outline"
@@ -884,6 +894,8 @@ export function QCDashboard({
         ) : activeTab === "Work History" ? (
           <QCWorkHistory
             onViewClick={onViewHistoryClick || (() => {})}
+            documents={convertCompletedDocumentsToWorkHistory()}
+            isLoading={isLoadingCompleted}
           />
         ) : null}
       </main>

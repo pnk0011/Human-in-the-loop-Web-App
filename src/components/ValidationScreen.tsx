@@ -211,15 +211,7 @@ export function ValidationScreen({
     }));
   };
 
-  const handleRejectReasonChange = (reason: string) => {
-    setFieldValidations((prev) => ({
-      ...prev,
-      [selectedFieldId]: {
-        ...prev[selectedFieldId],
-        rejectReason: reason,
-      },
-    }));
-  };
+
 
   const handleSubmitAll = async () => {
     const validations = Object.values(fieldValidations);
@@ -249,18 +241,7 @@ export function ValidationScreen({
         );
         return;
       }
-      if (
-        validation.action === "reject" &&
-        !validation.rejectReason
-      ) {
-        const field = document.fields.find(
-          (f) => f.id === validation.fieldId,
-        );
-        alert(
-          `Please select a reason for rejecting "${field?.fieldName}"`,
-        );
-        return;
-      }
+
     }
 
     // Set loading state and submit
@@ -359,11 +340,10 @@ export function ValidationScreen({
                         style={{ maxHeight: '80vh' }}
                         crossOrigin="anonymous"
                         onLoad={() => {
-                          console.log('Document image loaded successfully:', document.documentImage);
+                          // Document image loaded successfully
                         }}
                         onError={(e) => {
-                          console.error('Failed to load document image:', document.documentImage);
-                          console.error('Image error event:', e);
+                          // Failed to load document image
                           // Hide the image and show error message
                           e.currentTarget.style.display = 'none';
                           const errorElement = e.currentTarget.nextElementSibling;
@@ -467,7 +447,7 @@ export function ValidationScreen({
             <h3 className="text-[#012F66] dark:text-white mb-3">
               Fields to Validate ({document.fields.length})
             </h3>
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[180px]">
               <div className="space-y-2 pr-4">
                 {document.fields.map((field, index) => (
                   <div
@@ -640,38 +620,6 @@ export function ValidationScreen({
                   placeholder="Enter the correct value"
                   className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white"
                 />
-              </div>
-            )}
-
-            {/* Rejection Reason */}
-            {currentValidation.action === "reject" && (
-              <div className="mb-4 space-y-2">
-                <label className="text-[#012F66] dark:text-white">
-                  Rejection Reason
-                </label>
-                <Select
-                  value={currentValidation.rejectReason || ""}
-                  onValueChange={handleRejectReasonChange}
-                >
-                  <SelectTrigger className="bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
-                    <SelectValue placeholder="Select a reason" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unreadable">
-                      Document Unreadable
-                    </SelectItem>
-                    <SelectItem value="missing">
-                      Field Missing
-                    </SelectItem>
-                    <SelectItem value="incorrect_format">
-                      Incorrect Format
-                    </SelectItem>
-                    <SelectItem value="duplicate">
-                      Duplicate Entry
-                    </SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             )}
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardHeader } from './AppHeader';
 import { DashboardStats } from './DashboardStats';
 import { ValidationQueue } from './ValidationQueue';
@@ -46,7 +46,7 @@ export function Dashboard({ onValidateClick, onViewHistoryClick, onLogout, theme
     <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a]">
       <DashboardHeader activeTab={activeTab} onTabChange={setActiveTab} onLogout={onLogout} theme={theme} onToggleTheme={onToggleTheme} />
       
-      <main className="p-6 max-w-[1400px] mx-auto">
+      <main className="p-6 w-full">
         {isDataLoading ? (
           <>
             <LoadingDashboardStats />

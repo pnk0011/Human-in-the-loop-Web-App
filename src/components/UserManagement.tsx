@@ -88,11 +88,9 @@ export function UserManagement() {
       const response = await userAPI.getStats();
       if (response.status === 'success' && response.stats) {
         setStats(response.stats);
-      } else {
-        console.error('Failed to load stats:', response.message);
       }
     } catch (error: any) {
-      console.error('Failed to load stats:', error);
+      // Failed to load stats
     } finally {
       setIsLoadingStats(false);
     }
@@ -151,7 +149,6 @@ export function UserManagement() {
         setHasApiError(true);
       }
     } catch (error: any) {
-      console.error('Failed to load users:', error);
       toast.error('Failed to load users. Please try again.');
       setUsers([]);
       setTotalUsers(0);
@@ -216,7 +213,6 @@ export function UserManagement() {
         toast.error(response.message || 'Failed to create user');
       }
     } catch (error: any) {
-      console.error('Failed to create user:', error);
       toast.error(error.message || 'Failed to create user');
     } finally {
       setIsCreating(false);
@@ -253,7 +249,6 @@ export function UserManagement() {
         toast.error(response.message || 'Failed to update user');
       }
     } catch (error: any) {
-      console.error('Failed to update user:', error);
       toast.error(error.message || 'Failed to update user');
     } finally {
       setIsUpdating(false);
@@ -283,7 +278,6 @@ export function UserManagement() {
         toast.error(response.message || 'Failed to delete user');
       }
     } catch (error: any) {
-      console.error('Failed to delete user:', error);
       toast.error(error.message || 'Failed to delete user');
     } finally {
       setIsDeleting(false);

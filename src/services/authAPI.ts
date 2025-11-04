@@ -93,16 +93,14 @@ export class AuthAPI {
 
       // Validate input
       if (!email || !pwd) {
-        console.log('❌ Missing email or pwd');
         return {
           status: 'error',
-          message: 'Email and pwd are required',
-          error: 'Email and pwd are required'
+          message: 'Email and password are required',
+          error: 'Email and password are required'
         };
       }
 
       if (!isValidEmail(email)) {
-        console.log('❌ Invalid email format');
         return {
           status: 'error',
           message: 'Invalid email format',
@@ -112,8 +110,6 @@ export class AuthAPI {
 
       // Static admin login bypass
       if (email.toLowerCase() === 'admin@medpro.com' && pwd === 'admin123') {
-        console.log('✅ Static admin login successful');
-        
         const adminUser = {
           firstName: 'Admin',
           lastName: 'User',
@@ -144,10 +140,8 @@ export class AuthAPI {
       });
 
       const data = await response.json();
-      console.log('🌐 API Response:', data);
 
       if (!response.ok) {
-        console.log('❌ API request failed:', response.status, data);
         return {
           status: 'error',
           message: data.error || data.message || 'Login failed',
@@ -156,8 +150,6 @@ export class AuthAPI {
       }
 
       if (data.status === 'success' && data.user) {
-        console.log('✅ Login successful:', data.user);
-        
         // Don't store user data here - let AuthContext handle it
         
         return {
@@ -166,7 +158,6 @@ export class AuthAPI {
           user: data.user
         };
       } else {
-        console.log('❌ Login failed:', data.message);
         return {
           status: 'error',
           message: data.message || 'Login failed',
@@ -175,7 +166,6 @@ export class AuthAPI {
       }
 
     } catch (error: any) {
-      console.error('❌ Login API error:', error);
       return {
         status: 'error',
         message: error.message || 'An unexpected error occurred. Please try again.',
@@ -190,10 +180,8 @@ export class AuthAPI {
       localStorage.removeItem('user');
       localStorage.removeItem('accessToken');
       
-      console.log('✅ Logout successful');
       return { success: true };
     } catch (error) {
-      console.error('Logout API error:', error);
       return { success: false };
     }
   }
@@ -209,12 +197,10 @@ export class AuthAPI {
       }
 
       const user = JSON.parse(userData);
-      console.log('🔍 Token validation - user found:', user);
       
       return { valid: true, user };
 
     } catch (error) {
-      console.error('Token validation error:', error);
       return { valid: false };
     }
   }

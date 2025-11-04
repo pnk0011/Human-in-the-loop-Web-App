@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
@@ -12,7 +11,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from './ui/pagination';
-import { Eye, Search, FileText, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, FileText } from 'lucide-react';
 
 interface QCCompletedDocument {
   id: string;
@@ -29,10 +28,11 @@ interface QCCompletedDocument {
 
 interface QCWorkHistoryProps {
   onViewClick: (doc: QCCompletedDocument) => void;
+  documents?: QCCompletedDocument[];
+  isLoading?: boolean;
 }
 
-export function QCWorkHistory({ onViewClick }: QCWorkHistoryProps) {
-  const [documents] = useState<QCCompletedDocument[]>([]);
+export function QCWorkHistory({ onViewClick, documents = [], isLoading = false }: QCWorkHistoryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [reviewerFilter, setReviewerFilter] = useState('all');
@@ -77,11 +77,7 @@ export function QCWorkHistory({ onViewClick }: QCWorkHistoryProps) {
     setCurrentPage(1);
   };
 
-  const getPassRateColor = (passRate: number) => {
-    if (passRate >= 90) return 'text-green-600';
-    if (passRate >= 70) return 'text-[#FFC018]';
-    return 'text-[#FF0081]';
-  };
+
 
   const getTypeBadgeColor = (type: string) => {
     switch (type) {
@@ -103,9 +99,9 @@ export function QCWorkHistory({ onViewClick }: QCWorkHistoryProps) {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Reviewed</div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Completed</div>
           <div className="text-[#012F66] dark:text-white text-3xl font-bold">{documents.length}</div>
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
@@ -116,12 +112,6 @@ export function QCWorkHistory({ onViewClick }: QCWorkHistoryProps) {
               const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
               return docDate >= weekAgo;
             }).length}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Avg. Pass Rate</div>
-          <div className="text-green-600 text-3xl font-bold">
-            {documents.length > 0 ? Math.round(documents.reduce((sum, doc) => sum + doc.passRate, 0) / documents.length) : 0}%
           </div>
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
@@ -150,10 +140,37 @@ export function QCWorkHistory({ onViewClick }: QCWorkHistoryProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="Large Claim Review Form">Large Claim Review Form</SelectItem>
+              <SelectItem value="Actuarial/UW/Pricing Tools">Actuarial/UW/Pricing Tools</SelectItem>
+              <SelectItem value="Reinsurance">Reinsurance</SelectItem>
+              <SelectItem value="Indication/Quote">Indication/Quote</SelectItem>
+              <SelectItem value="Endorsement">Endorsement</SelectItem>
+              <SelectItem value="Green Card">Green Card</SelectItem>
+              <SelectItem value="Finance Agreement">Finance Agreement</SelectItem>
+              <SelectItem value="Policy Form">Policy Form</SelectItem>
+              <SelectItem value="Additional Risk">Additional Risk</SelectItem>
+              <SelectItem value="Reporting Endorsement">Reporting Endorsement</SelectItem>
+              <SelectItem value="zDup - Loss Run">zDup - Loss Run</SelectItem>
+              <SelectItem value="Loss Run">Loss Run</SelectItem>
+              <SelectItem value="zDup - Stat Notice/Non-Renewal">zDup - Stat Notice/Non-Renewal</SelectItem>
+              <SelectItem value="Expiration/Effective/Retro Date">Expiration/Effective/Retro Date</SelectItem>
+              <SelectItem value="Return Mail">Return Mail</SelectItem>
+              <SelectItem value="Policy">Policy</SelectItem>
+              <SelectItem value="Assessments">Assessments</SelectItem>
               <SelectItem value="Invoice">Invoice</SelectItem>
-              <SelectItem value="Policy Document">Policy Document</SelectItem>
-              <SelectItem value="Claim Form">Claim Form</SelectItem>
-              <SelectItem value="Medical Record">Medical Record</SelectItem>
+              <SelectItem value="Application">Application</SelectItem>
+              <SelectItem value="Stat Notice/Non-Renewal">Stat Notice/Non-Renewal</SelectItem>
+              <SelectItem value="zDup - Broker of Record (BOR)">zDup - Broker of Record (BOR)</SelectItem>
+              <SelectItem value="Address (not practice loc)">Address (not practice loc)</SelectItem>
+              <SelectItem value="zDup - Actuarial/UW/Pricing Tools">zDup - Actuarial/UW/Pricing Tools</SelectItem>
+              <SelectItem value="zDup - Indication/Quote">zDup - Indication/Quote</SelectItem>
+              <SelectItem value="Cash Application">Cash Application</SelectItem>
+              <SelectItem value="Processing Form">Processing Form</SelectItem>
+              <SelectItem value="Referral/Documentation">Referral/Documentation</SelectItem>
+              <SelectItem value="Coverage">Coverage</SelectItem>
+              <SelectItem value="Broker of Record (BOR)">Broker of Record (BOR)</SelectItem>
+              <SelectItem value="Fund Documentation">Fund Documentation</SelectItem>
+              <SelectItem value="Cancellation">Cancellation</SelectItem>
             </SelectContent>
           </Select>
           <Select value={reviewerFilter} onValueChange={(value) => handleFilterChange(setReviewerFilter, value)}>
@@ -194,16 +211,37 @@ export function QCWorkHistory({ onViewClick }: QCWorkHistoryProps) {
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Reviewer</th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">QC Completed</th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Fields</th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">QC Results</th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Pass Rate</th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">View</th>
               </tr>
             </thead>
             <tbody>
-              {documents.length === 0 ? (
+              {isLoading ? (
+                // Loading skeleton rows
+                Array.from({ length: 5 }, (_, index) => (
+                  <tr
+                    key={`loading-${index}`}
+                    className="border-b border-[#E5E7EB] dark:border-[#3a3a3a]"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-32"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-20"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-12"></div>
+                    </td>
+                  </tr>
+                ))
+              ) : documents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center">
-                    <div className="flex flex-col items-center justify-center">
+                  <td colSpan={5} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center" style={{ padding: '20px' }}>
                       <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
                         <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
                       </div>
@@ -237,34 +275,6 @@ export function QCWorkHistory({ onViewClick }: QCWorkHistoryProps) {
                       {new Date(doc.completedDate).toLocaleDateString()} {new Date(doc.completedDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </td>
                     <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.fieldsCount}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3 text-sm">
-                        <div className="flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4 text-green-600" />
-                          <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.approvedCount}</span>
-                        </div>
-                        {doc.sentBackCount > 0 && (
-                          <div className="flex items-center gap-1">
-                            <XCircle className="w-4 h-4 text-[#FF0081]" />
-                            <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.sentBackCount}</span>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={getPassRateColor(doc.passRate)}>{doc.passRate}%</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onViewClick(doc)}
-                        className="text-[#0292DC] hover:bg-[#0292DC]/10"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        View
-                      </Button>
-                    </td>
                   </tr>
                 ))
               )}

@@ -82,11 +82,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
             // If validation fails, keep the user from localStorage to avoid blank page
           } catch (validationError) {
-            console.warn('Token validation failed, keeping user from localStorage:', validationError);
             // Don't clear user data - keep them logged in with localStorage data
           }
         } catch (error) {
-          console.error('Failed to parse saved user:', error);
           localStorage.removeItem('user');
         }
       }
@@ -96,19 +94,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const login = useCallback(async (email: string, pwd: string) => {
-    console.log('🔐 AuthContext login started:', { email });
     setIsLoading(true);
     setLoginError(null);
 
     try {
       const loginRequest: LoginRequest = { email, pwd };
       const response: LoginResponse = await authAPI.login(loginRequest);
-
-      console.log('🔍 AuthContext received response:', response);
       
       if (response.status === 'success' && response.user) {
-        console.log('✅ Setting user in context:', response.user);
-        
         // Convert API response to match our User interface
         const userData = {
           id: response.user.email, // Use email as ID
@@ -124,15 +117,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('accessToken', `token_${response.user.email}_${Date.now()}`);
-        console.log('✅ User set in context, isAuthenticated should be true now');
         return true;
       } else {
-        console.log('❌ Login failed in AuthContext:', response.error || response.message);
         setLoginError(response.error || response.message || 'Login failed');
         return false;
       }
     } catch (error: any) {
-      console.error('Login error:', error);
       setLoginError(error.message || 'An unexpected error occurred. Please try again.');
       return false;
     } finally {
@@ -144,7 +134,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await authAPI.logout();
     } catch (error) {
-      console.error('Logout API error:', error);
+      // Logout API error
     }
 
     setUser(null);

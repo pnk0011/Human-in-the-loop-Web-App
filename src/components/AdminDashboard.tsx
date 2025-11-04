@@ -38,7 +38,7 @@ export const AdminDashboard = React.memo(function AdminDashboard({
       <AdminHeader onLogout={onLogout} theme={theme} onToggleTheme={onToggleTheme} />
 
       {/* Main Content */}
-      <main className="p-6 max-w-[1400px] mx-auto">
+      <main className="p-6 w-full">
         <Tabs
           value={activeTab}
           onValueChange={handleTabChange}

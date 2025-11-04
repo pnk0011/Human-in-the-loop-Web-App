@@ -22,7 +22,7 @@ interface QueueItem {
   extractedValue?: string;
   fieldDescription?: string;
   expectedFormat?: string;
-  doc_handle_id?: string; // Add doc_handle_id for display in Document ID column
+  doc_handle_id?: string;
 }
 
 interface ReviewerDashboardProps {
@@ -39,6 +39,12 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
   const { loading: dashboardLoading, withLoading } = useLoading({ delay: 300 });
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [apiDocuments, setApiDocuments] = useState<ReviewerDocument[]>([]);
+  const [completedDocuments, setCompletedDocuments] = useState<ReviewerDocument[]>([]);
+  const [isLoadingCompleted, setIsLoadingCompleted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [documentType, setDocumentType] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [docIdFilter, setDocIdFilter] = useState('all');
   const [stats, setStats] = useState<{
     Assigned_documents: number;
     Assigned_files: number;
@@ -46,39 +52,105 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
     Completed_today: number;
   } | undefined>();
 
-  // Load API data for real documents
+  // Load API data for real documents (fetch status=2 OR status=4)
   useEffect(() => {
     const loadApiData = async () => {
       if (user?.email) {
+        setIsLoading(true);
         try {
-          const params: GetReviewerDocumentsRequest = {
+          // Base params for both API calls
+          const baseParams: GetReviewerDocumentsRequest = {
             reviewer: user.email,
             page: 1,
             limit: 25,
-            doc_type_name: 'All',
-            priority: 'All',
-            status: 'All',
+            doc_type_name: documentType !== 'all' ? documentType : 'All',
+            priority: priorityFilter !== 'all' ? priorityFilter : 'All',
+            doc_handle_id: docIdFilter !== 'all' ? docIdFilter : undefined,
           };
+
+          // Fetch records with status=2 and status=4 in parallel
+          const [response2, response4] = await Promise.all([
+            documentOperationsAPI.getReviewerDocuments({ ...baseParams, status: '2' }),
+            documentOperationsAPI.getReviewerDocuments({ ...baseParams, status: '4' }),
+          ]);
+
+          // Merge the results from both API calls
+          const mergedFiles: ReviewerDocument[] = [];
+          const seenFileNames = new Set<string>();
+
+          // Add files from status=2 response
+          if (response2.status === 'success' && response2.files) {
+            response2.files.forEach(file => {
+              const uniqueKey = `${file.file_name}_${file.doc_handle_id}`;
+              if (!seenFileNames.has(uniqueKey)) {
+                seenFileNames.add(uniqueKey);
+                mergedFiles.push(file);
+              }
+            });
+          }
+
+          // Add files from status=4 response
+          if (response4.status === 'success' && response4.files) {
+            response4.files.forEach(file => {
+              const uniqueKey = `${file.file_name}_${file.doc_handle_id}`;
+              if (!seenFileNames.has(uniqueKey)) {
+                seenFileNames.add(uniqueKey);
+                mergedFiles.push(file);
+              }
+            });
+          }
+
+          // Set merged results
+          setApiDocuments(mergedFiles);
           
-          const response = await documentOperationsAPI.getReviewerDocuments(params);
-          if (response.status === 'success') {
-            if (response.files) {
-              setApiDocuments(response.files);
-            }
-            if (response.stats) {
-              setStats(response.stats);
-            }
+          // Use stats from status=2 response (or status=4 if status=2 fails)
+          if (response2.status === 'success' && response2.stats) {
+            setStats(response2.stats);
+          } else if (response4.status === 'success' && response4.stats) {
+            setStats(response4.stats);
           }
         } catch (error) {
-          console.error('Failed to load API documents:', error);
+          // Failed to load API documents - set empty array
+          setApiDocuments([]);
+        } finally {
+          setIsLoading(false);
         }
       }
     };
 
     loadApiData();
-  }, [user?.email]);
+  }, [user?.email, documentType, priorityFilter, docIdFilter]);
 
-  // Simulate data loading (same as original Dashboard)
+  // Load completed documents for work history tab
+  useEffect(() => {
+    const loadCompletedDocuments = async () => {
+      if (user?.email && activeTab === 'Work History') {
+        setIsLoadingCompleted(true);
+        try {
+          const params: GetReviewerDocumentsRequest = {
+            reviewer: user.email,
+            page: 1,
+            limit: 100, // Load more completed documents for history
+            doc_type_name: 'All',
+            priority: 'All',
+            status: '1', // Status '3' means 'Completed'
+          };
+          
+          const response = await documentOperationsAPI.getReviewerDocuments(params);
+          if (response.status === 'success' && response.files) {
+            setCompletedDocuments(response.files);
+          }
+        } catch (error) {
+          // Failed to load completed documents
+        } finally {
+          setIsLoadingCompleted(false);
+        }
+      }
+    };
+
+    loadCompletedDocuments();
+  }, [user?.email, activeTab]);
+
   useEffect(() => {
     const loadData = async () => {
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -123,13 +195,25 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
     }
   };
 
+  // Convert completed API documents to CompletedDocument format for WorkHistory
+  const convertCompletedDocumentsToWorkHistory = () => {
+    return completedDocuments.map((doc) => ({
+      id: `${doc.file_name}_${doc.doc_handle_id}`,
+      documentName: doc.file_name,
+      documentType: doc.doc_type_name || 'Unknown',
+      completedDate: doc.reviewer_update_dt ? doc.reviewer_update_dt.split(' ')[0] : new Date().toISOString().split('T')[0],
+      fieldsCount: doc.distinct_entity_type_count,
+      acceptedCount: 0, // Not available in API response
+      correctedCount: 0, // Not available in API response
+      rejectedCount: 0, // Not available in API response
+      accuracy: Math.round(doc.avg_confidence_percentage), // Use confidence as accuracy
+    }));
+  };
+
   // Handle validation click with API integration
   const handleValidateClick = async (item: QueueItem) => {
     if (onValidateClick) {
       await onValidateClick(item);
-    } else {
-      // Default behavior - log for debugging
-      console.log('Opening document for validation:', item);
     }
   };
 
@@ -137,7 +221,7 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
     <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a]">
       <DashboardHeader activeTab={activeTab} onTabChange={setActiveTab} onLogout={onLogout} theme={theme} onToggleTheme={onToggleTheme} />
       
-      <main className="p-6 max-w-[1400px] mx-auto">
+              <main className="p-6 w-full">
         {isDataLoading ? (
           <>
             <LoadingDashboardStats />
@@ -151,11 +235,22 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
               // Pass API documents converted to QueueItem format
               apiDocuments={convertApiDocumentsToQueueItems()}
               reviewerEmail={user?.email}
+              documentType={documentType}
+              onDocumentTypeChange={setDocumentType}
+              priorityFilter={priorityFilter}
+              onPriorityFilterChange={setPriorityFilter}
+              docIdFilter={docIdFilter}
+              onDocIdFilterChange={setDocIdFilter}
+              isLoading={isLoading}
             />
           </>
-        ) : activeTab === 'Work History' ? (
-          <WorkHistory onViewClick={onViewHistoryClick || (() => {})} />
-        ) : null}
+                  ) : activeTab === 'Work History' ? (
+          <WorkHistory 
+            onViewClick={onViewHistoryClick || (() => {})} 
+            documents={convertCompletedDocumentsToWorkHistory()}
+            isLoading={isLoadingCompleted}
+          />
+          ) : null}
       </main>
     </div>
   );

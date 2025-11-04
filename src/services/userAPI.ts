@@ -125,7 +125,6 @@ class UserAPI {
 
       return data;
     } catch (error) {
-      console.error('User API request failed:', error);
       throw error;
     }
   }
@@ -139,7 +138,6 @@ class UserAPI {
 
       return response;
     } catch (error: any) {
-      console.error('Create user API call failed:', error);
       throw error;
     }
   }
@@ -161,7 +159,6 @@ class UserAPI {
 
       return response;
     } catch (error: any) {
-      console.error('Get users API call failed:', error);
       throw error;
     }
   }
@@ -175,7 +172,6 @@ class UserAPI {
 
       return response;
     } catch (error: any) {
-      console.error('Update user API call failed:', error);
       throw error;
     }
   }
@@ -190,7 +186,6 @@ class UserAPI {
 
       return response;
     } catch (error: any) {
-      console.error('Delete user API call failed:', error);
       throw error;
     }
   }
@@ -203,8 +198,6 @@ class UserAPI {
 
       return response;
     } catch (error: any) {
-      console.error('Get user stats API call failed:', error);
-      
       // Mock response for development/fallback
       return {
         status: 'success',

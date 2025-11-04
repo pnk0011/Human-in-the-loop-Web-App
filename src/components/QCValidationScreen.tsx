@@ -270,11 +270,10 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
                         style={{ maxHeight: '80vh' }}
                         crossOrigin="anonymous"
                         onLoad={() => {
-                          console.log('QC Document image loaded successfully:', document.documentImage);
+                          // QC Document image loaded successfully
                         }}
                         onError={(e) => {
-                          console.error('Failed to load QC document image:', document.documentImage);
-                          console.error('QC Image error event:', e);
+                          // Failed to load QC document image
                           // Hide the image and show error message
                           e.currentTarget.style.display = 'none';
                           const errorElement = e.currentTarget.nextElementSibling;

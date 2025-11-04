@@ -89,19 +89,15 @@ export function DocumentAssignment() {
       setIsLoadingDocIds(true);
       try {
         const response = await documentAPI.getUniqueDocumentIds();
-        console.log('Unique document IDs API response:', response);
         
         // Check for different possible response structures
         if (response.status === 'success') {
           // Try different possible field names
           const docIds = response.doc_handle_ids || [];
-          console.log('Extracted document IDs:', docIds);
           setUniqueDocIds(Array.isArray(docIds) ? docIds : []);
-        } else {
-          console.error('API returned non-success status:', response.status);
         }
       } catch (error) {
-        console.error('Failed to load unique document IDs:', error);
+        // Failed to load unique document IDs
       } finally {
         setIsLoadingDocIds(false);
       }
@@ -173,7 +169,6 @@ export function DocumentAssignment() {
         setHasApiError(true);
       }
     } catch (error: any) {
-      console.error('Failed to load documents:', error);
       toast.error('Failed to load documents. Please try again.');
       setDocuments([]);
       setTotalDocuments(0);
@@ -275,11 +270,9 @@ export function DocumentAssignment() {
         
         setUsers(formattedUsers);
       } else {
-        console.error('Failed to load users:', firstPageResponse.message);
         setUsers([]);
       }
     } catch (error: any) {
-      console.error('Failed to load users:', error);
       setUsers([]);
     } finally {
       setIsLoadingAllReviewers(false);
@@ -305,23 +298,24 @@ export function DocumentAssignment() {
         return doc?.documentName || docId;
       });
 
-
-      
-      console.log('Available users:', users);
-
       const assignRequest: AssignReviewerRequest = {
         file_names: fileNames,
         reviewer: user.email,
         qc_assigned: user?.quality_control,
         status: '2'
       };
-      
-      console.log('Assign request:', assignRequest);
 
       const response = await documentOperationsAPI.assignReviewer(assignRequest);
       
       if (response.message) {
-        toast.success(response.message);
+        // Show success toast with document count and reviewer name
+        const documentCount = selectedDocuments.size;
+        toast.success(
+          `${documentCount} ${documentCount === 1 ? 'document has' : 'documents have'} been successfully assigned to ${user.name}`,
+          {
+            duration: 4000,
+          }
+        );
         
         // Update local state to reflect the assignment
         setDocuments((prev) =>
@@ -342,7 +336,6 @@ export function DocumentAssignment() {
         toast.error('Failed to assign documents');
       }
     } catch (error: any) {
-      console.error('Failed to assign documents:', error);
       toast.error(error.message || 'Failed to assign documents');
     } finally {
       setIsAssigning(false);
@@ -760,7 +753,7 @@ export function DocumentAssignment() {
         
         {/* No Data Found State */}
         {!isLoading && documents.length === 0 && !hasApiError && (
-          <div className="flex flex-col items-center justify-center py-16 px-6">
+          <div className="flex flex-col items-center justify-center py-16 px-6" style={{ padding: '20px' }}>
             <div className="w-24 h-24 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-6">
               <FileText className="w-12 h-12 text-[#80989A] dark:text-[#a0a0a0]" />
             </div>
@@ -896,9 +889,9 @@ export function DocumentAssignment() {
       <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
         <DialogContent className="bg-white dark:bg-[#2a2a2a] border-[#E5E7EB] dark:border-[#3a3a3a]">
           <DialogHeader>
-            <DialogTitle className="text-[#012F66] dark:text-white">Assign Documents to Reviewer</DialogTitle>
+            <DialogTitle className="text-[#012F66] dark:text-white">Assign Files to Reviewer</DialogTitle>
             <DialogDescription className="text-[#80989A] dark:text-[#a0a0a0]">
-              Select a reviewer to assign {selectedDocuments.size} document(s).
+              Select a reviewer to assign {selectedDocuments.size} file(s).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

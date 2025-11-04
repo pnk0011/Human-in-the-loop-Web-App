@@ -72,7 +72,6 @@ class DocumentAPI {
       const data = await response.json();
       return data;
     } catch (error: any) {
-      console.error('API request failed:', error);
       throw error;
     }
   }
@@ -97,7 +96,6 @@ class DocumentAPI {
 
       return response;
     } catch (error: any) {
-      console.error('Get documents API call failed:', error);
       // Mock response for development/fallback
       return {
         status: 'error',
@@ -128,7 +126,6 @@ class DocumentAPI {
       if (params.length > 0) {
         url += `?${params.join('&')}`;
       }
-      console.log('Fetching unique document IDs from:', url);
       
       const response = await fetch(url, {
         headers: {
@@ -142,10 +139,8 @@ class DocumentAPI {
       }
 
       const data = await response.json();
-      console.log('Unique document IDs raw response:', data);
       return data;
     } catch (error: any) {
-      console.error('Get unique document IDs API call failed:', error);
       return {
         status: 'error',
         message: 'Failed to fetch unique document IDs',

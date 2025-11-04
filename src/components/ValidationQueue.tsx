@@ -26,6 +26,13 @@ interface ValidationQueueProps {
   onValidateClick?: (item: QueueItem) => Promise<void>;
   apiDocuments?: QueueItem[]; // Optional API documents to override mock data
   reviewerEmail?: string; // Optional reviewer email for filtering document IDs
+  documentType?: string; // Document type filter value
+  onDocumentTypeChange?: (value: string) => void; // Callback to update document type filter
+  priorityFilter?: string; // Priority filter value
+  onPriorityFilterChange?: (value: string) => void; // Callback to update priority filter
+  docIdFilter?: string; // Document ID filter value
+  onDocIdFilterChange?: (value: string) => void; // Callback to update document ID filter
+  isLoading?: boolean; // Loading state from parent component
 }
 
 const mockData: QueueItem[] = [
@@ -109,11 +116,23 @@ const mockData: QueueItem[] = [
 type SortField = 'document' | 'confidence' | 'priority' | 'age';
 type SortDirection = 'asc' | 'desc';
 
-export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail }: ValidationQueueProps = {}) {
-  const [documentType, setDocumentType] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
+export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail, documentType: externalDocumentType, onDocumentTypeChange, priorityFilter: externalPriorityFilter, onPriorityFilterChange, docIdFilter: externalDocIdFilter, onDocIdFilterChange, isLoading: externalIsLoading }: ValidationQueueProps = {}) {
+  const [internalDocumentType, setInternalDocumentType] = useState('all');
+  // Use external documentType if provided, otherwise use internal state
+  const documentType = externalDocumentType !== undefined ? externalDocumentType : internalDocumentType;
+  const setDocumentType = onDocumentTypeChange || setInternalDocumentType;
+  
+  const [internalPriorityFilter, setInternalPriorityFilter] = useState('all');
+  // Use external priorityFilter if provided, otherwise use internal state
+  const priorityFilter = externalPriorityFilter !== undefined ? externalPriorityFilter : internalPriorityFilter;
+  const setPriorityFilter = onPriorityFilterChange || setInternalPriorityFilter;
+  
+  const [internalDocIdFilter, setInternalDocIdFilter] = useState('all');
+  // Use external docIdFilter if provided, otherwise use internal state
+  const docIdFilter = externalDocIdFilter !== undefined ? externalDocIdFilter : internalDocIdFilter;
+  const setDocIdFilter = onDocIdFilterChange || setInternalDocIdFilter;
+  
   const [ageFilter, setAgeFilter] = useState('all');
-  const [docIdFilter, setDocIdFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -127,19 +146,15 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail }
       setIsLoadingDocIds(true);
       try {
         const response = await documentAPI.getUniqueDocumentIds(reviewerEmail);
-        console.log('Unique document IDs API response:', response);
         
         // Check for different possible response structures
         if (response.status === 'success') {
           // Try different possible field names
           const docIds = response.doc_handle_ids || [];
-          console.log('Extracted document IDs:', docIds);
           setUniqueDocIds(Array.isArray(docIds) ? docIds : []);
-        } else {
-          console.error('API returned non-success status:', response.status);
         }
       } catch (error) {
-        console.error('Failed to load unique document IDs:', error);
+        // Failed to load unique document IDs
       } finally {
         setIsLoadingDocIds(false);
       }
@@ -148,10 +163,12 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail }
     loadUniqueDocIds();
   }, [reviewerEmail]);
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters change (only for internal filters, external filters are handled by parent)
   useEffect(() => {
-    setCurrentPage(1);
-  }, [documentType, priorityFilter, docIdFilter]);
+    if (externalDocumentType === undefined && externalPriorityFilter === undefined && externalDocIdFilter === undefined) {
+      setCurrentPage(1);
+    }
+  }, [documentType, priorityFilter, docIdFilter, externalDocumentType, externalPriorityFilter, externalDocIdFilter]);
 
   // Handle validate click with per-item loading state
   const handleValidateClick = async (item: QueueItem) => {
@@ -176,15 +193,19 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail }
   filteredData = filteredData.filter(item => item.status !== 'Completed');
   
   // Apply filters
-  if (documentType !== 'all') {
+  // Note: If external filters are provided, filtering is done server-side via API
+  // Only apply client-side filters if using internal state (not controlled by parent)
+  if (externalDocumentType === undefined && documentType !== 'all') {
     filteredData = filteredData.filter(item => item.type === documentType);
   }
   
-  if (priorityFilter !== 'all') {
+  // Only apply client-side priority filter if not controlled by parent
+  if (externalPriorityFilter === undefined && priorityFilter !== 'all') {
     filteredData = filteredData.filter(item => item.priority.toLowerCase() === priorityFilter.toLowerCase());
   }
   
-  if (docIdFilter !== 'all') {
+  // Only apply client-side doc ID filter if not controlled by parent
+  if (externalDocIdFilter === undefined && docIdFilter !== 'all') {
     filteredData = filteredData.filter(item => item.doc_handle_id === docIdFilter);
   }
   
@@ -239,10 +260,26 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail }
   };
 
   const resetFilters = () => {
-    setDocumentType('all');
-    setPriorityFilter('all');
+    // Reset document type filter (use callback if provided by parent, otherwise use local state)
+    if (onDocumentTypeChange) {
+      onDocumentTypeChange('all');
+    } else {
+      setDocumentType('all');
+    }
+    // Reset priority filter
+    if (onPriorityFilterChange) {
+      onPriorityFilterChange('all');
+    } else {
+      setPriorityFilter('all');
+    }
+    // Reset document ID filter
+    if (onDocIdFilterChange) {
+      onDocIdFilterChange('all');
+    } else {
+      setDocIdFilter('all');
+    }
     setAgeFilter('all');
-    setDocIdFilter('all');
+    setCurrentPage(1);
   };
 
   return (
@@ -422,8 +459,8 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail }
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E7EB] dark:divide-[#3a3a3a]">
-              {dataSource.length === 0 && (!apiDocuments || apiDocuments.length === 0) ? (
-                // Loading skeleton rows when no API data is available yet
+              {externalIsLoading || (dataSource.length === 0 && apiDocuments === undefined) ? (
+                // Loading skeleton rows when loading or no API data is available yet
                 Array.from({ length: 5 }, (_, index) => (
                   <tr
                     key={`loading-${index}`}
@@ -465,7 +502,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail }
                 // Empty state when no documents found after API data is loaded
                 <tr>
                   <td colSpan={9} className="px-6 py-16 text-center">
-                    <div className="flex flex-col items-center justify-center">
+                    <div className="flex flex-col items-center justify-center" style={{ padding: '20px' }}>
                       <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
                         <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
                       </div>
@@ -473,12 +510,12 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail }
                         No Documents Found
                       </h3>
                       <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-4 max-w-md">
-                        {dataSource.length === 0 
-                          ? "No documents have been assigned for validation yet."
+                        {apiDocuments && apiDocuments.length === 0 && dataSource.length === 0
+                          ? "No documents match your current filters. Try adjusting your search criteria or reset the filters."
                           : "No documents match your current filters. Try adjusting your search criteria or reset the filters."
                         }
                       </p>
-                      {dataSource.length > 0 && (
+                      {(documentType !== 'all' || priorityFilter !== 'all' || docIdFilter !== 'all' || (apiDocuments && apiDocuments.length === 0 && dataSource.length === 0)) && (
                         <Button
                           onClick={resetFilters}
                           variant="outline"

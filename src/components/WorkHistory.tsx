@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
@@ -12,7 +11,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from './ui/pagination';
-import { Eye, Search, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Search, FileText, Loader2 } from 'lucide-react';
 
 interface CompletedDocument {
   id: string;
@@ -28,10 +27,11 @@ interface CompletedDocument {
 
 interface WorkHistoryProps {
   onViewClick: (doc: CompletedDocument) => void;
+  documents?: CompletedDocument[];
+  isLoading?: boolean;
 }
 
-export function WorkHistory({ onViewClick }: WorkHistoryProps) {
-  const [documents] = useState<CompletedDocument[]>([]);
+export function WorkHistory({ onViewClick, documents = [], isLoading = false }: WorkHistoryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
@@ -72,12 +72,6 @@ export function WorkHistory({ onViewClick }: WorkHistoryProps) {
     setCurrentPage(1);
   };
 
-  const getAccuracyColor = (accuracy: number) => {
-    if (accuracy >= 90) return 'text-green-600';
-    if (accuracy >= 70) return 'text-[#FFC018]';
-    return 'text-[#FF0081]';
-  };
-
   const getTypeBadgeColor = (type: string) => {
     switch (type) {
       case 'Invoice':
@@ -96,7 +90,7 @@ export function WorkHistory({ onViewClick }: WorkHistoryProps) {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Completed</div>
           <div className="text-[#012F66] dark:text-white text-3xl font-bold">{documents.length}</div>
@@ -109,12 +103,6 @@ export function WorkHistory({ onViewClick }: WorkHistoryProps) {
               const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
               return docDate >= weekAgo;
             }).length}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Avg. Accuracy</div>
-          <div className="text-green-600 text-3xl font-bold">
-            {documents.length > 0 ? Math.round(documents.reduce((sum, doc) => sum + doc.accuracy, 0) / documents.length) : 0}%
           </div>
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
@@ -143,10 +131,37 @@ export function WorkHistory({ onViewClick }: WorkHistoryProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="Large Claim Review Form">Large Claim Review Form</SelectItem>
+              <SelectItem value="Actuarial/UW/Pricing Tools">Actuarial/UW/Pricing Tools</SelectItem>
+              <SelectItem value="Reinsurance">Reinsurance</SelectItem>
+              <SelectItem value="Indication/Quote">Indication/Quote</SelectItem>
+              <SelectItem value="Endorsement">Endorsement</SelectItem>
+              <SelectItem value="Green Card">Green Card</SelectItem>
+              <SelectItem value="Finance Agreement">Finance Agreement</SelectItem>
+              <SelectItem value="Policy Form">Policy Form</SelectItem>
+              <SelectItem value="Additional Risk">Additional Risk</SelectItem>
+              <SelectItem value="Reporting Endorsement">Reporting Endorsement</SelectItem>
+              <SelectItem value="zDup - Loss Run">zDup - Loss Run</SelectItem>
+              <SelectItem value="Loss Run">Loss Run</SelectItem>
+              <SelectItem value="zDup - Stat Notice/Non-Renewal">zDup - Stat Notice/Non-Renewal</SelectItem>
+              <SelectItem value="Expiration/Effective/Retro Date">Expiration/Effective/Retro Date</SelectItem>
+              <SelectItem value="Return Mail">Return Mail</SelectItem>
+              <SelectItem value="Policy">Policy</SelectItem>
+              <SelectItem value="Assessments">Assessments</SelectItem>
               <SelectItem value="Invoice">Invoice</SelectItem>
-              <SelectItem value="Policy Document">Policy Document</SelectItem>
-              <SelectItem value="Claim Form">Claim Form</SelectItem>
-              <SelectItem value="Medical Record">Medical Record</SelectItem>
+              <SelectItem value="Application">Application</SelectItem>
+              <SelectItem value="Stat Notice/Non-Renewal">Stat Notice/Non-Renewal</SelectItem>
+              <SelectItem value="zDup - Broker of Record (BOR)">zDup - Broker of Record (BOR)</SelectItem>
+              <SelectItem value="Address (not practice loc)">Address (not practice loc)</SelectItem>
+              <SelectItem value="zDup - Actuarial/UW/Pricing Tools">zDup - Actuarial/UW/Pricing Tools</SelectItem>
+              <SelectItem value="zDup - Indication/Quote">zDup - Indication/Quote</SelectItem>
+              <SelectItem value="Cash Application">Cash Application</SelectItem>
+              <SelectItem value="Processing Form">Processing Form</SelectItem>
+              <SelectItem value="Referral/Documentation">Referral/Documentation</SelectItem>
+              <SelectItem value="Coverage">Coverage</SelectItem>
+              <SelectItem value="Broker of Record (BOR)">Broker of Record (BOR)</SelectItem>
+              <SelectItem value="Fund Documentation">Fund Documentation</SelectItem>
+              <SelectItem value="Cancellation">Cancellation</SelectItem>
             </SelectContent>
           </Select>
           <Select value={dateFilter} onValueChange={(value) => handleFilterChange(setDateFilter, value)}>
@@ -173,16 +188,34 @@ export function WorkHistory({ onViewClick }: WorkHistoryProps) {
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Type</th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Completed</th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Fields</th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Actions</th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Accuracy</th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">View</th>
               </tr>
             </thead>
             <tbody>
-              {documents.length === 0 ? (
+              {isLoading ? (
+                // Loading skeleton rows
+                Array.from({ length: 5 }, (_, index) => (
+                  <tr
+                    key={`loading-${index}`}
+                    className="border-b border-[#E5E7EB] dark:border-[#3a3a3a]"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-32"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-20"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-12"></div>
+                    </td>
+                  </tr>
+                ))
+              ) : documents.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
-                    <div className="flex flex-col items-center justify-center">
+                  <td colSpan={4} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center" style={{ padding: '20px' }}>
                       <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
                         <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
                       </div>
@@ -213,38 +246,6 @@ export function WorkHistory({ onViewClick }: WorkHistoryProps) {
                       {new Date(doc.completedDate).toLocaleDateString()} {new Date(doc.completedDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </td>
                     <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.fieldsCount}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3 text-sm">
-                        <div className="flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4 text-green-600" />
-                          <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.acceptedCount}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <AlertCircle className="w-4 h-4 text-[#FFC018]" />
-                          <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.correctedCount}</span>
-                        </div>
-                        {doc.rejectedCount > 0 && (
-                          <div className="flex items-center gap-1">
-                            <AlertCircle className="w-4 h-4 text-[#FF0081]" />
-                            <span className="text-[#80989A] dark:text-[#a0a0a0]">{doc.rejectedCount}</span>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={getAccuracyColor(doc.accuracy)}>{doc.accuracy}%</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onViewClick(doc)}
-                        className="text-[#0292DC] hover:bg-[#0292DC]/10"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        View
-                      </Button>
-                    </td>
                   </tr>
                 ))
               )}

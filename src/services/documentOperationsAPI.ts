@@ -233,7 +233,6 @@ class DocumentOperationsAPI {
 
       return response.json();
     } catch (error: any) {
-      console.error('API request failed:', error);
       throw error;
     }
   }
@@ -258,7 +257,6 @@ class DocumentOperationsAPI {
       });
       return response;
     } catch (error: any) {
-      console.error('Assign reviewer API call failed:', error);
       throw error;
     }
   }
@@ -293,7 +291,6 @@ class DocumentOperationsAPI {
       });
       return response;
     } catch (error: any) {
-      console.error('Get reviewer documents API call failed:', error);
       // Mock response for development/fallback
       return {
         status: 'error',
@@ -318,7 +315,6 @@ class DocumentOperationsAPI {
       });
       return response;
     } catch (error: any) {
-      console.error('Review file API call failed:', error);
       return {
         success: false,
         error: error.message || 'Failed to fetch file details',
@@ -335,7 +331,6 @@ class DocumentOperationsAPI {
       });
       return response;
     } catch (error: any) {
-      console.error('Update file API call failed:', error);
       return {
         message: error.message || 'Failed to update file',
         total_rows_updated: 0,
@@ -392,7 +387,6 @@ class DocumentOperationsAPI {
       });
       return response;
     } catch (error: any) {
-      console.error('Get reviewers assigned to QC API call failed:', error);
       return {
         status: 'error',
         message: error.message || 'Failed to fetch reviewers',
