@@ -267,11 +267,6 @@ export const QCHeader = React.memo(function QCHeader({
       onLogout={onLogout}
       theme={theme}
       onToggleTheme={onToggleTheme}
-      customUser={{
-        name: "QC User",
-        role: "QC",
-        initials: "QC"
-      }}
     />
   );
 });

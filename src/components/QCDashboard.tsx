@@ -46,12 +46,12 @@ export function QCDashboard({
 
   const [docIdFilter, setDocIdFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [sortField, setSortField] = useState<SortField | null>(
     null,
   );
   const [sortDirection, setSortDirection] =
     useState<SortDirection>("asc");
-  const itemsPerPage = 5;
   const [apiDocuments, setApiDocuments] = useState<QCDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
@@ -131,6 +131,11 @@ export function QCDashboard({
     setCurrentPage(1);
   }, [documentType, priorityFilter, reviewerFilter, docIdFilter]);
 
+  // Reset to page 1 when itemsPerPage changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
+
   // Load API data for QC documents
   useEffect(() => {
     const loadApiData = async () => {
@@ -140,7 +145,7 @@ export function QCDashboard({
           const params: GetQCDocumentsRequest = {
             quality_control: user.email,
             page: 1,
-            limit: 25,
+            limit: 10,
             doc_type_name: documentType !== 'all' ? documentType : 'All',
             priority: priorityFilter !== 'all' ? priorityFilter : 'All',
             status: '3', // Always use status=3 (QC Pending) for QC review queue
@@ -573,6 +578,28 @@ export function QCDashboard({
                             {docId}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-full md:w-auto md:min-w-[150px]">
+                    <label className="block text-[#012F66] dark:text-white mb-2">
+                      Show
+                    </label>
+                    <Select
+                      value={itemsPerPage.toString()}
+                      onValueChange={(value) => {
+                        setItemsPerPage(Number(value));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

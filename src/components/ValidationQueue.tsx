@@ -134,6 +134,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail, 
   
   const [ageFilter, setAgeFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -169,6 +170,11 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail, 
       setCurrentPage(1);
     }
   }, [documentType, priorityFilter, docIdFilter, externalDocumentType, externalPriorityFilter, externalDocIdFilter]);
+
+  // Reset to page 1 when itemsPerPage changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   // Handle validate click with per-item loading state
   const handleValidateClick = async (item: QueueItem) => {
@@ -210,7 +216,6 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail, 
   }
   
   const totalItems = filteredData.length;
-  const itemsPerPage = 5;
 
   // Calculate pagination
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -374,6 +379,26 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail, 
                     {docId}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full md:w-auto md:min-w-[150px]">
+            <label className="block text-[#012F66] dark:text-white mb-2">Show</label>
+            <Select
+              value={itemsPerPage.toString()}
+              onValueChange={(value) => {
+                setItemsPerPage(Number(value));
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5</SelectItem>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
               </SelectContent>
             </Select>
           </div>

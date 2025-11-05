@@ -62,7 +62,7 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
           const baseParams: GetReviewerDocumentsRequest = {
             reviewer: user.email,
             page: 1,
-            limit: 25,
+            limit: 10,
             doc_type_name: documentType !== 'all' ? documentType : 'All',
             priority: priorityFilter !== 'all' ? priorityFilter : 'All',
             doc_handle_id: docIdFilter !== 'all' ? docIdFilter : undefined,
