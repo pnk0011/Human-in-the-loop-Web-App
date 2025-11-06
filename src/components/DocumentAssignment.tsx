@@ -26,6 +26,7 @@ interface User {
   name: string;
   email: string;
   role: 'Admin' | 'Reviewer' | 'QC';
+  quality_control?: string;
   currentLoad: number | string;
 }
 
@@ -240,14 +241,14 @@ export function DocumentAssignment() {
       const response = await documentOperationsAPI.getReviewersAssignedToQC('All');
       
       if (response.status === 'success' && response.reviewers && Array.isArray(response.reviewers)) {
-        // Convert reviewer emails to User format
-        // The API returns an array of reviewer email strings
-        const formattedUsers = response.reviewers.map((reviewerEmail: string) => ({
-          id: reviewerEmail, // Use email as ID
-          name: reviewerEmail.split('@')[0].replace(/\./g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()), // Format email to name
-          email: reviewerEmail,
+        // Convert reviewer objects to User format
+        // The API now returns an array of objects with email and quality_control
+        const formattedUsers = response.reviewers.map((reviewer: { email: string; quality_control: string }) => ({
+          id: reviewer.email, // Use email as ID
+          name: reviewer.email.split('@')[0].replace(/\./g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()), // Format email to name
+          email: reviewer.email,
           role: 'Reviewer' as const,
-          quality_control: undefined,
+          quality_control: reviewer.quality_control, // Include quality_control from API response
           currentLoad: 'N/A', // API doesn't provide current load
         }));
         
@@ -289,7 +290,7 @@ export function DocumentAssignment() {
       const assignRequest: AssignReviewerRequest = {
         file_names: fileNames,
         reviewer: user.email,
-        qc_assigned: user?.quality_control,
+        qc_assigned: user.quality_control || undefined, // Include quality_control from user object
         status: '2'
       };
 

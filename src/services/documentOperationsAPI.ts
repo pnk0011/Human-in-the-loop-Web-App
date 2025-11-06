@@ -168,10 +168,16 @@ export interface GetQCDocumentsResponse {
   files?: QCDocument[];
 }
 
+export interface ReviewerWithQC {
+  email: string;
+  quality_control: string;
+}
+
 export interface ReviewerAssignedToQCResponse {
   status: string;
   message: string;
-  reviewers?: string[];
+  reviewers?: ReviewerWithQC[];
+  qc_user_requested?: string;
   error?: string;
 }
 

@@ -113,7 +113,11 @@ export function QCDashboard({
           const response = await documentOperationsAPI.getReviewersAssignedToQC(user.email);
           
           if (response.status === 'success' && response.reviewers) {
-            setReviewers(Array.isArray(response.reviewers) ? response.reviewers : []);
+            // Extract email addresses from reviewer objects
+            const reviewerEmails = Array.isArray(response.reviewers) 
+              ? response.reviewers.map((reviewer: { email: string; quality_control: string }) => reviewer.email)
+              : [];
+            setReviewers(reviewerEmails);
           }
         } catch (error) {
           // Failed to load QC reviewers
