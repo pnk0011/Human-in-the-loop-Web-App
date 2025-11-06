@@ -236,25 +236,43 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
         <div className={`${isFullscreen ? 'fixed inset-0 z-50 p-2 bg-[#F5F7FA]' : 'flex-1'}`}>
           <div className="bg-[#E5E7EB] rounded-lg h-full flex flex-col">
             {/* Document Display */}
-            <div className="flex-1 relative overflow-auto flex items-center justify-center p-1">
+            <div className="flex-1 relative overflow-hidden flex items-center justify-center p-1">
               <div 
                 className="bg-white shadow-lg relative"
                 style={{ 
-                  transform: `scale(${zoom / 100})`,
+                  transform: document.documentImage && (document.documentImage.includes('.csv') || (document.documentName && document.documentName.includes('.csv'))) 
+                    ? 'none' 
+                    : `scale(${zoom / 100})`,
                   transformOrigin: 'center',
                   transition: 'transform 0.2s',
                   width: '100%',
                   height: '100%',
                   maxWidth: '100%',
                   maxHeight: '100%',
+                  overflow: document.documentImage && (document.documentImage.includes('.csv') || (document.documentName && document.documentName.includes('.csv'))) 
+                    ? 'hidden' 
+                    : 'auto',
                 }}
               >
                 {document.documentImage ? (
                   /* Real Document Image from API */
-                  <div className="relative">
-                    {/* Check if it's a PDF document */}
-                    {document.documentImage.includes('.pdf') ? (
-                      /* PDF Document - Use PDFViewer component with blob approach */
+                  <div className="relative w-full h-full" style={{ maxWidth: '100%', overflow: 'hidden' }}>
+                    {/* Check if it's a PDF, Word, Excel, or CSV document */}
+                    {document.documentImage.includes('.pdf') || 
+                     document.documentImage.includes('.doc') || 
+                     document.documentImage.includes('.docx') ||
+                     document.documentImage.includes('.xls') ||
+                     document.documentImage.includes('.xlsx') ||
+                     document.documentImage.includes('.csv') ||
+                     (document.documentName && (
+                       document.documentName.includes('.pdf') ||
+                       document.documentName.includes('.doc') ||
+                       document.documentName.includes('.docx') ||
+                       document.documentName.includes('.xls') ||
+                       document.documentName.includes('.xlsx') ||
+                       document.documentName.includes('.csv')
+                     )) ? (
+                      /* PDF/Word/Excel/CSV Document - Use PDFViewer component */
                       <PDFViewer 
                         url={document.documentImage}
                         fileName={document.documentName}
