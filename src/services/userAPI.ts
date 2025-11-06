@@ -1,6 +1,9 @@
 // Get API base URL from environment variable
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
 
+// Get API key from environment variable
+const API_KEY = (import.meta as any).env?.VITE_API_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
+
 export interface CreateUserRequest {
   firstName: string;
   lastName: string;
@@ -98,6 +101,7 @@ class UserAPI {
     
     const defaultHeaders: HeadersInit = {
       'Content-Type': 'application/json',
+      'x-api-key': API_KEY,
     };
 
     if (tdata) {

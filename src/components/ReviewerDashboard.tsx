@@ -51,6 +51,10 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
     Critical_files: number;
     Completed_today: number;
   } | undefined>();
+  
+  // State to store field counts for each document
+  const [fieldCounts, setFieldCounts] = useState<Record<string, number>>({});
+  const [isLoadingFieldCounts, setIsLoadingFieldCounts] = useState(false);
 
   // Load API data for real documents (fetch status=2 OR status=4)
   useEffect(() => {
@@ -159,24 +163,76 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
     loadData();
   }, []);
 
-  // Convert API documents to QueueItem format for compatibility
+  // Fetch field counts for all documents in the queue
+  useEffect(() => {
+    const fetchFieldCounts = async () => {
+      if (apiDocuments.length === 0) return;
+      
+      setIsLoadingFieldCounts(true);
+      const counts: Record<string, number> = {};
+      
+      try {
+        // Fetch field counts for all documents in parallel
+        const countPromises = apiDocuments.map(async (doc) => {
+          try {
+            const response = await documentOperationsAPI.reviewFile({ file_name: doc.file_name });
+            if (response.success && response.data?.document?.fields) {
+              // Count only fields where qc_action is null or "sendback"
+              const visibleFieldsCount = response.data.document.fields.filter(
+                (field: any) => !field.qc_action || field.qc_action === 'sendback'
+              ).length;
+              return { docId: `${doc.file_name}_${doc.doc_handle_id}`, count: visibleFieldsCount };
+            }
+          } catch (error) {
+            // If API call fails, fallback to total field count
+          }
+          return { docId: `${doc.file_name}_${doc.doc_handle_id}`, count: doc.distinct_entity_type_count };
+        });
+        
+        const results = await Promise.all(countPromises);
+        results.forEach(({ docId, count }) => {
+          counts[docId] = count;
+        });
+        
+        setFieldCounts(counts);
+      } catch (error) {
+        // If fetching fails, use total field counts as fallback
+        const fallbackCounts: Record<string, number> = {};
+        apiDocuments.forEach((doc) => {
+          fallbackCounts[`${doc.file_name}_${doc.doc_handle_id}`] = doc.distinct_entity_type_count;
+        });
+        setFieldCounts(fallbackCounts);
+      } finally {
+        setIsLoadingFieldCounts(false);
+      }
+    };
+    
+    fetchFieldCounts();
+  }, [apiDocuments]);
+
   const convertApiDocumentsToQueueItems = (): QueueItem[] => {
-    return apiDocuments.map((doc, index) => ({
-      id: `${doc.file_name}_${doc.doc_handle_id}` || `doc-${index}`,
-      document: doc.file_name,
-      type: doc.doc_type_name || 'Unknown',
-      field: `${doc.distinct_entity_type_count} fields`, // Use field count as field info
-      confidence: Math.round(doc.avg_confidence_percentage),
-      priority: doc.priority,
-      age: doc.age_assigned || '0d 0h',
-      assignedTo: 'Reviewer', // Set to 'Reviewer' to match filter
-      fieldsCount: doc.distinct_entity_type_count,
-      status: getStatusFromApiResponse(doc.status),
-      extractedValue: 'See document', // Dummy value
-      fieldDescription: 'Review document fields', // Dummy value
-      expectedFormat: 'Various formats', // Dummy value
-      doc_handle_id: doc.doc_handle_id, // Add doc_handle_id for display in table
-    }));
+    return apiDocuments.map((doc, index) => {
+      const docId = `${doc.file_name}_${doc.doc_handle_id}` || `doc-${index}`;
+      // Use calculated field count if available, otherwise fallback to total count
+      const fieldsToReview = fieldCounts[docId] ?? doc.distinct_entity_type_count;
+      
+      return {
+        id: docId,
+        document: doc.file_name,
+        type: doc.doc_type_name || 'Unknown',
+        field: `${fieldsToReview} fields`, // Use calculated field count
+        confidence: Math.round(doc.avg_confidence_percentage),
+        priority: doc.priority,
+        age: doc.age_assigned || '0d 0h',
+        assignedTo: 'Reviewer', // Set to 'Reviewer' to match filter
+        fieldsCount: fieldsToReview, // Use calculated field count (only fields with qc_action null or "sendback")
+        status: getStatusFromApiResponse(doc.status),
+        extractedValue: 'See document', // Dummy value
+        fieldDescription: 'Review document fields', // Dummy value
+        expectedFormat: 'Various formats', // Dummy value
+        doc_handle_id: doc.doc_handle_id, // Add doc_handle_id for display in table
+      };
+    });
   };
 
   // Helper function to map API status to display status

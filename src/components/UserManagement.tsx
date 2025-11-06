@@ -395,55 +395,64 @@ export function UserManagement() {
 
       {/* Filters and Actions */}
       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+          <h3 className="text-[#012F66] dark:text-white mb-4">Filter Users</h3>
+          <div className="flex flex-wrap items-center gap-4">
             {isLoading && (
               <div className="flex items-center gap-2 text-[#80989A] dark:text-[#a0a0a0]">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span className="text-sm">Loading users...</span>
               </div>
             )}
-            <div className="relative">
-              <Search className="w-4 h-4 text-[#80989A] absolute left-3 top-1/2 -translate-y-1/2" />
-              <Input
-                placeholder="Search users..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64 pl-10 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
-              />
+            <div className="w-full md:w-auto md:min-w-[150px]">
+              <div className="relative">
+                <Search className="w-4 h-4 text-[#80989A] absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  placeholder="Search users..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+                />
+              </div>
             </div>
-            <Select
-              value={roleFilter}
-              onValueChange={(value) => handleFilterChange(setRoleFilter, value)}
-            >
-              <SelectTrigger className="w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
-                <SelectValue placeholder="Role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="Reviewer">
-                  Reviewer
-                </SelectItem>
-                <SelectItem value="QC">QC</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => handleFilterChange(setStatusFilter, value)}
-            >
-              <SelectTrigger className="w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Inactive">
-                  Inactive
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-2">
-              <span className="text-[#80989A] dark:text-[#a0a0a0] text-sm">Show:</span>
+            <div className="w-full md:w-auto md:min-w-[150px]">
+              <label className="block text-[#012F66] dark:text-white mb-2">Role</label>
+              <Select
+                value={roleFilter}
+                onValueChange={(value) => handleFilterChange(setRoleFilter, value)}
+              >
+                <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                  <SelectValue placeholder="Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="Reviewer">
+                    Reviewer
+                  </SelectItem>
+                  <SelectItem value="QC">QC</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full md:w-auto md:min-w-[150px]">
+              <label className="block text-[#012F66] dark:text-white mb-2">Status</label>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => handleFilterChange(setStatusFilter, value)}
+              >
+                <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">
+                    Inactive
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full md:w-auto md:min-w-[150px]">
+              <label className="block text-[#012F66] dark:text-white mb-2">Show</label>
               <Select
                 value={itemsPerPage.toString()}
                 onValueChange={(value) => {
@@ -452,7 +461,7 @@ export function UserManagement() {
                   setCurrentPage(1); // Reset to first page when changing page size
                 }}
               >
-                <SelectTrigger className="w-20 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -462,24 +471,24 @@ export function UserManagement() {
                   <SelectItem value="50">50</SelectItem>
                 </SelectContent>
               </Select>
-              {(searchQuery || roleFilter !== 'all' || statusFilter !== 'all') && (
-                <Button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setDebouncedSearchQuery("");
-                    setRoleFilter("all");
-                    setStatusFilter("all");
-                    setCurrentPage(1);
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white text-xs mb-4 cursor-pointer"
-                >
-                  <RefreshCw className="w-3 h-3 mr-1" />
-                  Reset
-                </Button>
-              )}
             </div>
+            {(searchQuery || roleFilter !== 'all' || statusFilter !== 'all') && (
+              <Button
+                onClick={() => {
+                  setSearchQuery("");
+                  setDebouncedSearchQuery("");
+                  setRoleFilter("all");
+                  setStatusFilter("all");
+                  setCurrentPage(1);
+                }}
+                variant="outline"
+                size="sm"
+                className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white text-xs cursor-pointer"
+              >
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Reset
+              </Button>
+            )}
           </div>
           <Button
             onClick={() => {

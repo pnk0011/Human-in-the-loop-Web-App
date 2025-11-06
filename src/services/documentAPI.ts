@@ -52,6 +52,9 @@ export interface UniqueDocumentIdsResponse {
 class DocumentAPI {
   // Get API base URL from environment variable
   private baseURL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
+  
+  // Get API key from environment variable
+  private apiKey = (import.meta as any).env?.VITE_API_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
 
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
@@ -60,6 +63,7 @@ class DocumentAPI {
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
           ...options.headers,
         },
         ...options,
@@ -130,6 +134,7 @@ class DocumentAPI {
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
         },
         method: 'GET',
       });

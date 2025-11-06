@@ -17,7 +17,6 @@ import {
 import { Users, ChevronUp, ChevronDown, Filter, Loader2, FileText, AlertCircle, RefreshCw } from 'lucide-react';
 import { toast } from "sonner";
 import { documentAPI, Document, GetDocumentsRequest } from '../services/documentAPI';
-import { userAPI } from '../services/userAPI';
 import { documentOperationsAPI, AssignReviewerRequest } from '../services/documentOperationsAPI';
 
 // Document interface is imported from documentAPI service
@@ -236,44 +235,33 @@ export function DocumentAssignment() {
     setIsLoadingAllReviewers(true);
     
     try {
-      // First, fetch page 1 to get total pages
-      const firstPageResponse = await userAPI.getUsers(1, 10);
+      // Use the get-reviewer-assignedto-qc API with qc_user=All to get all reviewers
+      // API endpoint: https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/get-reviewer-assignedto-qc?qc_user=All
+      const response = await documentOperationsAPI.getReviewersAssignedToQC('All');
       
-      if (firstPageResponse.status === 'success' && firstPageResponse.users && firstPageResponse.pagination) {
-        const totalPages = firstPageResponse.pagination.total_pages;
-        const allUsers = [...firstPageResponse.users];
-        
-        // Fetch remaining pages
-        const pagePromises: Promise<any>[] = [];
-        for (let page = 2; page <= totalPages; page++) {
-          pagePromises.push(userAPI.getUsers(page, 10));
-        }
-        
-        const remainingPagesResponses = await Promise.all(pagePromises);
-        
-        // Combine all users
-        remainingPagesResponses.forEach(response => {
-          if (response.status === 'success' && response.users) {
-            allUsers.push(...response.users);
-          }
-        });
-        
-        // Convert API response to match component expectations
-        const formattedUsers = allUsers.map(user => ({
-          id: user.email, // Use email as ID
-          name: `${user.first_name} ${user.last_name}`,
-          email: user.email,
-          role: user.role,
-          quality_control: user.quality_control,
+      if (response.status === 'success' && response.reviewers && Array.isArray(response.reviewers)) {
+        // Convert reviewer emails to User format
+        // The API returns an array of reviewer email strings
+        const formattedUsers = response.reviewers.map((reviewerEmail: string) => ({
+          id: reviewerEmail, // Use email as ID
+          name: reviewerEmail.split('@')[0].replace(/\./g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()), // Format email to name
+          email: reviewerEmail,
+          role: 'Reviewer' as const,
+          quality_control: undefined,
           currentLoad: 'N/A', // API doesn't provide current load
         }));
         
         setUsers(formattedUsers);
       } else {
+        // If response doesn't have reviewers array, set empty array
         setUsers([]);
+        if (response.status !== 'success') {
+          toast.error(response.message || 'Failed to load reviewers');
+        }
       }
     } catch (error: any) {
       setUsers([]);
+      toast.error('Failed to load reviewers. Please try again.');
     } finally {
       setIsLoadingAllReviewers(false);
     }
@@ -481,87 +469,101 @@ export function DocumentAssignment() {
               <Filter className="w-4 h-4 text-[#80989A]" />
               <span className="text-[#012F66] dark:text-white">Filters</span>
             </div> */}
-            <Input
-              placeholder="Search documents..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full md:w-64 dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
-            />
-            <Select value={statusFilter} onValueChange={(value) => handleFilterChange(setStatusFilter, value)}>
-              <SelectTrigger className="w-full md:w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Status</SelectItem>
-                <SelectItem value="0">Unassigned</SelectItem>
-                <SelectItem value="1">Assigned</SelectItem>
-                <SelectItem value="2">In Progress</SelectItem>
-                <SelectItem value="3">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={(value) => handleFilterChange(setTypeFilter, value)}>
-              <SelectTrigger className="w-full md:w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Types</SelectItem>
-                <SelectItem value="Large Claim Review Form">Large Claim Review Form</SelectItem>
-                <SelectItem value="Actuarial/UW/Pricing Tools">Actuarial/UW/Pricing Tools</SelectItem>
-                <SelectItem value="Reinsurance">Reinsurance</SelectItem>
-                <SelectItem value="Indication/Quote">Indication/Quote</SelectItem>
-                <SelectItem value="Endorsement">Endorsement</SelectItem>
-                <SelectItem value="Green Card">Green Card</SelectItem>
-                <SelectItem value="Finance Agreement">Finance Agreement</SelectItem>
-                <SelectItem value="Policy Form">Policy Form</SelectItem>
-                <SelectItem value="Additional Risk">Additional Risk</SelectItem>
-                <SelectItem value="Reporting Endorsement">Reporting Endorsement</SelectItem>
-                <SelectItem value="zDup - Loss Run">zDup - Loss Run</SelectItem>
-                <SelectItem value="Loss Run">Loss Run</SelectItem>
-                <SelectItem value="zDup - Stat Notice/Non-Renewal">zDup - Stat Notice/Non-Renewal</SelectItem>
-                <SelectItem value="Expiration/Effective/Retro Date">Expiration/Effective/Retro Date</SelectItem>
-                <SelectItem value="Return Mail">Return Mail</SelectItem>
-                <SelectItem value="Policy">Policy</SelectItem>
-                <SelectItem value="Assessments">Assessments</SelectItem>
-                <SelectItem value="Invoice">Invoice</SelectItem>
-                <SelectItem value="Application">Application</SelectItem>
-                <SelectItem value="Stat Notice/Non-Renewal">Stat Notice/Non-Renewal</SelectItem>
-                <SelectItem value="zDup - Broker of Record (BOR)">zDup - Broker of Record (BOR)</SelectItem>
-                <SelectItem value="Address (not practice loc)">Address (not practice loc)</SelectItem>
-                <SelectItem value="zDup - Actuarial/UW/Pricing Tools">zDup - Actuarial/UW/Pricing Tools</SelectItem>
-                <SelectItem value="zDup - Indication/Quote">zDup - Indication/Quote</SelectItem>
-                <SelectItem value="Cash Application">Cash Application</SelectItem>
-                <SelectItem value="Processing Form">Processing Form</SelectItem>
-                <SelectItem value="Referral/Documentation">Referral/Documentation</SelectItem>
-                <SelectItem value="Coverage">Coverage</SelectItem>
-                <SelectItem value="Broker of Record (BOR)">Broker of Record (BOR)</SelectItem>
-                <SelectItem value="Fund Documentation">Fund Documentation</SelectItem>
-                <SelectItem value="Cancellation">Cancellation</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={priorityFilter} onValueChange={(value) => handleFilterChange(setPriorityFilter, value)}>
-              <SelectTrigger className="w-full md:w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Priority</SelectItem>
-                <SelectItem value="High">High</SelectItem>
-                <SelectItem value="Medium">Medium</SelectItem>
-                <SelectItem value="Low">Low</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={docIdFilter} onValueChange={(value) => handleFilterChange(setDocIdFilter, value)}>
-              <SelectTrigger className="w-full md:w-40 bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white" disabled={isLoadingDocIds}>
-                <SelectValue placeholder={isLoadingDocIds ? "Loading IDs..." : "Document ID"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Document IDs</SelectItem>
-                {uniqueDocIds.map((docId) => (
-                  <SelectItem key={docId} value={docId}>
-                    {docId}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="w-full md:w-auto md:min-w-[150px]">
+              <Input
+                placeholder="Search documents..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              />
+            </div>
+            <div className="w-full md:w-auto md:min-w-[150px]">
+              <label className="block text-[#012F66] dark:text-white mb-2">Status</label>
+              <Select value={statusFilter} onValueChange={(value) => handleFilterChange(setStatusFilter, value)}>
+                <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Status</SelectItem>
+                  <SelectItem value="0">Unassigned</SelectItem>
+                  <SelectItem value="1">Assigned</SelectItem>
+                  <SelectItem value="2">In Progress</SelectItem>
+                  <SelectItem value="3">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full md:w-auto md:min-w-[150px]">
+              <label className="block text-[#012F66] dark:text-white mb-2">Document Type</label>
+              <Select value={typeFilter} onValueChange={(value) => handleFilterChange(setTypeFilter, value)}>
+                <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Types</SelectItem>
+                  <SelectItem value="Large Claim Review Form">Large Claim Review Form</SelectItem>
+                  <SelectItem value="Actuarial/UW/Pricing Tools">Actuarial/UW/Pricing Tools</SelectItem>
+                  <SelectItem value="Reinsurance">Reinsurance</SelectItem>
+                  <SelectItem value="Indication/Quote">Indication/Quote</SelectItem>
+                  <SelectItem value="Endorsement">Endorsement</SelectItem>
+                  <SelectItem value="Green Card">Green Card</SelectItem>
+                  <SelectItem value="Finance Agreement">Finance Agreement</SelectItem>
+                  <SelectItem value="Policy Form">Policy Form</SelectItem>
+                  <SelectItem value="Additional Risk">Additional Risk</SelectItem>
+                  <SelectItem value="Reporting Endorsement">Reporting Endorsement</SelectItem>
+                  <SelectItem value="zDup - Loss Run">zDup - Loss Run</SelectItem>
+                  <SelectItem value="Loss Run">Loss Run</SelectItem>
+                  <SelectItem value="zDup - Stat Notice/Non-Renewal">zDup - Stat Notice/Non-Renewal</SelectItem>
+                  <SelectItem value="Expiration/Effective/Retro Date">Expiration/Effective/Retro Date</SelectItem>
+                  <SelectItem value="Return Mail">Return Mail</SelectItem>
+                  <SelectItem value="Policy">Policy</SelectItem>
+                  <SelectItem value="Assessments">Assessments</SelectItem>
+                  <SelectItem value="Invoice">Invoice</SelectItem>
+                  <SelectItem value="Application">Application</SelectItem>
+                  <SelectItem value="Stat Notice/Non-Renewal">Stat Notice/Non-Renewal</SelectItem>
+                  <SelectItem value="zDup - Broker of Record (BOR)">zDup - Broker of Record (BOR)</SelectItem>
+                  <SelectItem value="Address (not practice loc)">Address (not practice loc)</SelectItem>
+                  <SelectItem value="zDup - Actuarial/UW/Pricing Tools">zDup - Actuarial/UW/Pricing Tools</SelectItem>
+                  <SelectItem value="zDup - Indication/Quote">zDup - Indication/Quote</SelectItem>
+                  <SelectItem value="Cash Application">Cash Application</SelectItem>
+                  <SelectItem value="Processing Form">Processing Form</SelectItem>
+                  <SelectItem value="Referral/Documentation">Referral/Documentation</SelectItem>
+                  <SelectItem value="Coverage">Coverage</SelectItem>
+                  <SelectItem value="Broker of Record (BOR)">Broker of Record (BOR)</SelectItem>
+                  <SelectItem value="Fund Documentation">Fund Documentation</SelectItem>
+                  <SelectItem value="Cancellation">Cancellation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full md:w-auto md:min-w-[150px]">
+              <label className="block text-[#012F66] dark:text-white mb-2">Priority</label>
+              <Select value={priorityFilter} onValueChange={(value) => handleFilterChange(setPriorityFilter, value)}>
+                <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Priority</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full md:w-auto md:min-w-[150px]">
+              <label className="block text-[#012F66] dark:text-white mb-2">Document ID</label>
+              <Select value={docIdFilter} onValueChange={(value) => handleFilterChange(setDocIdFilter, value)}>
+                <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white" disabled={isLoadingDocIds}>
+                  <SelectValue placeholder={isLoadingDocIds ? "Loading IDs..." : "Document ID"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Document IDs</SelectItem>
+                  {uniqueDocIds.map((docId) => (
+                    <SelectItem key={docId} value={docId}>
+                      {docId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-[#80989A] dark:text-[#a0a0a0] text-sm">Show:</span>
               <Select
@@ -908,24 +910,16 @@ export function DocumentAssignment() {
                     <SelectValue placeholder="Choose a reviewer" />
                   </SelectTrigger>
                   <SelectContent>
-                    {users.filter(user => user.role === 'Reviewer').map((user) => (
+                    {users.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
-                        <div className="flex items-center justify-between w-full">
-                          <div>
-                            <div className="text-[#012F66]">{user.name}</div>
-                            <div className="text-[#80989A]">{user.email}</div>
-                          </div>
-                          <div className="ml-4">
-                            <Badge className="bg-[#0292DC] text-white">
-                              {user.role}
-                            </Badge>
-                            <span className="text-[#80989A] ml-2">({user.currentLoad})</span>
-                          </div>
+                        <div>
+                          <div className="text-[#012F66] dark:text-white">{user.name}</div>
+                          <div className="text-[#80989A] dark:text-[#a0a0a0] text-sm">{user.email}</div>
                         </div>
                       </SelectItem>
                     ))}
                     
-                    {users.filter(user => user.role === 'Reviewer').length === 0 && !isLoadingAllReviewers && (
+                    {users.length === 0 && !isLoadingAllReviewers && (
                       <div className="p-3 text-[#80989A] dark:text-[#a0a0a0] text-center">
                         No reviewers found
                       </div>

@@ -1,6 +1,9 @@
 // Get API base URL from environment variable
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
 
+// Get API key from environment variable
+const API_KEY = (import.meta as any).env?.VITE_API_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
+
 // Assign Reviewer API Interfaces
 export interface AssignReviewerRequest {
   file_names: string[];
@@ -74,7 +77,12 @@ export interface ReviewFileRequest {
 export interface ReviewFileEntity {
   entity_type: string;
   entity_value: string;
+  updated_entity_value?: string | null;
+  reviewer_action?: 'accept' | 'correct' | 'reject' | null;
+  qc_action?: 'approve' | 'reject' | 'sendback' | null;
   confidence: number;
+  begin_offset?: string;
+  end_offset?: string;
 }
 
 export interface ReviewFileDocument {
@@ -86,6 +94,7 @@ export interface ReviewFileDocument {
   documentImage: string;
   reviewer_updated_dt: string;
   reviewer: string;
+  qc_action?: string | null;
 }
 
 export interface ReviewFileResponse {
@@ -220,6 +229,7 @@ class DocumentOperationsAPI {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          'x-api-key': API_KEY,
           // Add authorization header if needed
           // 'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           ...options?.headers,

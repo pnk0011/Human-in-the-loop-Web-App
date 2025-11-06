@@ -215,6 +215,62 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail, 
     filteredData = filteredData.filter(item => item.doc_handle_id === docIdFilter);
   }
   
+  // Sort to prioritize Reassigned status documents at the top
+  // Then apply manual sorting if sortField is set
+  filteredData = [...filteredData].sort((a, b) => {
+    // First priority: Reassigned status should always be at the top
+    if (a.status === 'Reassigned' && b.status !== 'Reassigned') return -1;
+    if (a.status !== 'Reassigned' && b.status === 'Reassigned') return 1;
+    
+    // If both have same Reassigned priority, apply manual sorting if set
+    if (sortField) {
+      let aVal: any;
+      let bVal: any;
+      
+      switch (sortField) {
+        case 'document':
+          aVal = a.document?.toLowerCase() || '';
+          bVal = b.document?.toLowerCase() || '';
+          break;
+        case 'confidence':
+          aVal = a.confidence || 0;
+          bVal = b.confidence || 0;
+          break;
+        case 'priority':
+          const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+          aVal = priorityOrder[a.priority] || 0;
+          bVal = priorityOrder[b.priority] || 0;
+          break;
+        case 'age':
+          // Parse age string (e.g., "2d", "5h", "30m")
+          const parseAge = (age: string) => {
+            if (!age) return 0;
+            const match = age.match(/(\d+)([dhm])/);
+            if (!match) return 0;
+            const value = parseInt(match[1]);
+            const unit = match[2];
+            if (unit === 'd') return value * 24 * 60; // days to minutes
+            if (unit === 'h') return value * 60; // hours to minutes
+            return value; // minutes
+          };
+          aVal = parseAge(a.age);
+          bVal = parseAge(b.age);
+          break;
+        default:
+          return 0;
+      }
+      
+      if (sortDirection === 'asc') {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    }
+    
+    // If no manual sorting, maintain original order
+    return 0;
+  });
+  
   const totalItems = filteredData.length;
 
   // Calculate pagination
@@ -598,7 +654,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, reviewerEmail, 
                       item.status === 'In Progress' ? 'bg-[#FFC018]/10 text-[#FFC018]' :
                       item.status === 'Pending Review' ? 'bg-[#80989A]/10 text-[#80989A]' :
                       item.status === 'Completed' ? 'bg-green-600 text-white' :
-                      item.status === 'Reassigned' ? 'bg-[#F59E0B]/20 text-[#D97706]' :
+                      item.status === 'Reassigned' ? 'bg-[#FF0081] text-white' :
                       'bg-[#FF0081]/10 text-[#FF0081]'
                     }>
                       {item.status}

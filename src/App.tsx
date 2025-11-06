@@ -29,6 +29,7 @@ interface ValidationDocument {
   priority: "High" | "Medium" | "Low";
   fields: ExtractedField[];
   documentImage?: string; // URL to the document image
+  allFields?: any[]; // Store all fields from API for submission (including those with qc_action not null)
 }
 
 interface QCValidationDocument extends ValidationDocument {
@@ -119,18 +120,28 @@ const AppContent = React.memo(function AppContent() {
         if (response.success && response.data?.document) {
           const apiDoc = response.data.document;
           
+          // Filter fields to show only those where qc_action is null or "sendback"
+          const visibleFields = apiDoc.fields.filter(field => 
+            !field.qc_action || field.qc_action === 'sendback'
+          );
+          
+          // Store all fields for submission (including those with qc_action not null)
+          const allFields = apiDoc.fields;
+          
           // Transform API response to component format
+          // Only show fields where qc_action is null or "sendback"
           document = {
             id: apiDoc.id || item.id,
             documentName: apiDoc.documentName || item.document,
             documentType: apiDoc.documentType || item.type,
             priority: item.priority,
             documentImage: apiDoc.documentImage, // Include document image URL from API
-            fields: apiDoc.fields.map((field, index) => ({
+            allFields: allFields, // Store all fields for submission
+            fields: visibleFields.map((field, index) => ({
               id: `field-${index + 1}`,
               fieldName: field.entity_type,
               fieldDescription: `AI extracted ${field.entity_type.toLowerCase()} from document`,
-              extractedValue: field.entity_value,
+              extractedValue: field.updated_entity_value || field.entity_value,
               confidence: field.confidence,
               expectedFormat: 'Text',
               location: { x: 48, y: 175 + (index * 40), width: 180, height: 24 },
@@ -233,7 +244,7 @@ const AppContent = React.memo(function AppContent() {
               id: `field-${index + 1}`,
               fieldName: field.entity_type,
               fieldDescription: `AI extracted ${field.entity_type.toLowerCase()} from document`,
-              extractedValue: field.updated_entity_text || field.entity_value,
+              extractedValue: field.entity_value,
               confidence: field.confidence,
               expectedFormat: 'Text',
               location: { x: 48, y: 175 + (index * 40), width: 180, height: 24 },
@@ -467,13 +478,41 @@ const AppContent = React.memo(function AppContent() {
         if (selectedDocument) {
           const { documentOperationsAPI } = await import('./services/documentOperationsAPI');
           
-          // Transform validations to API format
-          const apiValidations = validations.map(validation => ({
-            entity_type: selectedDocument.fields.find(f => f.id === validation.fieldId)?.fieldName || '',
-            reviewer_action: validation.action || 'accept',
-            updated_entity_text: validation.correctedValue || null,
-            reviewer_comment: validation.note || null,
-          }));
+          // Create a map of validations by field ID for quick lookup
+          const validationMap = new Map<string, FieldValidation>();
+          validations.forEach(validation => {
+            validationMap.set(validation.fieldId, validation);
+          });
+          
+          // Include ALL fields from API response in the payload
+          // For visible fields, use the validation from the form
+          // For hidden fields (qc_action not null and not "sendback"), use existing values from API
+          const allFields = selectedDocument.allFields || [];
+          
+          const apiValidations = allFields.map((apiField: any) => {
+            // Find if this field was visible (has a validation from the form)
+            const visibleField = selectedDocument.fields.find(f => f.fieldName === apiField.entity_type);
+            const validation = visibleField ? validationMap.get(visibleField.id) : null;
+            
+            if (validation) {
+              // Field was visible and validated by user
+              return {
+                entity_type: apiField.entity_type,
+                reviewer_action: validation.action || 'accept',
+                updated_entity_text: validation.correctedValue || null,
+                reviewer_comment: validation.note || null,
+              };
+            } else {
+              // Field was hidden (qc_action not null and not "sendback")
+              // Include it with existing values from API
+              return {
+                entity_type: apiField.entity_type,
+                reviewer_action: apiField.reviewer_action || 'accept',
+                updated_entity_text: apiField.updated_entity_value || apiField.entity_value || null,
+                reviewer_comment: null,
+              };
+            }
+          });
 
           const response = await documentOperationsAPI.updateFile({
             file_name: selectedDocument.documentName,

@@ -21,7 +21,6 @@ import {
   Sun,
   Download
 } from 'lucide-react';
-import logo from 'figma:asset/d37108ff06015dcbcdb272cec41a1cfc0b3b3dfd.png';
 import { LoadingSpinner } from './LoadingComponents';
 import { PDFViewer } from './PDFViewer';
 
