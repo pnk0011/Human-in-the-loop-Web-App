@@ -28,7 +28,6 @@ import {
   Sun,
   Download,
 } from "lucide-react";
-import logo from "figma:asset/d37108ff06015dcbcdb272cec41a1cfc0b3b3dfd.png";
 import { LoadingSpinner, LoadingOverlay } from "./LoadingComponents";
 import { useLoading } from "../hooks/useLoading";
 import { PDFViewer } from "./PDFViewer";
@@ -300,14 +299,18 @@ export function ValidationScreen({
         subtitle={document.documentType}
       />
 
-      <div className="flex-1 flex gap-1 p-2">
+      <div className="flex-1 min-h-0 flex flex-row gap-4 p-4 overflow-hidden">
         {/* Document Viewer */}
         <div
-          className={`${isFullscreen ? "fixed inset-0 z-50 p-2 bg-[#F5F7FA] dark:bg-[#1a1a1a]" : "flex-1"}`}
+          className={`${
+            isFullscreen
+              ? "fixed inset-0 z-50 p-2 bg-[#F5F7FA] dark:bg-[#1a1a1a]"
+              : "flex-1 min-w-0 min-h-0"
+          }`}
         >
-          <div className="bg-[#E5E7EB] dark:bg-[#2a2a2a] rounded-lg h-full flex flex-col">
+          <div className="bg-[#E5E7EB] dark:bg-[#2a2a2a] rounded-lg h-full flex flex-col min-h-0">
             {/* Document Display */}
-            <div className="flex-1 relative overflow-hidden flex items-center justify-center p-1">
+            <div className="flex-1 relative overflow-hidden flex items-center justify-center p-1 min-h-0">
               <div
                 className="bg-white shadow-lg relative"
                 style={{
@@ -327,13 +330,14 @@ export function ValidationScreen({
               >
                 {document.documentImage ? (
                   /* Real Document Image from API */
-                  <div className="relative w-full h-full" style={{ maxWidth: '100%', overflow: 'hidden' }}>
+                  <div className="relative w-full h-full" style={{ maxWidth: '100%', overflow: 'hidden', height: '100%' }}>
                     {/* Check if it's a PDF, Word, Excel, or CSV document */}
                     {document.documentImage.includes('.pdf') || 
                      document.documentImage.includes('.doc') || 
                      document.documentImage.includes('.docx') ||
                      document.documentImage.includes('.xls') ||
                      document.documentImage.includes('.xlsx') ||
+                     document.documentImage.includes('.msg') ||
                      document.documentImage.includes('.csv') ||
                      (document.documentName && (
                        document.documentName.includes('.pdf') ||
@@ -341,6 +345,7 @@ export function ValidationScreen({
                        document.documentName.includes('.docx') ||
                        document.documentName.includes('.xls') ||
                        document.documentName.includes('.xlsx') ||
+                       document.documentName.includes('.msg') ||
                        document.documentName.includes('.csv')
                      )) ? (
                       /* PDF/Word/Excel/CSV Document - Use PDFViewer component */
@@ -459,210 +464,213 @@ export function ValidationScreen({
         </div>
 
         {/* Right Panel */}
-        <div className="w-[350px] flex flex-col gap-4">
-          {/* Fields List */}
-          <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-4 border-[#E5E7EB] dark:border-[#3a3a3a]">
-            <h3 className="text-[#012F66] dark:text-white mb-3">
-              Fields to Validate ({document.fields.length})
-            </h3>
-            <ScrollArea className="h-[180px]">
-              <div className="space-y-2 pr-4">
-                {document.fields.map((field, index) => (
-                  <div
-                    key={field.id}
-                    onClick={() => setSelectedFieldId(field.id)}
-                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                      selectedFieldId === field.id
-                        ? "border-[#FF0081] bg-[#FF0081]/5"
-                        : "border-[#E5E7EB] hover:border-[#0292DC] bg-white"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#80989A]">
-                            #{index + 1}
-                          </span>
-                          <span className="text-[#012F66]">
-                            {field.fieldName}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge
-                            className={`${
-                              field.confidence >= 70
-                                ? "bg-[#FFC018]"
-                                : field.confidence >= 50
+        <div className="w-[360px] flex-shrink-0 h-full flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            {/* Fields List */}
+            <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-4 border-[#E5E7EB] dark:border-[#3a3a3a]">
+              <h3 className="text-[#012F66] dark:text-white mb-3">
+                Fields to Validate ({document.fields.length})
+              </h3>
+              <ScrollArea className="h-[180px]">
+                <div className="space-y-2 pr-4">
+                  {document.fields.map((field, index) => (
+                    <div
+                      key={field.id}
+                      onClick={() => setSelectedFieldId(field.id)}
+                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        selectedFieldId === field.id
+                          ? "border-[#FF0081] bg-[#FF0081]/5"
+                          : "border-[#E5E7EB] hover:border-[#0292DC] bg-white"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#80989A]">
+                              #{index + 1}
+                            </span>
+                            <span className="text-[#012F66]">
+                              {field.fieldName}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge
+                              className={`${
+                                field.confidence >= 70
                                   ? "bg-[#FFC018]"
-                                  : "bg-[#FF0081]"
-                            } text-white`}
-                          >
-                            {field.confidence}%
-                          </Badge>
-                          <span className="text-[#80989A]">
-                            {field.extractedValue}
-                          </span>
+                                  : field.confidence >= 50
+                                    ? "bg-[#FFC018]"
+                                    : "bg-[#FF0081]"
+                              } text-white`}
+                            >
+                              {field.confidence}%
+                            </Badge>
+                            <span className="text-[#80989A]">
+                              {field.extractedValue}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex-shrink-0">
-                        {getFieldStatusIcon(field.id)}
+                        <div className="flex-shrink-0">
+                          {getFieldStatusIcon(field.id)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-
-          {/* Field Information */}
-          {/* <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-            <h3 className="text-[#012F66] dark:text-white mb-2">
-              {selectedField.fieldName}
-            </h3>
-            <p className="text-[#80989A] dark:text-[#a0a0a0] mb-4">
-              {selectedField.fieldDescription}
-            </p>
-            {selectedField.expectedFormat && (
-              <p className="text-[#80989A] dark:text-[#a0a0a0]">
-                Format: {selectedField.expectedFormat}
-              </p>
-            )}
-          </div> */}
-
-          {/* AI Extraction */}
-          <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 rounded-full bg-[#0292DC]" />
-              <span className="text-[#80989A] dark:text-[#a0a0a0]">
-                AI Extraction
-              </span>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
 
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
+            {/* Field Information */}
+            {/* <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+              <h3 className="text-[#012F66] dark:text-white mb-2">
+                {selectedField.fieldName}
+              </h3>
+              <p className="text-[#80989A] dark:text-[#a0a0a0] mb-4">
+                {selectedField.fieldDescription}
+              </p>
+              {selectedField.expectedFormat && (
+                <p className="text-[#80989A] dark:text-[#a0a0a0]">
+                  Format: {selectedField.expectedFormat}
+                </p>
+              )}
+            </div> */}
+
+            {/* AI Extraction */}
+            <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 rounded-full bg-[#0292DC]" />
                 <span className="text-[#80989A] dark:text-[#a0a0a0]">
-                  Confidence
-                </span>
-                <span className="text-[#012F66] dark:text-white">
-                  {selectedField.confidence}%
+                  AI Extraction
                 </span>
               </div>
-              <div className="relative h-2 bg-[#E5E7EB] dark:bg-[#1a1a1a] rounded-full overflow-hidden">
-                <div
-                  className={`absolute left-0 top-0 h-full ${getConfidenceColor(selectedField.confidence)} transition-all`}
-                  style={{
-                    width: `${selectedField.confidence}%`,
-                  }}
-                />
+
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[#80989A] dark:text-[#a0a0a0]">
+                    Confidence
+                  </span>
+                  <span className="text-[#012F66] dark:text-white">
+                    {selectedField.confidence}%
+                  </span>
+                </div>
+                <div className="relative h-2 bg-[#E5E7EB] dark:bg-[#1a1a1a] rounded-full overflow-hidden">
+                  <div
+                    className={`absolute left-0 top-0 h-full ${getConfidenceColor(selectedField.confidence)} transition-all`}
+                    style={{
+                      width: `${selectedField.confidence}%`,
+                    }}
+                  />
+                </div>
+                <span className="text-[#80989A] dark:text-[#a0a0a0] mt-1 block">
+                  {getConfidenceLabel(selectedField.confidence)}
+                </span>
               </div>
-              <span className="text-[#80989A] dark:text-[#a0a0a0] mt-1 block">
-                {getConfidenceLabel(selectedField.confidence)}
-              </span>
+
+              <div className="bg-[#F5F7FA] dark:bg-[#1a1a1a] p-4 rounded border border-[#D0D5DD] dark:border-[#3a3a3a]">
+                <p className="text-[#012F66] dark:text-white">
+                  {selectedField.extractedValue}
+                </p>
+              </div>
             </div>
 
-            <div className="bg-[#F5F7FA] dark:bg-[#1a1a1a] p-4 rounded border border-[#D0D5DD] dark:border-[#3a3a3a]">
-              <p className="text-[#012F66] dark:text-white">
-                {selectedField.extractedValue}
-              </p>
-            </div>
-          </div>
+            {/* Validation Actions */}
+            <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+              <h4 className="text-[#012F66] dark:text-white mb-4">
+                Your Validation
+              </h4>
 
-          {/* Validation Actions */}
-          <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-            <h4 className="text-[#012F66] dark:text-white mb-4">
-              Your Validation
-            </h4>
-
-            <div className="flex gap-2 mb-4">
-              <Button
-                variant={
-                  currentValidation.action === "accept"
-                    ? "default"
-                    : "outline"
-                }
-                onClick={() => handleActionChange("accept")}
-                className={
-                  currentValidation.action === "accept"
-                    ? "flex-1 bg-green-600 hover:bg-green-700 text-white"
-                    : "flex-1 border-green-600 text-green-600 hover:bg-green-50"
-                }
-              >
-                <Check className="w-4 h-4 mr-2" />
-                Accept
-              </Button>
-              <Button
-                variant={
-                  currentValidation.action === "correct"
-                    ? "default"
-                    : "outline"
-                }
-                onClick={() => handleActionChange("correct")}
-                className={
-                  currentValidation.action === "correct"
-                    ? "flex-1 bg-[#FFC018] hover:bg-[#FFC018]/90 text-white"
-                    : "flex-1 border-[#FFC018] text-[#FFC018] hover:bg-[#FFC018]/10"
-                }
-              >
-                <Edit3 className="w-4 h-4 mr-2" />
-                Correct
-              </Button>
-              <Button
-                variant={
-                  currentValidation.action === "reject"
-                    ? "default"
-                    : "outline"
-                }
-                onClick={() => handleActionChange("reject")}
-                className={
-                  currentValidation.action === "reject"
-                    ? "flex-1 bg-[#FF0081] hover:bg-[#FF0081]/90 text-white"
-                    : "flex-1 border-[#FF0081] text-[#FF0081] hover:bg-[#FF0081]/10"
-                }
-              >
-                <X className="w-4 h-4 mr-2" />
-                Reject
-              </Button>
-            </div>
-
-            {/* Correction Input */}
-            {currentValidation.action === "correct" && (
-              <div className="mb-4 space-y-2">
-                <label className="text-[#012F66] dark:text-white">
-                  Corrected Value
-                </label>
-                <Input
-                  value={currentValidation.correctedValue || ""}
-                  onChange={(e) =>
-                    handleCorrectedValueChange(e.target.value)
+              <div className="flex gap-2 mb-4">
+                <Button
+                  variant={
+                    currentValidation.action === "accept"
+                      ? "default"
+                      : "outline"
                   }
-                  placeholder="Enter the correct value"
-                  className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white"
+                  onClick={() => handleActionChange("accept")}
+                  className={
+                    currentValidation.action === "accept"
+                      ? "flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      : "flex-1 border-green-600 text-green-600 hover:bg-green-50"
+                  }
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Accept
+                </Button>
+                <Button
+                  variant={
+                    currentValidation.action === "correct"
+                      ? "default"
+                      : "outline"
+                  }
+                  onClick={() => handleActionChange("correct")}
+                  className={
+                    currentValidation.action === "correct"
+                      ? "flex-1 bg-[#FFC018] hover:bg-[#FFC018]/90 text-white"
+                      : "flex-1 border-[#FFC018] text-[#FFC018] hover:bg-[#FFC018]/10"
+                  }
+                >
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Correct
+                </Button>
+                <Button
+                  variant={
+                    currentValidation.action === "reject"
+                      ? "default"
+                      : "outline"
+                  }
+                  onClick={() => handleActionChange("reject")}
+                  className={
+                    currentValidation.action === "reject"
+                      ? "flex-1 bg-[#FF0081] hover:bg-[#FF0081]/90 text-white"
+                      : "flex-1 border-[#FF0081] text-[#FF0081] hover:bg-[#FF0081]/10"
+                  }
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Reject
+                </Button>
+              </div>
+
+              {/* Correction Input */}
+              {currentValidation.action === "correct" && (
+                <div className="mb-4 space-y-2">
+                  <label className="text-[#012F66] dark:text-white">
+                    Corrected Value
+                  </label>
+                  <Input
+                    value={currentValidation.correctedValue || ""}
+                    onChange={(e) =>
+                      handleCorrectedValueChange(e.target.value)
+                    }
+                    placeholder="Enter the correct value"
+                    className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white"
+                  />
+                </div>
+              )}
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <label className="text-[#012F66] dark:text-white">
+                  Notes (Optional)
+                </label>
+                <Textarea
+                  value={currentValidation.note || ""}
+                  onChange={(e) =>
+                    handleNoteChange(e.target.value)
+                  }
+                  placeholder="Add any relevant notes about this field..."
+                  rows={3}
+                  className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white resize-none"
                 />
               </div>
-            )}
-
-            {/* Notes */}
-            <div className="space-y-2">
-              <label className="text-[#012F66] dark:text-white">
-                Notes (Optional)
-              </label>
-              <Textarea
-                value={currentValidation.note || ""}
-                onChange={(e) =>
-                  handleNoteChange(e.target.value)
-                }
-                placeholder="Add any relevant notes about this field..."
-                rows={3}
-                className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white resize-none"
-              />
             </div>
+
           </div>
 
           {/* Submit Button */}
           <Button
             onClick={handleSubmitAll}
             disabled={getValidatedFieldsCount() === 0 || isSubmitting}
-            className="w-full bg-[#0292DC] hover:bg-[#012F66] text-white"
+            className="mt-4 w-full bg-[#0292DC] hover:bg-[#012F66] text-white flex-shrink-0"
           >
             {isSubmitting ? (
               <LoadingSpinner size="sm" text="Submitting..." />

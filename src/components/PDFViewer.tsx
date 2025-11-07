@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useMemo } from 'react';
+import MsgReader from 'msgreader';
 import { Button } from './ui/button';
 import { Download, FileText, AlertCircle } from 'lucide-react';
 
@@ -8,11 +9,41 @@ interface PDFViewerProps {
   className?: string;
 }
 
+interface ParsedMsgData {
+  subject?: string;
+  senderName?: string;
+  senderEmail?: string;
+  toRecipients?: string[];
+  ccRecipients?: string[];
+  bodyHTML?: string;
+  bodyText?: string;
+  sentOn?: string;
+}
+
+interface MsgAttachment {
+  fileName: string;
+  url: string;
+  size: number;
+  mimeType: string;
+}
+
 export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
   const [hasError, setHasError] = useState(false);
   const [csvData, setCsvData] = useState<string[][]>([]);
   const [isLoadingCsv, setIsLoadingCsv] = useState(false);
-  const [csvBlobUrl, setCsvBlobUrl] = useState<string | null>(null);
+  const [isLoadingMsg, setIsLoadingMsg] = useState(false);
+  const [msgData, setMsgData] = useState<ParsedMsgData | null>(null);
+  const [msgAttachments, setMsgAttachments] = useState<MsgAttachment[]>([]);
+
+  const formatAttachmentSize = useCallback((size: number) => {
+    if (size >= 1024 * 1024) {
+      return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    if (size >= 1024) {
+      return `${(size / 1024).toFixed(1)} KB`;
+    }
+    return `${size} B`;
+  }, []);
 
   // Detect file type from URL or fileName
   const fileType = useMemo(() => {
@@ -21,6 +52,9 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
     
     if (fileUrl.includes('.csv') || name.includes('.csv')) {
       return 'csv';
+    }
+    if (fileUrl.includes('.msg') || name.includes('.msg')) {
+      return 'msg';
     }
     if (fileUrl.includes('.xlsx') || name.includes('.xlsx')) {
       return 'xlsx';
@@ -67,180 +101,252 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
         return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       case 'doc':
         return 'application/msword';
+      case 'msg':
+        return 'application/vnd.ms-outlook';
       default:
         return 'application/pdf';
     }
   }, [fileType]);
 
-  // Helper function to escape HTML
-  const escapeHtml = useCallback((text: string): string => {
-    const map: { [key: string]: string } = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    };
-    return text.replace(/[&<>"']/g, (m) => map[m]);
+  // Determine if the URL belongs to the API domain (requires auth headers)
+  const apiBaseUrl = useMemo(() => {
+    const value = (import.meta as any).env?.VITE_API_BASE_URL || 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
+    return value.endsWith('/') ? value : `${value}/`;
   }, []);
 
-  // Load and parse CSV file, create HTML table in blob URL
-  React.useEffect(() => {
-    if (fileType === 'csv') {
-      setIsLoadingCsv(true);
-      setHasError(false);
-      
-      // Clean up previous blob URL
-      const previousBlobUrl = csvBlobUrl;
-      if (previousBlobUrl) {
-        URL.revokeObjectURL(previousBlobUrl);
-        setCsvBlobUrl(null);
-      }
-      
-      fetch(url)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Failed to fetch CSV file');
-          }
-          return response.text();
-        })
-        .then(text => {
-          // Parse CSV (simple parser - handles basic CSV format)
-          const lines = text.split('\n').filter(line => line.trim() !== '');
-          const parsed = lines.map(line => {
-            // Handle quoted fields and commas
-            const result: string[] = [];
-            let current = '';
-            let inQuotes = false;
-            
-            for (let i = 0; i < line.length; i++) {
-              const char = line[i];
-              const nextChar = line[i + 1];
-              
-              if (char === '"') {
-                if (inQuotes && nextChar === '"') {
-                  // Escaped quote
-                  current += '"';
-                  i++; // Skip next quote
-                } else {
-                  // Toggle quote state
-                  inQuotes = !inQuotes;
-                }
-              } else if (char === ',' && !inQuotes) {
-                // End of field
-                result.push(current.trim());
-                current = '';
-              } else {
-                current += char;
-              }
-            }
-            // Add last field
-            result.push(current.trim());
-            return result;
-          });
-          
-          setCsvData(parsed);
-          
-          // Create HTML table and convert to blob URL for iframe
-          if (parsed.length > 0) {
-            const headers = parsed[0];
-            const rows = parsed.slice(1);
-            
-            // Escape headers and rows
-            const escapedHeaders = headers.map(h => escapeHtml(h));
-            const escapedRows = rows.map(row => 
-              headers.map((_, index) => escapeHtml(row[index] || ''))
-            );
-            
-            // Create HTML content
-            const htmlContent = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { 
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        padding: 0;
-        margin: 0;
-        overflow: auto;
-      }
-      .table-container {
-        width: 100%;
-        height: 100vh;
-        overflow: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 14px;
-      }
-      thead {
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        background-color: #f9fafb;
-      }
-      th {
-        background-color: #f9fafb;
-        padding: 12px;
-        text-align: left;
-        font-weight: 600;
-        border: 1px solid #e5e7eb;
-        white-space: nowrap;
-      }
-      td {
-        padding: 12px;
-        border: 1px solid #e5e7eb;
-        white-space: nowrap;
-      }
-      tbody tr:nth-child(even) {
-        background-color: #f9fafb;
-      }
-      tbody tr:hover {
-        background-color: #f3f4f6;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            ${escapedHeaders.map(header => `<th>${header}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>
-          ${escapedRows.map(row => `
-            <tr>
-              ${row.map(cell => `<td>${cell}</td>`).join('')}
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  </body>
-</html>`;
-            
-            // Create blob and URL
-            const blob = new Blob([htmlContent], { type: 'text/html' });
-            const blobUrl = URL.createObjectURL(blob);
-            setCsvBlobUrl(blobUrl);
-          }
-          
-          setIsLoadingCsv(false);
-        })
-        .catch(error => {
-          setHasError(true);
-          setIsLoadingCsv(false);
-        });
+  const shouldAttachAuth = useMemo(() => {
+    try {
+      const normalizedUrl = url || '';
+      if (!normalizedUrl) return false;
+      return normalizedUrl.startsWith(apiBaseUrl);
+    } catch (error) {
+      return false;
     }
-    
-    // Cleanup blob URL on unmount or when URL changes
-    return () => {
-      // Cleanup will be handled in the next effect run
+  }, [url, apiBaseUrl]);
+
+  // Load and parse CSV / MSG files
+  React.useEffect(() => {
+    let isCancelled = false;
+    let createdAttachmentUrls: string[] = [];
+
+    const clearAttachmentUrls = () => {
+      createdAttachmentUrls.forEach((attachmentUrl) => URL.revokeObjectURL(attachmentUrl));
+      createdAttachmentUrls = [];
     };
-  }, [url, fileType, escapeHtml, csvBlobUrl]);
+
+    const resetState = () => {
+      if (isCancelled) return;
+      setCsvData([]);
+      setMsgData(null);
+      setMsgAttachments([]);
+      setIsLoadingCsv(false);
+      setIsLoadingMsg(false);
+    };
+
+    const token = localStorage.getItem('accessToken');
+    const apiKey = (import.meta as any).env?.VITE_API_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
+
+    const baseHeaders: HeadersInit = {
+      Accept: fileType === 'csv' ? 'text/csv,text/plain,*/*' : '*/*',
+    };
+
+    if (shouldAttachAuth) {
+      if (token) {
+        baseHeaders['Authorization'] = `Bearer ${token}`;
+      }
+      baseHeaders['x-api-key'] = apiKey;
+    }
+
+    const fetchWithFallback = async () => {
+      try {
+        const primaryResponse = await fetch(url, {
+          credentials: shouldAttachAuth ? 'include' : 'omit',
+          headers: baseHeaders,
+        });
+
+        if (!primaryResponse.ok) {
+          if (shouldAttachAuth && [401, 403, 415].includes(primaryResponse.status)) {
+            return await fetch(url);
+          }
+          return primaryResponse;
+        }
+
+        return primaryResponse;
+      } catch (error) {
+        if (shouldAttachAuth) {
+          return await fetch(url);
+        }
+        throw error;
+      }
+    };
+
+    if (fileType === 'csv' || fileType === 'msg') {
+      const isMsg = fileType === 'msg';
+
+      if (isMsg) {
+        setIsLoadingMsg(true);
+      } else {
+        setIsLoadingCsv(true);
+      }
+
+      setHasError(false);
+      setCsvData([]);
+      setMsgData(null);
+      setMsgAttachments([]);
+      clearAttachmentUrls();
+
+      fetchWithFallback()
+        .then(async (response) => {
+          if (isCancelled) return;
+
+          if (!response.ok) {
+            throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+          }
+
+          if (isMsg) {
+            const buffer = await response.arrayBuffer();
+            if (isCancelled) return;
+
+            if (!buffer.byteLength) {
+              throw new Error('MSG file is empty');
+            }
+
+            const reader = new MsgReader(buffer);
+            const fileData: any = reader.getFileData();
+
+            const toRecipients: string[] = [];
+            const ccRecipients: string[] = [];
+
+            (fileData.recipients || []).forEach((recipient: any) => {
+              const displayName = recipient?.name || recipient?.email || recipient?.displayName;
+              if (!displayName) return;
+              const typeValue = recipient?.type ?? recipient?.recipientType ?? recipient?.recipType;
+              if (typeValue === 2 || `${typeValue}`.toLowerCase() === 'cc') {
+                ccRecipients.push(displayName);
+              } else {
+                toRecipients.push(displayName);
+              }
+            });
+
+            const attachments: MsgAttachment[] = (fileData.attachments || []).map((attachment: any, index: number) => {
+              const content: Uint8Array = attachment?.content || attachment?.data || new Uint8Array();
+              const mimeType = attachment?.mimeType || attachment?.contentType || 'application/octet-stream';
+              const blob = new Blob([content], { type: mimeType });
+              const attachmentUrl = URL.createObjectURL(blob);
+              createdAttachmentUrls.push(attachmentUrl);
+              return {
+                fileName: attachment?.fileName || attachment?.name || `attachment-${index + 1}`,
+                url: attachmentUrl,
+                size: blob.size,
+                mimeType,
+              };
+            });
+
+            if (!isCancelled) {
+              setMsgData({
+                subject: fileData.subject,
+                senderName: fileData.senderName,
+                senderEmail: fileData.senderEmail,
+                toRecipients,
+                ccRecipients,
+                bodyHTML: fileData.bodyHTML,
+                bodyText: fileData.body,
+                sentOn: fileData.sentOn || fileData.messageDeliveryTime,
+              });
+              setMsgAttachments(attachments);
+              setIsLoadingMsg(false);
+            }
+          } else {
+            const contentType = response.headers.get('content-type')?.toLowerCase() || '';
+            if (contentType && !contentType.includes('text/csv') && !contentType.includes('text/plain')) {
+              // Not an expected CSV response, but still attempt to parse as text
+            }
+
+            const text = await response.text();
+            if (isCancelled) return;
+
+            if (!text || text.trim().length === 0) {
+              throw new Error('CSV file is empty');
+            }
+
+            const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const lines = normalizedText.split('\n').filter((line) => line.trim() !== '');
+
+            if (lines.length === 0) {
+              throw new Error('CSV file has no data');
+            }
+
+            const parsed = lines.map((line) => {
+              const result: string[] = [];
+              let current = '';
+              let inQuotes = false;
+
+              for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                const nextChar = line[i + 1];
+
+                if (char === '"') {
+                  if (inQuotes && nextChar === '"') {
+                    current += '"';
+                    i++;
+                  } else {
+                    inQuotes = !inQuotes;
+                  }
+                } else if (char === ',' && !inQuotes) {
+                  result.push(current);
+                  current = '';
+                } else {
+                  current += char;
+                }
+              }
+
+              result.push(current);
+              return result;
+            });
+
+            if (parsed.length > 0) {
+              const maxColumns = parsed[0].length;
+              const normalizedParsed = parsed.map((row) => {
+                const normalizedRow = [...row];
+                while (normalizedRow.length < maxColumns) {
+                  normalizedRow.push('');
+                }
+                return normalizedRow.slice(0, maxColumns);
+              });
+
+              if (!isCancelled) {
+                setCsvData(normalizedParsed);
+                setIsLoadingCsv(false);
+              }
+            } else {
+              throw new Error('CSV file has no data');
+            }
+          }
+        })
+        .catch(() => {
+          if (isCancelled) return;
+          setHasError(true);
+          if (fileType === 'msg') {
+            clearAttachmentUrls();
+            setMsgData(null);
+            setMsgAttachments([]);
+            setIsLoadingMsg(false);
+          } else {
+            setCsvData([]);
+            setIsLoadingCsv(false);
+          }
+        });
+    } else {
+      resetState();
+      setHasError(false);
+      clearAttachmentUrls();
+    }
+
+    return () => {
+      isCancelled = true;
+      clearAttachmentUrls();
+    };
+  }, [url, fileType, shouldAttachAuth]);
 
   // Get viewer URL for Office documents
   const getViewerUrl = useCallback(() => {
@@ -285,6 +391,8 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
     switch (fileType) {
       case 'csv':
         return 'CSV';
+      case 'msg':
+        return 'Email';
       case 'xlsx':
       case 'xls':
         return 'Excel';
@@ -374,17 +482,142 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
                 <p className="text-gray-600">Loading CSV file...</p>
               </div>
             </div>
-          ) : csvBlobUrl ? (
-            <iframe
-              src={csvBlobUrl}
-              className="w-full h-full border-0"
-              style={{ height: 'calc(100vh - 60px)', minHeight: '900px', width: '100%', maxWidth: '100vw' }}
-              title={`CSV Document: ${fileName || 'Document'}`}
-              onError={() => setHasError(true)}
-            />
+          ) : csvData.length > 0 ? (
+            <div className="h-full w-full bg-white overflow-auto" style={{ display: 'flex', flexDirection: 'column' }}>
+              <div className="flex-1 overflow-auto p-4">
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-300" style={{ minWidth: '100%' }}>
+                    <thead className="bg-gray-50 sticky top-0 z-10">
+                      {csvData.length > 0 && (
+                        <tr>
+                          {csvData[0].map((header, index) => (
+                            <th
+                              key={index}
+                              scope="col"
+                              className="px-3 py-2 text-left text-xs font-medium text-gray-700 border border-gray-300 bg-gray-50"
+                              style={{ whiteSpace: 'nowrap' }}
+                            >
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      )}
+                    </thead>
+                    <tbody className="bg-white">
+                      {csvData.slice(1).map((row, rowIndex) => (
+                        <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100'}>
+                          {csvData[0].map((_, cellIndex) => (
+                            <td
+                              key={cellIndex}
+                              className="px-3 py-2 text-sm text-gray-700 border border-gray-300"
+                              style={{ whiteSpace: 'nowrap' }}
+                            >
+                              {row[cellIndex] || ''}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-full w-full" style={{ minHeight: '400px' }}>
               <p className="text-gray-600">No data to display</p>
+            </div>
+          )
+        ) : fileType === 'msg' ? (
+          isLoadingMsg ? (
+            <div className="flex items-center justify-center h-full w-full" style={{ minHeight: '400px' }}>
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0292DC] mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading email...</p>
+              </div>
+            </div>
+          ) : msgData ? (
+            <div className="h-full w-full overflow-auto bg-white">
+              <div className="max-w-3xl mx-auto p-6 space-y-6">
+                <div className="space-y-2 border-b border-gray-200 pb-4">
+                  <h2 className="text-xl font-semibold text-[#012F66]">
+                    {msgData.subject || 'No subject'}
+                  </h2>
+                  <div className="text-sm text-gray-600">
+                    <span>{msgData.senderName || msgData.senderEmail || 'Unknown sender'}</span>
+                    {msgData.senderEmail && (
+                      <span className="ml-2 text-gray-500">&lt;{msgData.senderEmail}&gt;</span>
+                    )}
+                  </div>
+                  {msgData.sentOn && (
+                    <div className="text-xs text-gray-500">
+                      {new Date(msgData.sentOn).toLocaleString()}
+                    </div>
+                  )}
+                  {msgData.toRecipients?.length ? (
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium text-[#012F66]">To:</span>{' '}
+                      {msgData.toRecipients.join(', ')}
+                    </div>
+                  ) : null}
+                  {msgData.ccRecipients?.length ? (
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium text-[#012F66]">Cc:</span>{' '}
+                      {msgData.ccRecipients.join(', ')}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="border border-gray-200 rounded-lg bg-white shadow-sm">
+                  <div className="prose prose-sm max-w-none p-4 text-[#012F66]">
+                    {msgData.bodyHTML ? (
+                      <div dangerouslySetInnerHTML={{ __html: msgData.bodyHTML }} />
+                    ) : (
+                      <p className="whitespace-pre-wrap">
+                        {msgData.bodyText || 'No message body available.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {msgAttachments.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-[#012F66]">
+                      Attachments ({msgAttachments.length})
+                    </h3>
+                    <ul className="space-y-2">
+                      {msgAttachments.map((attachment) => (
+                        <li
+                          key={attachment.url}
+                          className="flex items-center justify-between gap-3 bg-[#F5F7FA] border border-[#E5E7EB] rounded-md px-3 py-2"
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-sm text-[#012F66] font-medium">
+                              {attachment.fileName}
+                            </span>
+                            <span className="text-xs text-[#80989A]">
+                              {formatAttachmentSize(attachment.size)} • {attachment.mimeType}
+                            </span>
+                          </div>
+                          <a
+                            href={attachment.url}
+                            download={attachment.fileName}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-[#0292DC] hover:text-[#012F66] flex items-center gap-1"
+                          >
+                            <Download className="w-3 h-3" />
+                            Download
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full w-full" style={{ minHeight: '400px' }}>
+              <p className="text-gray-600">No email content available.</p>
             </div>
           )
         ) : fileType === 'xlsx' || fileType === 'xls' ? (

@@ -231,12 +231,18 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
         }}
       />
 
-      <div className="flex-1 flex gap-1 p-2">
+      <div className="flex-1 min-h-0 flex flex-row gap-4 p-4 overflow-hidden">
         {/* Document Viewer */}
-        <div className={`${isFullscreen ? 'fixed inset-0 z-50 p-2 bg-[#F5F7FA]' : 'flex-1'}`}>
-          <div className="bg-[#E5E7EB] rounded-lg h-full flex flex-col">
+        <div
+          className={`${
+            isFullscreen
+              ? "fixed inset-0 z-50 p-2 bg-[#F5F7FA]"
+              : "flex-1 min-w-0 min-h-0"
+          }`}
+        >
+          <div className="bg-[#E5E7EB] rounded-lg h-full flex flex-col min-h-0">
             {/* Document Display */}
-            <div className="flex-1 relative overflow-hidden flex items-center justify-center p-1">
+            <div className="flex-1 relative overflow-hidden flex items-center justify-center p-2 min-h-0">
               <div 
                 className="bg-white shadow-lg relative"
                 style={{ 
@@ -256,13 +262,14 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
               >
                 {document.documentImage ? (
                   /* Real Document Image from API */
-                  <div className="relative w-full h-full" style={{ maxWidth: '100%', overflow: 'hidden' }}>
+                  <div className="relative w-full h-full" style={{ maxWidth: '100%', overflow: 'hidden', height: '100%' }}>
                     {/* Check if it's a PDF, Word, Excel, or CSV document */}
                     {document.documentImage.includes('.pdf') || 
                      document.documentImage.includes('.doc') || 
                      document.documentImage.includes('.docx') ||
                      document.documentImage.includes('.xls') ||
                      document.documentImage.includes('.xlsx') ||
+                     document.documentImage.includes('.msg') ||
                      document.documentImage.includes('.csv') ||
                      (document.documentName && (
                        document.documentName.includes('.pdf') ||
@@ -270,6 +277,7 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
                        document.documentName.includes('.docx') ||
                        document.documentName.includes('.xls') ||
                        document.documentName.includes('.xlsx') ||
+                       document.documentName.includes('.msg') ||
                        document.documentName.includes('.csv')
                      )) ? (
                       /* PDF/Word/Excel/CSV Document - Use PDFViewer component */
@@ -385,172 +393,160 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
         </div>
 
         {/* Right Panel */}
-        <div className="w-[350px] flex flex-col gap-4">
-          {/* Reviewer Info */}
-          <div className="bg-[#0292DC]/10 border border-[#0292DC] rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[#80989A]">Reviewed by</p>
-                <p className="text-[#012F66]">{document.reviewer}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[#80989A]">Date</p>
-                <p className="text-[#012F66]">{document.reviewedDate}</p>
+        <div className="w-[360px] flex-shrink-0 h-full flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            {/* Reviewer Info */}
+            <div className="bg-[#0292DC]/10 border border-[#0292DC] rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[#80989A]">Reviewed by</p>
+                  <p className="text-[#012F66]">{document.reviewer}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[#80989A]">Date</p>
+                  <p className="text-[#012F66]">{document.reviewedDate}</p>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Fields List */}
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <h3 className="text-[#012F66] mb-3">Fields to Review ({document.fields.length})</h3>
-            <ScrollArea className="h-[180px]">
-              <div className="space-y-2 pr-4">
-                {document.fields.map((field, index) => {
-                  const validation = document.reviewerValidations.find(v => v.fieldId === field.id);
-                  return (
-                    <div
-                      key={field.id}
-                      onClick={() => setSelectedFieldId(field.id)}
-                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        selectedFieldId === field.id
-                          ? 'border-[#FF0081] bg-[#FF0081]/5'
-                          : 'border-[#E5E7EB] hover:border-[#0292DC] bg-white'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[#80989A]">#{index + 1}</span>
-                            <span className="text-[#012F66]">{field.fieldName}</span>
+            {/* Fields List */}
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <h3 className="text-[#012F66] mb-3">Fields to Review ({document.fields.length})</h3>
+              <ScrollArea className="h-[180px]">
+                <div className="space-y-2 pr-4">
+                  {document.fields.map((field, index) => {
+                    const validation = document.reviewerValidations.find(v => v.fieldId === field.id);
+                    return (
+                      <div
+                        key={field.id}
+                        onClick={() => setSelectedFieldId(field.id)}
+                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                          selectedFieldId === field.id
+                            ? 'border-[#FF0081] bg-[#FF0081]/5'
+                            : 'border-[#E5E7EB] hover:border-[#0292DC] bg-white'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[#80989A]">#{index + 1}</span>
+                              <span className="text-[#012F66]">{field.fieldName}</span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              {validation && getReviewerActionBadge(validation.action)}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            {validation && getReviewerActionBadge(validation.action)}
+                          <div className="flex-shrink-0">
+                            {getFieldStatusIcon(field.id)}
                           </div>
-                        </div>
-                        <div className="flex-shrink-0">
-                          {getFieldStatusIcon(field.id)}
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          </div>
-
-          {/* Field Information */}
-          {/* <div className="bg-white rounded-lg shadow-sm p-6">
-            <h3 className="text-[#012F66] mb-2">{selectedField.fieldName}</h3>
-            <p className="text-[#80989A] mb-4">{selectedField.fieldDescription}</p>
-          </div> */}
-
-          {/* AI Extraction */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 rounded-full bg-[#0292DC]" />
-              <span className="text-[#80989A]">Original AI Extraction</span>
-            </div>
-            
-            <div className="mb-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[#80989A]">Confidence</span>
-                <span className="text-[#012F66]">{selectedField.confidence}%</span>
-              </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
             </div>
 
-            <div className="bg-[#F5F7FA] p-4 rounded border border-[#D0D5DD] mb-4">
-              <p className="text-[#012F66]">{selectedField.extractedValue}</p>
-            </div>
-
-            {/* Reviewer's Decision */}
-            <div className="border-t border-[#D0D5DD] pt-4">
+            {/* AI Extraction */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-[#FFC018]" />
-                <span className="text-[#80989A]">Reviewer's Validation</span>
+                <div className="w-2 h-2 rounded-full bg-[#0292DC]" />
+                <span className="text-[#80989A]">Original AI Extraction</span>
               </div>
-
-              <div className="mb-3">
-                {getReviewerActionBadge(reviewerValidation.action)}
-              </div>
-
-              {reviewerValidation.action === 'correct' && reviewerValidation.correctedValue && (
-                <div className="mb-3">
-                  <p className="text-[#80989A] mb-1">Corrected Value:</p>
-                  <div className="bg-[#FFC018]/10 p-3 rounded border border-[#FFC018]">
-                    <p className="text-[#012F66]">{reviewerValidation.correctedValue}</p>
-                  </div>
-                </div>
-              )}
-
-              {reviewerValidation.action === 'reject' && reviewerValidation.rejectReason && (
-                <div className="mb-3">
-                  <p className="text-[#80989A] mb-1">Rejection Reason:</p>
-                  <div className="bg-[#FF0081]/10 p-3 rounded border border-[#FF0081]">
-                    <p className="text-[#012F66]">{reviewerValidation.rejectReason}</p>
-                  </div>
-                </div>
-              )}
-
-              {reviewerValidation.note && (
-                <div>
-                  <p className="text-[#80989A] mb-1">Reviewer Notes:</p>
-                  <div className="bg-[#F5F7FA] p-3 rounded border border-[#D0D5DD]">
-                    <p className="text-[#012F66]">{reviewerValidation.note}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* QC Decision */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h4 className="text-[#012F66] mb-4">Your QC Decision</h4>
             
-            <div className="flex gap-2 mb-4">
-              <Button
-                variant={currentDecision.decision === 'approve' ? 'default' : 'outline'}
-                onClick={() => handleDecisionChange('approve')}
-                className={
-                  currentDecision.decision === 'approve'
-                    ? 'flex-1 bg-green-600 hover:bg-green-700 text-white'
-                    : 'flex-1 border-green-600 text-green-600 hover:bg-green-50'
-                }
-              >
-                <ThumbsUp className="w-4 h-4 mr-2" />
-                Approve
-              </Button>
-              <Button
-                variant={currentDecision.decision === 'sendback' ? 'default' : 'outline'}
-                onClick={() => handleDecisionChange('sendback')}
-                className={
-                  currentDecision.decision === 'sendback'
-                    ? 'flex-1 bg-[#FF0081] hover:bg-[#FF0081]/90 text-white'
-                    : 'flex-1 border-[#FF0081] text-[#FF0081] hover:bg-[#FF0081]/10'
-                }
-              >
-                <ThumbsDown className="w-4 h-4 mr-2" />
-                Send Back
-              </Button>
+              <div className="mb-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#80989A]">Confidence</span>
+                  <span className="text-[#012F66]">{selectedField.confidence}%</span>
+                </div>
+              </div>
+
+              <div className="bg-[#F5F7FA] p-4 rounded border border-[#D0D5DD] mb-4">
+                <p className="text-[#012F66]">{selectedField.extractedValue}</p>
+              </div>
+
+              {/* Reviewer's Decision */}
+              <div className="border-t border-[#D0D5DD] pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 rounded-full bg-[#FFC018]" />
+                  <span className="text-[#80989A]">Reviewer's Validation</span>
+                </div>
+
+                <div className="mb-3">
+                  {getReviewerActionBadge(reviewerValidation.action)}
+                </div>
+
+                {reviewerValidation.action === 'correct' && reviewerValidation.correctedValue && (
+                  <div className="mb-3">
+                    <p className="text-[#80989A] mb-1">Corrected Value:</p>
+                    <div className="bg-[#FFC018]/10 p-3 rounded border border-[#FFC018]">
+                      <p className="text-[#012F66]">{reviewerValidation.correctedValue}</p>
+                    </div>
+                  </div>
+                )}
+
+                {reviewerValidation.action === 'reject' && reviewerValidation.rejectReason && (
+                  <div className="mb-3">
+                    <p className="text-[#80989A] mb-1">Rejection Reason:</p>
+                    <div className="bg-[#FF0081]/10 p-3 rounded border border-[#FF0081]">
+                      <p className="text-[#012F66]">{reviewerValidation.rejectReason}</p>
+                    </div>
+                  </div>
+                )}
+
+                {reviewerValidation.note && (
+                  <div>
+                    <p className="text-[#80989A] mb-1">Reviewer Notes:</p>
+                    <div className="bg-[#F5F7FA] p-3 rounded border border-[#D0D5DD]">
+                      <p className="text-[#012F66]">{reviewerValidation.note}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* QC Notes */}
-            <div className="space-y-2">
-              <label className="text-[#012F66]">QC Notes (Optional)</label>
-              <Textarea
-                value={currentDecision.qcNote || ''}
-                onChange={(e) => handleQcNoteChange(e.target.value)}
-                placeholder="Add notes about this field review..."
-                rows={3}
-                className="border-[#D0D5DD] resize-none"
-              />
+            {/* QC Decision Section */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h4 className="text-[#012F66] mb-4">QC Decision</h4>
+
+              <div className="flex gap-2 mb-4">
+                <Button
+                  variant={currentDecision.decision === 'approve' ? 'default' : 'outline'}
+                  onClick={() => handleDecisionChange('approve')}
+                  className={currentDecision.decision === 'approve' ? 'flex-1 bg-green-600 hover:bg-green-700 text-white' : 'flex-1 border-green-600 text-green-600 hover:bg-green-50'}
+                >
+                  <ThumbsUp className="w-4 h-4 mr-2" />
+                  Approve
+                </Button>
+                <Button
+                  variant={currentDecision.decision === 'sendback' ? 'default' : 'outline'}
+                  onClick={() => handleDecisionChange('sendback')}
+                  className={currentDecision.decision === 'sendback' ? 'flex-1 bg-[#FF0081] hover:bg-[#FF0081]/90 text-white' : 'flex-1 border-[#FF0081] text-[#FF0081] hover:bg-[#FF0081]/10'}
+                >
+                  <ThumbsDown className="w-4 h-4 mr-2" />
+                  Send Back
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[#012F66]">QC Notes (Optional)</label>
+                <Textarea
+                  value={currentDecision.qcNote || ''}
+                  onChange={(e) => handleQcNoteChange(e.target.value)}
+                  placeholder="Add any QC feedback..."
+                  rows={4}
+                  className="border-[#D0D5DD]"
+                />
+              </div>
             </div>
+
           </div>
 
           {/* Submit Button */}
           <Button
             onClick={handleSubmitAll}
             disabled={getReviewedFieldsCount() === 0 || isSubmitting}
-            className="w-full bg-[#0292DC] hover:bg-[#012F66] text-white"
+            className="mt-4 w-full bg-[#0292DC] hover:bg-[#012F66] text-white flex-shrink-0"
           >
             {isSubmitting ? (
               <LoadingSpinner size="sm" text="Submitting..." />
