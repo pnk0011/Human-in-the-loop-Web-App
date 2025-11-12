@@ -233,7 +233,16 @@ const AppContent = React.memo(function AppContent() {
         if (response.success && response.data?.document) {
           const apiDoc = response.data.document;
           
+          // Filter fields to show only those where qc_action is NOT 'approve'
+          const fieldsForQCReview = apiDoc.fields.filter(field => 
+            field.qc_action !== 'approve'
+          );
+          
+          // Store all fields for submission (including those with qc_action = 'approve')
+          const allFields = apiDoc.fields;
+          
           // Transform API response to component format
+          // Only show fields where qc_action is NOT 'approve'
           qcDocument = {
             id: apiDoc.id || item.id,
             documentName: apiDoc.documentName || item.document,
@@ -242,7 +251,8 @@ const AppContent = React.memo(function AppContent() {
             reviewer: apiDoc.reviewer || item.reviewer,
             reviewedDate: apiDoc.qc_updated_dt?.split(' ')[0] || item.reviewedDate,
             documentImage: apiDoc.documentImage, // Include document image URL from API
-            fields: apiDoc.fields.map((field, index) => ({
+            allFields: allFields, // Store all fields for submission
+            fields: fieldsForQCReview.map((field, index) => ({
               id: `field-${index + 1}`,
               fieldName: field.entity_type,
               fieldDescription: `AI extracted ${field.entity_type.toLowerCase()} from document`,
@@ -251,8 +261,8 @@ const AppContent = React.memo(function AppContent() {
               expectedFormat: 'Text',
               location: { x: 48, y: 175 + (index * 40), width: 180, height: 24 },
             })),
-            reviewerValidations: apiDoc.fields.map(field => ({
-              fieldId: `field-${apiDoc.fields.indexOf(field) + 1}`,
+            reviewerValidations: fieldsForQCReview.map(field => ({
+              fieldId: `field-${fieldsForQCReview.indexOf(field) + 1}`,
               action: field.reviewer_action,
               correctedValue: field.updated_entity_text || undefined,
               note: field.reviewer_comment || undefined,
@@ -547,13 +557,40 @@ const AppContent = React.memo(function AppContent() {
         if (selectedQCDocument) {
           const { documentOperationsAPI } = await import('./services/documentOperationsAPI');
           
-          // Transform QC decisions to API format
-          const qcValidations = decisions.map(decision => ({
-            entity_type: selectedQCDocument.fields.find(f => f.id === decision.fieldId)?.fieldName || '',
-            qc_action: decision.decision === 'approve' ? 'approve' as const : 
-                      decision.decision === 'sendback' ? 'sendback' as const : 'reject' as const,
-            qc_comment: decision.qcNote || null,
-          }));
+          // Create a map of QC decisions by field ID for quick lookup
+          const decisionMap = new Map<string, QCDecision>();
+          decisions.forEach(decision => {
+            decisionMap.set(decision.fieldId, decision);
+          });
+          
+          // Include ALL fields from API response in the payload
+          // For visible fields (qc_action !== 'approve'), use the decision from the form
+          // For hidden fields (qc_action === 'approve'), keep existing values from API
+          const allFields = selectedQCDocument.allFields || [];
+          
+          const qcValidations = allFields.map((apiField: any) => {
+            // Find if this field was visible (has a decision from the form)
+            const visibleField = selectedQCDocument.fields.find(f => f.fieldName === apiField.entity_type);
+            const decision = visibleField ? decisionMap.get(visibleField.id) : null;
+            
+            if (decision) {
+              // Field was visible and QC made a decision
+              return {
+                entity_type: apiField.entity_type,
+                qc_action: decision.decision === 'approve' ? 'approve' as const : 
+                          decision.decision === 'sendback' ? 'sendback' as const : 'reject' as const,
+                qc_comment: decision.qcNote || null,
+              };
+            } else {
+              // Field was hidden (qc_action === 'approve')
+              // Include it with existing values from API
+              return {
+                entity_type: apiField.entity_type,
+                qc_action: apiField.qc_action || 'approve' as const,
+                qc_comment: apiField.qc_comment || null,
+              };
+            }
+          });
 
           const response = await documentOperationsAPI.qcUpdateFile({
             file_name: selectedQCDocument.documentName,

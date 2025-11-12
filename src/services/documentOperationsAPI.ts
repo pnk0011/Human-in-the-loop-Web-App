@@ -80,6 +80,7 @@ export interface ReviewFileEntity {
   updated_entity_value?: string | null;
   reviewer_action?: 'accept' | 'correct' | 'reject' | null;
   qc_action?: 'approve' | 'reject' | 'sendback' | null;
+  qc_comment?: string | null;
   confidence: number;
   begin_offset?: string;
   end_offset?: string;
@@ -208,6 +209,8 @@ export interface QCDocumentField {
   updated_entity_text: string | null;
   reviewer_action: 'accept' | 'correct' | 'reject';
   reviewer_comment: string | null;
+  qc_action?: 'approve' | 'reject' | 'sendback' | null;
+  qc_comment?: string | null;
 }
 
 export interface QCUpdateFileRequest {
