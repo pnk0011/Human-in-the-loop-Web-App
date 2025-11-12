@@ -235,6 +235,14 @@ export function UserManagement() {
         isactive: formData.status === 'Active',
       };
 
+      if (formData.role === 'Reviewer') {
+        updateUserData.qualityControl = formData.qualityControl?.trim()
+          ? formData.qualityControl.trim()
+          : null;
+      } else {
+        updateUserData.qualityControl = null;
+      }
+
       const response = await userAPI.updateUser(updateUserData);
       
       if (response.status === 'success') {

@@ -19,6 +19,7 @@ export interface UpdateUserRequest {
   lastName?: string;
   role?: 'Admin' | 'Reviewer' | 'QC';
   isactive?: boolean;
+  qualityControl?: string | null;
 }
 
 export interface DeleteUserRequest {
