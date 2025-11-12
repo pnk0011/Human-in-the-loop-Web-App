@@ -2,7 +2,7 @@
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat';
 
 // Get API key from environment variable
-const API_KEY = (import.meta as any).env?.VITE_HEDER_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
+const API_KEY = (import.meta as any).env?.VITE_HEADER_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
 
 export interface CreateUserRequest {
   firstName: string;

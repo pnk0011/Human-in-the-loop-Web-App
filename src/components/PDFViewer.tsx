@@ -152,7 +152,7 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
     };
 
     const tdata = localStorage.getItem('accessToken');
-    const apiKey = (import.meta as any).env?.VITE_HEDER_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
+    const apiKey = (import.meta as any).env?.VITE_HEADER_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
 
     const baseHeaders: HeadersInit = {
       Accept: fileType === 'csv' ? 'text/csv,text/plain,*/*' : '*/*',
