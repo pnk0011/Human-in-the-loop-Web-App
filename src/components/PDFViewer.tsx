@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useMemo } from 'react';
 import MsgReader from '@kenjiuno/msgreader';
+import mammoth from 'mammoth/mammoth.browser';
 import { Button } from './ui/button';
 import { Download, FileText, AlertCircle } from 'lucide-react';
 
@@ -8,6 +9,102 @@ interface PDFViewerProps {
   fileName?: string;
   className?: string;
 }
+
+const DOCX_STYLE_MAP = [
+  "p[style-name='Title'] => h1.title",
+  "p[style-name='Subtitle'] => h2.subtitle",
+  "p[style-name='Heading 1'] => h2.heading-one",
+  "p[style-name='Heading 2'] => h3.heading-two",
+  "p[style-name='Heading 3'] => h4.heading-three",
+  "p[style-name='Heading 4'] => h5.heading-four",
+  "p[style-name='Heading 5'] => h6.heading-five",
+  "p[style-name='Heading 6'] => h6.heading-six",
+  "table => table.docx-table",
+  "table > row => tr",
+  "table > row > cell => td",
+  "p[style-name='Code'] => pre.code",
+  "p[style-name='Quote'] => blockquote"
+];
+
+const DOCX_DEFAULT_STYLES = `
+.docx-viewer-root {
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  color: #012F66;
+  background-color: #ffffff;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+.docx-viewer-root p {
+  margin: 0 0 0.85rem;
+}
+.docx-viewer-root h1,
+.docx-viewer-root h2,
+.docx-viewer-root h3,
+.docx-viewer-root h4,
+.docx-viewer-root h5,
+.docx-viewer-root h6 {
+  font-weight: 600;
+  color: #012F66;
+  margin: 1.4rem 0 0.8rem;
+  line-height: 1.3;
+}
+.docx-viewer-root h1 { font-size: 2rem; }
+.docx-viewer-root h2 { font-size: 1.6rem; }
+.docx-viewer-root h3 { font-size: 1.3rem; }
+.docx-viewer-root h4 { font-size: 1.15rem; }
+.docx-viewer-root h5 { font-size: 1rem; }
+.docx-viewer-root h6 { font-size: 0.95rem; }
+.docx-viewer-root ul, .docx-viewer-root ol {
+  margin: 0 0 1rem 1.4rem;
+  padding-left: 1rem;
+}
+.docx-viewer-root li {
+  margin-bottom: 0.35rem;
+}
+.docx-viewer-root strong, .docx-viewer-root b {
+  font-weight: 600;
+}
+.docx-viewer-root em, .docx-viewer-root i {
+  font-style: italic;
+}
+.docx-viewer-root table.docx-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2rem 0;
+  font-size: 0.9rem;
+}
+.docx-viewer-root table.docx-table td,
+.docx-viewer-root table.docx-table th {
+  border: 1px solid #d0d5dd;
+  padding: 0.6rem 0.75rem;
+  vertical-align: top;
+}
+.docx-viewer-root table.docx-table th {
+  background-color: #f5f7fa;
+  font-weight: 600;
+}
+.docx-viewer-root blockquote {
+  border-left: 4px solid #0292DC;
+  padding-left: 1rem;
+  color: #4a6073;
+  margin: 1.2rem 0;
+  font-style: italic;
+}
+.docx-viewer-root pre.code {
+  background-color: #f5f7fa;
+  border: 1px solid #d0d5dd;
+  padding: 0.75rem;
+  border-radius: 6px;
+  overflow: auto;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 0.9rem;
+}
+.docx-viewer-root hr {
+  border: 0;
+  border-top: 1px solid #d0d5dd;
+  margin: 1.5rem 0;
+}
+`;
 
 interface ParsedMsgData {
   subject?: string;
@@ -20,30 +117,14 @@ interface ParsedMsgData {
   sentOn?: string;
 }
 
-interface MsgAttachment {
-  fileName: string;
-  url: string;
-  size: number;
-  mimeType: string;
-}
-
 export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
   const [hasError, setHasError] = useState(false);
   const [csvData, setCsvData] = useState<string[][]>([]);
   const [isLoadingCsv, setIsLoadingCsv] = useState(false);
   const [isLoadingMsg, setIsLoadingMsg] = useState(false);
   const [msgData, setMsgData] = useState<ParsedMsgData | null>(null);
-  const [msgAttachments, setMsgAttachments] = useState<MsgAttachment[]>([]);
-
-  const formatAttachmentSize = useCallback((size: number) => {
-    if (size >= 1024 * 1024) {
-      return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-    }
-    if (size >= 1024) {
-      return `${(size / 1024).toFixed(1)} KB`;
-    }
-    return `${size} B`;
-  }, []);
+  const [docxHtml, setDocxHtml] = useState<string | null>(null);
+  const [isLoadingDocx, setIsLoadingDocx] = useState(false);
 
   // Detect file type from URL or fileName
   const fileType = useMemo(() => {
@@ -135,18 +216,10 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
   // Load and parse CSV / MSG files
   React.useEffect(() => {
     let isCancelled = false;
-    let createdAttachmentUrls: string[] = [];
-
-    const clearAttachmentUrls = () => {
-      createdAttachmentUrls.forEach((attachmentUrl) => URL.revokeObjectURL(attachmentUrl));
-      createdAttachmentUrls = [];
-    };
-
     const resetState = () => {
       if (isCancelled) return;
       setCsvData([]);
       setMsgData(null);
-      setMsgAttachments([]);
       setIsLoadingCsv(false);
       setIsLoadingMsg(false);
     };
@@ -200,8 +273,6 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
       setHasError(false);
       setCsvData([]);
       setMsgData(null);
-      setMsgAttachments([]);
-      clearAttachmentUrls();
 
       fetchWithFallback()
         .then(async (response) => {
@@ -236,20 +307,6 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
               }
             });
 
-            const attachments: MsgAttachment[] = (fileData.attachments || []).map((attachment: any, index: number) => {
-              const content: Uint8Array = attachment?.content || attachment?.data || new Uint8Array();
-              const mimeType = attachment?.mimeType || attachment?.contentType || 'application/octet-stream';
-              const blob = new Blob([content as any], { type: mimeType });
-              const attachmentUrl = URL.createObjectURL(blob);
-              createdAttachmentUrls.push(attachmentUrl);
-              return {
-                fileName: attachment?.fileName || attachment?.name || `attachment-${index + 1}`,
-                url: attachmentUrl,
-                size: blob.size,
-                mimeType,
-              };
-            });
-
             if (!isCancelled) {
               setMsgData({
                 subject: fileData.subject,
@@ -261,7 +318,6 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
                 bodyText: fileData.body,
                 sentOn: fileData.sentOn || fileData.messageDeliveryTime,
               });
-              setMsgAttachments(attachments);
               setIsLoadingMsg(false);
             }
           } else {
@@ -335,9 +391,7 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
           if (isCancelled) return;
           setHasError(true);
           if (fileType === 'msg') {
-            clearAttachmentUrls();
             setMsgData(null);
-            setMsgAttachments([]);
             setIsLoadingMsg(false);
           } else {
             setCsvData([]);
@@ -347,19 +401,110 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
     } else {
       resetState();
       setHasError(false);
-      clearAttachmentUrls();
     }
 
     return () => {
       isCancelled = true;
-      clearAttachmentUrls();
+    };
+  }, [url, fileType, shouldAttachAuth]);
+
+  // Load and render DOCX files as HTML
+  React.useEffect(() => {
+    if (fileType !== 'docx') {
+      setDocxHtml(null);
+      setIsLoadingDocx(false);
+      return;
+    }
+
+    let isCancelled = false;
+    setIsLoadingDocx(true);
+    setDocxHtml(null);
+    setHasError(false);
+
+    const tdata = localStorage.getItem('accessToken');
+    const apiKey = (import.meta as any).env?.VITE_HEADER_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
+
+    const baseHeaders: HeadersInit = {
+      Accept: '*/*',
+    };
+
+    if (shouldAttachAuth) {
+      if (tdata) {
+        baseHeaders['Authorization'] = `Bearer ${tdata}`;
+      }
+      baseHeaders['x-api-key'] = apiKey;
+    }
+
+    const fetchWithFallback = async () => {
+      try {
+        const response = await fetch(url, {
+          credentials: shouldAttachAuth ? 'include' : 'omit',
+          headers: baseHeaders,
+        });
+
+        if (!response.ok) {
+          if (shouldAttachAuth && [401, 403, 415].includes(response.status)) {
+            const fallback = await fetch(url);
+            if (!fallback.ok) {
+              throw new Error(`Failed to fetch DOCX: ${fallback.status}`);
+            }
+            return fallback;
+          }
+          throw new Error(`Failed to fetch DOCX: ${response.status}`);
+        }
+
+        return response;
+      } catch (error) {
+        if (shouldAttachAuth) {
+          const fallback = await fetch(url);
+          if (!fallback.ok) {
+            throw new Error(`Failed to fetch DOCX: ${fallback.status}`);
+          }
+          return fallback;
+        }
+        throw error;
+      }
+    };
+
+    fetchWithFallback()
+      .then(async (response) => {
+        if (isCancelled) return;
+
+        const arrayBuffer = await response.arrayBuffer();
+        if (isCancelled) return;
+
+        if (!arrayBuffer.byteLength) {
+          throw new Error('DOCX file is empty');
+        }
+
+        const { value: html } = await mammoth.convertToHtml(
+          { arrayBuffer },
+          {
+            styleMap: DOCX_STYLE_MAP,
+            includeDefaultStyleMap: true,
+          },
+        );
+        if (!isCancelled) {
+          setDocxHtml(html || '<p>No content available.</p>');
+          setIsLoadingDocx(false);
+        }
+      })
+      .catch(() => {
+        if (isCancelled) return;
+        setDocxHtml(null);
+        setIsLoadingDocx(false);
+        setHasError(true);
+      });
+
+    return () => {
+      isCancelled = true;
     };
   }, [url, fileType, shouldAttachAuth]);
 
   // Get viewer URL for Office documents
   const getViewerUrl = useCallback(() => {
-    // Use Microsoft Office Online viewer for Excel files
-    if (fileType === 'xlsx' || fileType === 'xls') {
+    // Use Microsoft Office Online viewer for supported documents
+    if (fileType === 'xlsx' || fileType === 'xls' || fileType === 'doc') {
       // Encode the URL for the Office Online viewer
       return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
     }
@@ -369,8 +514,8 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
   // Check if embed/iframe failed to load after a timeout
   React.useEffect(() => {
     const timer = setTimeout(() => {
-      // For Office documents (XLSX, XLS), check iframe
-      if (fileType === 'xlsx' || fileType === 'xls') {
+      // For Office documents viewed through Office Online
+      if (fileType === 'xlsx' || fileType === 'xls' || fileType === 'doc') {
         const iframeElement = window.document.querySelector(`iframe[src*="${url}"]`);
         if (iframeElement) {
           // Check if iframe has dimensions (loaded successfully)
@@ -587,40 +732,6 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
                   </div>
                 </div>
 
-                {msgAttachments.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-[#012F66]">
-                      Attachments ({msgAttachments.length})
-                    </h3>
-                    <ul className="space-y-2">
-                      {msgAttachments.map((attachment) => (
-                        <li
-                          key={attachment.url}
-                          className="flex items-center justify-between gap-3 bg-[#F5F7FA] border border-[#E5E7EB] rounded-md px-3 py-2"
-                        >
-                          <div className="flex flex-col">
-                            <span className="text-sm text-[#012F66] font-medium">
-                              {attachment.fileName}
-                            </span>
-                            <span className="text-xs text-[#80989A]">
-                              {formatAttachmentSize(attachment.size)} • {attachment.mimeType}
-                            </span>
-                          </div>
-                          <a
-                            href={attachment.url}
-                            download={attachment.fileName}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-[#0292DC] hover:text-[#012F66] flex items-center gap-1"
-                          >
-                            <Download className="w-3 h-3" />
-                            Download
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </div>
             </div>
           ) : (
@@ -628,13 +739,33 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
               <p className="text-gray-600">No email content available.</p>
             </div>
           )
-        ) : fileType === 'xlsx' || fileType === 'xls' ? (
-          // Use iframe with Microsoft Office Online viewer for Excel files
+        ) : fileType === 'docx' ? (
+          isLoadingDocx ? (
+            <div className="flex items-center justify-center h-full w-full" style={{ minHeight: '400px' }}>
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0292DC] mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading Word document...</p>
+              </div>
+            </div>
+          ) : docxHtml ? (
+            <div className="h-full w-full overflow-auto bg-white">
+              <div className="max-w-4xl mx-auto p-8">
+                <style>{DOCX_DEFAULT_STYLES}</style>
+                <div className="docx-viewer-root" dangerouslySetInnerHTML={{ __html: docxHtml }} />
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full w-full" style={{ minHeight: '400px' }}>
+              <p className="text-gray-600">No content available.</p>
+            </div>
+          )
+        ) : fileType === 'xlsx' || fileType === 'xls' || fileType === 'doc' ? (
+          // Use iframe with Microsoft Office Online viewer for Excel and legacy Word documents
           <iframe
             src={getViewerUrl()}
             className="w-full h-full border-0"
             style={{ height: 'calc(100vh - 60px)', minHeight: '900px', width: '100%', maxWidth: '100vw' }}
-            title={`Excel Document: ${fileName || 'Document'}`}
+            title={`${getDocumentTypeName()} Document: ${fileName || 'Document'}`}
             onError={() => setHasError(true)}
           />
         ) : (

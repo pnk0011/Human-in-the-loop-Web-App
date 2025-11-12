@@ -58,56 +58,79 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
       if (user?.email) {
         setIsLoading(true);
         try {
-          // Base params for both API calls
+          // Base params shared by all API requests
           const baseParams: GetReviewerDocumentsRequest = {
             reviewer: user.email,
-            page: 1,
-            limit: 10,
             doc_type_name: documentType !== 'all' ? documentType : 'All',
             priority: priorityFilter !== 'all' ? priorityFilter : 'All',
             doc_handle_id: docIdFilter !== 'all' ? docIdFilter : undefined,
           };
 
-          // Fetch records with status=2 and status=4 in parallel
-          const [response2, response4] = await Promise.all([
-            documentOperationsAPI.getReviewerDocuments({ ...baseParams, status: '2' }),
-            documentOperationsAPI.getReviewerDocuments({ ...baseParams, status: '4' }),
+          // Helper to fetch all pages for a specific status
+          const fetchDocumentsForStatus = async (status: '2' | '4') => {
+            const accumulatedFiles: ReviewerDocument[] = [];
+            let statsForStatus: typeof stats | undefined;
+            let page = 1;
+            const pageSize = 50; // Fetch in batches to keep client-side pagination responsive
+
+            while (true) {
+              const response = await documentOperationsAPI.getReviewerDocuments({
+                ...baseParams,
+                status,
+                page,
+                limit: pageSize,
+              });
+
+              if (response.status !== 'success') {
+                break;
+              }
+
+              if (response.files?.length) {
+                accumulatedFiles.push(...response.files);
+              }
+
+              if (!statsForStatus && response.stats) {
+                statsForStatus = response.stats;
+              }
+
+              const totalPages = response.pagination?.total_pages
+                ? Number(response.pagination.total_pages)
+                : 1;
+
+              if (!response.pagination || !Number.isFinite(totalPages) || page >= totalPages) {
+                break;
+              }
+
+              page += 1;
+            }
+
+            return { files: accumulatedFiles, stats: statsForStatus };
+          };
+
+          // Fetch records with status=2 and status=4 in parallel (each fetching all pages)
+          const [status2Result, status4Result] = await Promise.all([
+            fetchDocumentsForStatus('2'),
+            fetchDocumentsForStatus('4'),
           ]);
 
-          // Merge the results from both API calls
+          // Merge the results while preserving uniqueness
           const mergedFiles: ReviewerDocument[] = [];
           const seenFileNames = new Set<string>();
 
-          // Add files from status=2 response
-          if (response2.status === 'success' && response2.files) {
-            response2.files.forEach(file => {
-              const uniqueKey = `${file.file_name}_${file.doc_handle_id}`;
-              if (!seenFileNames.has(uniqueKey)) {
-                seenFileNames.add(uniqueKey);
-                mergedFiles.push(file);
-              }
-            });
-          }
+          [...status2Result.files, ...status4Result.files].forEach((file) => {
+            const uniqueKey = `${file.file_name}_${file.doc_handle_id}`;
+            if (!seenFileNames.has(uniqueKey)) {
+              seenFileNames.add(uniqueKey);
+              mergedFiles.push(file);
+            }
+          });
 
-          // Add files from status=4 response
-          if (response4.status === 'success' && response4.files) {
-            response4.files.forEach(file => {
-              const uniqueKey = `${file.file_name}_${file.doc_handle_id}`;
-              if (!seenFileNames.has(uniqueKey)) {
-                seenFileNames.add(uniqueKey);
-                mergedFiles.push(file);
-              }
-            });
-          }
-
-          // Set merged results
           setApiDocuments(mergedFiles);
-          
-          // Use stats from status=2 response (or status=4 if status=2 fails)
-          if (response2.status === 'success' && response2.stats) {
-            setStats(response2.stats);
-          } else if (response4.status === 'success' && response4.stats) {
-            setStats(response4.stats);
+
+          if (status2Result.stats) {
+            setStats(status2Result.stats);
+          } else if (status4Result.stats) {
+            setStats(status4Result.stats);
           }
         } catch (error) {
           // Failed to load API documents - set empty array
