@@ -39,6 +39,7 @@ interface ExtractedField {
   extractedValue: string;
   confidence: number;
   expectedFormat?: string;
+  qcComment?: string; // QC comment from previous review
   location: {
     x: number;
     y: number;
@@ -572,6 +573,21 @@ export function ValidationScreen({
                 </p>
               </div>
             </div>
+
+            {/* QC Comment (if available) */}
+            {selectedField.qcComment && (
+              <div className="bg-[#FFC018]/10 border border-[#FFC018] rounded-lg p-4">
+                <div className="flex items-start gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-[#FFC018] mt-1.5" />
+                  <span className="text-[#80989A] dark:text-[#a0a0a0] font-medium">
+                    QC Feedback
+                  </span>
+                </div>
+                <p className="text-[#012F66] dark:text-white pl-4">
+                  {selectedField.qcComment}
+                </p>
+              </div>
+            )}
 
             {/* Validation Actions */}
             <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">

@@ -90,7 +90,7 @@ export function WorkHistory({ onViewClick, documents = [], isLoading = false }: 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Completed</div>
           <div className="text-[#012F66] dark:text-white text-3xl font-bold">{documents.length}</div>

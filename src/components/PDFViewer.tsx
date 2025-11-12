@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useMemo } from 'react';
-import MsgReader from 'msgreader';
+import MsgReader from '@kenjiuno/msgreader';
 import { Button } from './ui/button';
 import { Download, FileText, AlertCircle } from 'lucide-react';
 
@@ -50,26 +50,34 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
     const fileUrl = url.toLowerCase();
     const name = (fileName || '').toLowerCase();
     
-    if (fileUrl.includes('.csv') || name.includes('.csv')) {
-      return 'csv';
-    }
-    if (fileUrl.includes('.msg') || name.includes('.msg')) {
-      return 'msg';
-    }
-    if (fileUrl.includes('.xlsx') || name.includes('.xlsx')) {
+    // Helper function to check if string ends with extension
+    const hasExtension = (str: string, ext: string): boolean => {
+      return str.endsWith(ext) || str.includes(ext + '?') || str.includes(ext + '&');
+    };
+    
+    // Check extensions in order of specificity (more specific first)
+    // Check XLSX before XLS to avoid false positives
+    if (hasExtension(fileUrl, '.xlsx') || hasExtension(name, '.xlsx')) {
       return 'xlsx';
     }
-    if (fileUrl.includes('.xls') || name.includes('.xls')) {
+    if (hasExtension(fileUrl, '.xls') || hasExtension(name, '.xls')) {
       return 'xls';
     }
-    if (fileUrl.includes('.docx') || name.includes('.docx')) {
+    // Check DOCX before DOC to avoid false positives
+    if (hasExtension(fileUrl, '.docx') || hasExtension(name, '.docx')) {
       return 'docx';
     }
-    if (fileUrl.includes('.doc') || name.includes('.doc')) {
+    if (hasExtension(fileUrl, '.doc') || hasExtension(name, '.doc')) {
       return 'doc';
     }
-    if (fileUrl.includes('.pdf') || name.includes('.pdf')) {
+    if (hasExtension(fileUrl, '.pdf') || hasExtension(name, '.pdf')) {
       return 'pdf';
+    }
+    if (hasExtension(fileUrl, '.csv') || hasExtension(name, '.csv')) {
+      return 'csv';
+    }
+    if (hasExtension(fileUrl, '.msg') || hasExtension(name, '.msg')) {
+      return 'msg';
     }
     return 'pdf'; // Default to PDF
   }, [url, fileName]);
@@ -143,16 +151,16 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
       setIsLoadingMsg(false);
     };
 
-    const token = localStorage.getItem('accessToken');
-    const apiKey = (import.meta as any).env?.VITE_API_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
+    const tdata = localStorage.getItem('accessToken');
+    const apiKey = (import.meta as any).env?.VITE_HEDER_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
 
     const baseHeaders: HeadersInit = {
       Accept: fileType === 'csv' ? 'text/csv,text/plain,*/*' : '*/*',
     };
 
     if (shouldAttachAuth) {
-      if (token) {
-        baseHeaders['Authorization'] = `Bearer ${token}`;
+      if (tdata) {
+        baseHeaders['Authorization'] = `Bearer ${tdata}`;
       }
       baseHeaders['x-api-key'] = apiKey;
     }
@@ -231,7 +239,7 @@ export function PDFViewer({ url, fileName, className = "" }: PDFViewerProps) {
             const attachments: MsgAttachment[] = (fileData.attachments || []).map((attachment: any, index: number) => {
               const content: Uint8Array = attachment?.content || attachment?.data || new Uint8Array();
               const mimeType = attachment?.mimeType || attachment?.contentType || 'application/octet-stream';
-              const blob = new Blob([content], { type: mimeType });
+              const blob = new Blob([content as any], { type: mimeType });
               const attachmentUrl = URL.createObjectURL(blob);
               createdAttachmentUrls.push(attachmentUrl);
               return {

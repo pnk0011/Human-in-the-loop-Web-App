@@ -14,6 +14,7 @@ interface ExtractedField {
   extractedValue: string;
   confidence: number;
   expectedFormat?: string;
+  qcComment?: string; // QC comment from previous review
   location: {
     x: number;
     y: number;
@@ -144,6 +145,7 @@ const AppContent = React.memo(function AppContent() {
               extractedValue: field.updated_entity_value || field.entity_value,
               confidence: field.confidence,
               expectedFormat: 'Text',
+              qcComment: field.qc_comment || undefined, // Include QC comment if available
               location: { x: 48, y: 175 + (index * 40), width: 180, height: 24 },
             })),
           };
