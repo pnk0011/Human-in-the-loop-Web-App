@@ -1,10 +1,14 @@
 
-  import { defineConfig } from 'vite';
-  import react from '@vitejs/plugin-react-swc';
-  import path from 'path';
-  import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react-swc';
+import path from 'path';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
-  export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const isDev = mode === 'development';
+
+  return {
+    base: isDev ? '/' : '/humanloop/seniorcare/',
     plugins: [
       react(),
       nodePolyfills({
@@ -47,4 +51,5 @@
     optimizeDeps: {
       include: ['react', 'react-dom', 'lucide-react', '@kenjiuno/msgreader'],
     },
-  });
+  };
+});
