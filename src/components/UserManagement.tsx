@@ -197,7 +197,7 @@ export function UserManagement() {
         email: formData.email,
         'password': formData.pwd,
         role: formData.role,
-        qualityControl: formData.qualityControl || undefined,
+        quality_control: formData.qualityControl || undefined,
       };
 
       const response = await userAPI.createUser(createUserData);
@@ -236,11 +236,11 @@ export function UserManagement() {
       };
 
       if (formData.role === 'Reviewer') {
-        updateUserData.qualityControl = formData.qualityControl?.trim()
+        updateUserData.quality_control = formData.qualityControl?.trim()
           ? formData.qualityControl.trim()
           : null;
       } else {
-        updateUserData.qualityControl = null;
+        updateUserData.quality_control = null;
       }
 
       const response = await userAPI.updateUser(updateUserData);

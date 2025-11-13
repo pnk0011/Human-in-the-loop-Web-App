@@ -10,7 +10,7 @@ export interface CreateUserRequest {
   email: string;
   role: 'Admin' | 'Reviewer' | 'QC';
   'password': string;
-  qualityControl?: string;
+  quality_control?: string;
 }
 
 export interface UpdateUserRequest {
@@ -19,7 +19,7 @@ export interface UpdateUserRequest {
   lastName?: string;
   role?: 'Admin' | 'Reviewer' | 'QC';
   isactive?: boolean;
-  qualityControl?: string | null;
+  quality_control?: string | null;
 }
 
 export interface DeleteUserRequest {
