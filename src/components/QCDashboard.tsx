@@ -61,6 +61,8 @@ export function QCDashboard({
     "Critical_files": number;
     "Completed_today": number;
   } | undefined>();
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [uniqueDocIds, setUniqueDocIds] = useState<string[]>([]);
   const [isLoadingDocIds, setIsLoadingDocIds] = useState(false);
   const [reviewers, setReviewers] = useState<string[]>([]);
@@ -148,8 +150,8 @@ export function QCDashboard({
         try {
           const params: GetQCDocumentsRequest = {
             quality_control: user.email,
-            page: 1,
-            limit: 10,
+            page: currentPage,
+            limit: itemsPerPage,
             doc_type_name: documentType !== 'all' ? documentType : 'All',
             priority: priorityFilter !== 'all' ? priorityFilter : 'All',
             status: '3', // Always use status=3 (QC Pending) for QC review queue
@@ -164,13 +166,28 @@ export function QCDashboard({
             if (response.stats) {
               setStats(response.stats);
             }
+            if (response.pagination) {
+              setTotalRecords(Number(response.pagination.total_records) || (response.files?.length ?? 0));
+              setTotalPages(Number(response.pagination.total_pages) || 1);
+              const apiPage = Number(response.pagination.page) || 1;
+              if (apiPage !== currentPage) {
+                setCurrentPage(apiPage);
+              }
+            } else {
+              setTotalRecords(response.files?.length ?? 0);
+              setTotalPages(1);
+            }
           } else {
             // Set empty array if response status is not success
             setApiDocuments([]);
+            setTotalRecords(0);
+            setTotalPages(0);
           }
         } catch (error) {
           // Failed to load QC documents - set empty array
           setApiDocuments([]);
+          setTotalRecords(0);
+          setTotalPages(0);
         } finally {
           setIsLoading(false);
         }
@@ -178,7 +195,7 @@ export function QCDashboard({
     };
 
     loadApiData();
-  }, [user?.email, documentType, priorityFilter, reviewerFilter, docIdFilter]);
+  }, [user?.email, documentType, priorityFilter, reviewerFilter, docIdFilter, currentPage, itemsPerPage]);
 
   // Load completed documents for work history tab (status=1)
   useEffect(() => {
@@ -382,13 +399,16 @@ export function QCDashboard({
     );
   });
 
-  const totalItems = filteredQueue.length;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedQueue = filteredQueue.slice(
-    startIndex,
-    endIndex,
-  );
+  const displayTotalItems = totalRecords || filteredQueue.length;
+  const computedTotalPages =
+    totalPages || Math.max(Math.ceil(filteredQueue.length / itemsPerPage), 1);
+  const startIndex =
+    displayTotalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const endIndex =
+    displayTotalItems === 0
+      ? 0
+      : Math.min(currentPage * itemsPerPage, displayTotalItems);
+  const paginatedQueue = filteredQueue;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -863,9 +883,9 @@ export function QCDashboard({
                 {filteredQueue.length > 0 && (
                   <div className="px-6 py-4 border-t border-[#E5E7EB] dark:border-[#3a3a3a] flex items-center justify-between">
                     <div className="text-[#80989A] dark:text-[#a0a0a0]">
-                      Showing {startIndex + 1}-
-                      {Math.min(endIndex, totalItems)} of{" "}
-                      {totalItems} items
+                      {displayTotalItems > 0
+                        ? `Showing ${startIndex}-${endIndex} of ${displayTotalItems} items`
+                        : 'No items'}
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -878,14 +898,7 @@ export function QCDashboard({
                       >
                         Previous
                       </Button>
-                      {Array.from(
-                        {
-                          length: Math.ceil(
-                            totalItems / itemsPerPage,
-                          ),
-                        },
-                        (_, i) => i + 1,
-                      ).map((page) => (
+                      {Array.from({ length: computedTotalPages }, (_, i) => i + 1).map((page) => (
                         <Button
                           key={page}
                           variant={
@@ -907,7 +920,7 @@ export function QCDashboard({
                         variant="outline"
                         disabled={
                           currentPage >=
-                          Math.ceil(totalItems / itemsPerPage)
+                          computedTotalPages
                         }
                         onClick={() =>
                           setCurrentPage((p) => p + 1)

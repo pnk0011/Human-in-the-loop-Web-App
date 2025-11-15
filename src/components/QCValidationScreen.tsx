@@ -393,7 +393,7 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
         </div>
 
         {/* Right Panel */}
-        <div className="w-[360px] flex-shrink-0 h-full flex flex-col overflow-hidden">
+        <div className="w-[360px] min-w-[360px] max-w-[360px] basis-[360px] flex-shrink-0 h-full flex flex-col overflow-hidden" style={{ width: '360px' }}>
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
             {/* Reviewer Info */}
             <div className="bg-[#0292DC]/10 border border-[#0292DC] rounded-lg p-4">
@@ -495,10 +495,15 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
                 )}
 
                 {reviewerValidation.note && (
-                  <div>
+                  <div >
                     <p className="text-[#80989A] mb-1">Reviewer Notes:</p>
                     <div className="bg-[#F5F7FA] p-3 rounded border border-[#D0D5DD]">
-                      <p className="text-[#012F66]">{reviewerValidation.note}</p>
+                      <p
+                        className="text-[#012F66] whitespace-pre-wrap break-words break-all max-w-full"
+                        style={{ overflowWrap: 'anywhere', wordBreak: 'break-word'  }}
+                      >
+                        {reviewerValidation.note}
+                      </p>
                     </div>
                   </div>
                 )}

@@ -58,7 +58,7 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
       if (user?.email) {
         setIsLoading(true);
         try {
-          // Base params shared by all API requests
+          // Base params shared by the API request
           const baseParams: GetReviewerDocumentsRequest = {
             reviewer: user.email,
             doc_type_name: documentType !== 'all' ? documentType : 'All',
@@ -66,72 +66,47 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
             doc_handle_id: docIdFilter !== 'all' ? docIdFilter : undefined,
           };
 
-          // Helper to fetch all pages for a specific status
-          const fetchDocumentsForStatus = async (status: '2' | '4') => {
-            const accumulatedFiles: ReviewerDocument[] = [];
-            let statsForStatus: typeof stats | undefined;
-            let page = 1;
-            const pageSize = 50; // Fetch in batches to keep client-side pagination responsive
+          const accumulatedFiles: ReviewerDocument[] = [];
+          let collectedStats: typeof stats | undefined;
+          let page = 1;
+          const pageSize = 50;
 
-            while (true) {
-              const response = await documentOperationsAPI.getReviewerDocuments({
-                ...baseParams,
-                status,
-                page,
-                limit: pageSize,
-              });
+          while (true) {
+            const response = await documentOperationsAPI.getReviewerDocuments({
+              ...baseParams,
+              status: 'STATUS_IN_2_4',
+              page,
+              limit: pageSize,
+            });
 
-              if (response.status !== 'success') {
-                break;
-              }
-
-              if (response.files?.length) {
-                accumulatedFiles.push(...response.files);
-              }
-
-              if (!statsForStatus && response.stats) {
-                statsForStatus = response.stats;
-              }
-
-              const totalPages = response.pagination?.total_pages
-                ? Number(response.pagination.total_pages)
-                : 1;
-
-              if (!response.pagination || !Number.isFinite(totalPages) || page >= totalPages) {
-                break;
-              }
-
-              page += 1;
+            if (response.status !== 'success') {
+              break;
             }
 
-            return { files: accumulatedFiles, stats: statsForStatus };
-          };
-
-          // Fetch records with status=2 and status=4 in parallel (each fetching all pages)
-          const [status2Result, status4Result] = await Promise.all([
-            fetchDocumentsForStatus('2'),
-            fetchDocumentsForStatus('4'),
-          ]);
-
-          // Merge the results while preserving uniqueness
-          const mergedFiles: ReviewerDocument[] = [];
-          const seenFileNames = new Set<string>();
-
-          [...status2Result.files, ...status4Result.files].forEach((file) => {
-            const uniqueKey = `${file.file_name}_${file.doc_handle_id}`;
-            if (!seenFileNames.has(uniqueKey)) {
-              seenFileNames.add(uniqueKey);
-              mergedFiles.push(file);
+            if (response.files?.length) {
+              accumulatedFiles.push(...response.files);
             }
-          });
 
-          setApiDocuments(mergedFiles);
+            if (!collectedStats && response.stats) {
+              collectedStats = response.stats;
+            }
 
-          if (status2Result.stats) {
-            setStats(status2Result.stats);
-          } else if (status4Result.stats) {
-            setStats(status4Result.stats);
+            if (response.pagination) {
+              const currentPage = Number(response.pagination.page ?? page);
+              const totalPagesFromApi = Number(response.pagination.total_pages ?? 1);
+              if (!Number.isFinite(totalPagesFromApi) || currentPage >= totalPagesFromApi) {
+                break;
+              }
+            } else {
+              break;
+            }
+
+            page += 1;
           }
+
+          setApiDocuments(accumulatedFiles);
+
+          setStats(collectedStats ?? undefined);
         } catch (error) {
           // Failed to load API documents - set empty array
           setApiDocuments([]);
