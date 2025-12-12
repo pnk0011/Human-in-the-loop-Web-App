@@ -1,10 +1,180 @@
-| Endpoint | UI Tasks | API Integration Tasks |
-| --- | --- | --- |
-| Validation screen redesign (reviewer & QC) | Restructure both validation views to surface the account overview panel first. New design will now have 3 different tables (LD, AD, ED). | Need to implement new API response handling that updates the existing validation response interfaces to align with the account-level schema. |
-| `GET /admin/documents` | Update admin grid columns to display account-level data (includes changes in existing columns) instead of document-specific info. | Need to implement new API response handling for account-scoped data, including changes to the current response interfaces and normalization of account aggregates. |
-| `GET /dashboard/reviewer` | Rebuild widgets/tables around accounts (queue counts by account, SLA timers, exception counts); update filter controls to account status/priority; revise empty/error states with account context. | Need to implement new API response handling for the reviewer dashboard, updating existing response interfaces to the account-centric payload. |
-| `POST /dashboard/reviewer/validate` | Capture account-wide checklist, risk rating, reviewer notes before document overrides; provide inline validation summary tied to account context. | Need to implement new API response handling for the reviewer validation flow, updating the current payload/response interfaces to support account-level submissions. |
-| `GET /dashboard/qc` | Refresh QC dashboard cards/list views to highlight account-level escalations, compliance trends, reviewer feedback summaries; adjust filters to account status and severity. | Need to implement new API response handling for the QC dashboard, updating existing response interfaces to cover account-level metrics. |
-| `POST /dashboard/qc/validate` | Support account-level approval/rejection with reviewer feedback panel and confirmation banner; ensure accessibility for final decision toggles. | Need to implement new API response handling for the QC validation workflow, updating the current response interfaces to reflect account-level approvals. |
-| `GET /dashboard/reviewer/history` | Redesign reviewer history page to show account-level event timelines (validation outcomes, escalations, reassignment notes) with filters for account status and date range. | Need to implement new API response handling for the reviewer history feed, updating existing response interfaces to deliver account-level event logs. |
-| `GET /dashboard/qc/history` | Update QC history page to present account-level audit trails with reviewer feedback, QC decisions, and compliance flags; add advanced filtering/search. | Need to implement new API response handling for the QC history feed, updating current response interfaces to accommodate account-level audit records. |
+Admin (GetAllDocuments)
+ 
+
+ 
+
+URL
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/get-all-documents?page=1&limit=10&search_term=LLC&status=1
+
+Sample response
+
+{
+
+    "status": "success",
+
+    "message": "Database operations completed successfully. Active documents fetched.",
+
+    "stats": {
+
+        "Total_accounts": 54,
+
+        "Assigned_accounts": 0,
+
+        "Completed_accounts": 1
+
+    },
+
+    "pagination": {
+
+        "page": 1,
+
+        "limit": 10,
+
+        "total_records": 1,
+
+        "total_pages": 1
+
+    },
+
+    "files": [
+
+        {
+
+            "id": 6380,
+
+            "first_named_insured": "RK4 LLC",
+
+            "document_count": 8,
+
+            "description_summary": "DECLINATION | SUBMISSION | SUPPORTING DOCUMENTATION",
+
+            "reviewer_assigned": null,
+
+            "qc_assigned": null,
+
+            "status": "1",
+
+            "is_active": true
+
+        }
+
+    ]
+
+}
+
+ 
+
+ 
+
+ 
+
+Assign Reviewers
+ 
+
+URL
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/assign-reviewer
+
+ 
+
+Sample Request
+
+{
+
+    "first_named_insured": [
+
+        "BAYVILLE HEALTHCARE LLC",
+
+        "RK4 LLC",
+
+        "CPP SENIOR HOLDINGS, LLC",
+
+        "DUPAGE COUNTY ILLINOIS CONVALESCENT CENTER"
+
+    ],
+
+    "reviewer_assigned": "Binoj.Cherian@medpro.com",
+
+    "qc_assigned": "Pankaj.Singh@medpro.com",
+
+    "status": "2"
+
+}
+
+ 
+
+ 
+
+ 
+
+Get Reviewer Documents
+ 
+
+
+
+URL
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/get-all-reviewer-documents?reviewer_assigned=Binoj.Cherian@medpro.com&page=1&limit=25&status=2&first_named_insured=BAYVILLE
+
+ 
+
+Sample Response
+
+{
+
+    "status": "success",
+
+    "message": "Successfully assigned policies to reviewer",
+
+    "stats": {
+
+        "Assigned_accounts": 54,
+
+        "Completed_accounts": 0
+
+    },
+
+    "pagination": {
+
+        "page": 1,
+
+        "limit": 25,
+
+        "total_records": 1,
+
+        "total_pages": 1
+
+    },
+
+    "files": [
+
+        {
+
+            "id": 863,
+
+            "first_named_insured": "BAYVILLE HEALTHCARE LLC",
+
+            "document_count": 8,
+
+            "description_summary": "INFO GATHERING | MPG | RATING TOOL | SUBMISSION | SUPPORTING DOCUMENTATION",
+
+            "reviewer_assigned": "Binoj.Cherian@medpro.com",
+
+            "qc_assigned": "Pankaj.Singh@medpro.com",
+
+            "status": "2",
+
+            "is_active": true
+
+        }
+
+    ]
+
+}
+
+ 
+
+ 
+
+ 
