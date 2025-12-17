@@ -405,7 +405,7 @@ export function UserManagement() {
       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
           <h3 className="text-[#012F66] dark:text-white mb-4">Filter Users</h3>
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4 flex-1">
             {isLoading && (
               <div className="flex items-center gap-2 text-[#80989A] dark:text-[#a0a0a0]">
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -503,10 +503,10 @@ export function UserManagement() {
               resetForm();
               setIsCreateDialogOpen(true);
             }}
-            className="bg-[#0292DC] hover:bg-[#012F66] text-white cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#0292DC] hover:bg-[#012F66] text-white cursor-pointer whitespace-nowrap shadow-sm flex-shrink-0 self-start md:self-auto"
           >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Create User
+            <UserPlus className="w-4 h-4" />
+            <span>Create User</span>
           </Button>
         </div>
       </div>

@@ -8,16 +8,13 @@ import { useLoading } from '../hooks/useLoading';
 
 interface QueueItem {
   id: string;
-  document: string;
-  type: string;
-  field: string;
-  confidence: number;
-  priority: 'High' | 'Medium' | 'Low';
-  age: string;
-  assignedTo: string;
-  extractedValue?: string;
-  fieldDescription?: string;
-  expectedFormat?: string;
+  accountName: string;
+  documentCount: number;
+  descriptionSummary?: string;
+  reviewerAssigned?: string | null;
+  qcAssigned?: string | null;
+  status?: 'New' | 'In Progress' | 'Pending Review' | 'On Hold' | 'Completed' | 'Reassigned';
+  isActive?: boolean;
 }
 
 interface DashboardProps {

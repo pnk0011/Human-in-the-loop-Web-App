@@ -25,9 +25,9 @@ interface QCDashboardProps {
 }
 
 type SortField =
-  | "document"
-  | "reviewer"
-  | "priority"
+  | "account"
+  | "documentCount"
+  | "status"
   | "reviewedDate";
 type SortDirection = "asc" | "desc";
 
@@ -40,11 +40,8 @@ export function QCDashboard({
 }: QCDashboardProps) {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("Current Queue");
-  const [documentType, setDocumentType] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState("all");
-  const [reviewerFilter, setReviewerFilter] = useState("all");
-
-  const [docIdFilter, setDocIdFilter] = useState("all");
+  const [accountSearch, setAccountSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [sortField, setSortField] = useState<SortField | null>(
@@ -56,19 +53,23 @@ export function QCDashboard({
   const [isLoading, setIsLoading] = useState(false);
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
   const [stats, setStats] = useState<{
-    "Assigned Documents": number;
-    "Assigned_files": number;
-    "Critical_files": number;
-    "Completed_today": number;
+    Assigned_accounts: number;
+    Completed_accounts: number;
   } | undefined>();
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [uniqueDocIds, setUniqueDocIds] = useState<string[]>([]);
-  const [isLoadingDocIds, setIsLoadingDocIds] = useState(false);
-  const [reviewers, setReviewers] = useState<string[]>([]);
-  const [isLoadingReviewers, setIsLoadingReviewers] = useState(false);
   const [completedDocuments, setCompletedDocuments] = useState<QCDocument[]>([]);
   const [isLoadingCompleted, setIsLoadingCompleted] = useState(false);
+
+  // Legacy filter placeholders (document-level filters removed in new account flow)
+  const documentType = 'all';
+  const priorityFilter = 'all';
+  const reviewerFilter = 'all';
+  const docIdFilter = 'all';
+  const isLoadingReviewers = false;
+  const reviewers: string[] = [];
+  const isLoadingDocIds = false;
+  const uniqueDocIds: string[] = [];
 
   // Handle validate click with per-item loading state
   const handleValidateClick = async (item: any) => {
@@ -83,64 +84,9 @@ export function QCDashboard({
     }
   };
 
-  // Load unique document IDs for QC user
-  useEffect(() => {
-    const loadUniqueDocIds = async () => {
-      if (user?.email) {
-        setIsLoadingDocIds(true);
-        try {
-          const response = await documentAPI.getUniqueDocumentIds(undefined, user.email);
-          
-          if (response.status === 'success') {
-            const docIds = response.doc_handle_ids || response.data || [];
-            setUniqueDocIds(Array.isArray(docIds) ? docIds : []);
-          }
-        } catch (error) {
-          // Failed to load QC unique document IDs
-        } finally {
-          setIsLoadingDocIds(false);
-        }
-      }
-    };
-    
-    loadUniqueDocIds();
-  }, [user?.email]);
-
-  // Load reviewers assigned to QC user
-  useEffect(() => {
-    const loadReviewers = async () => {
-      if (user?.email) {
-        setIsLoadingReviewers(true);
-        try {
-          const response = await documentOperationsAPI.getReviewersAssignedToQC(user.email);
-          
-          if (response.status === 'success' && response.reviewers) {
-            // Extract email addresses from reviewer objects
-            const reviewerEmails = Array.isArray(response.reviewers) 
-              ? response.reviewers.map((reviewer: { email: string; quality_control: string }) => reviewer.email)
-              : [];
-            setReviewers(reviewerEmails);
-          }
-        } catch (error) {
-          // Failed to load QC reviewers
-        } finally {
-          setIsLoadingReviewers(false);
-        }
-      }
-    };
-    
-    loadReviewers();
-  }, [user?.email]);
-
-  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [documentType, priorityFilter, reviewerFilter, docIdFilter]);
-
-  // Reset to page 1 when itemsPerPage changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [itemsPerPage]);
+  }, [accountSearch, statusFilter, itemsPerPage]);
 
   // Load API data for QC documents
   useEffect(() => {
@@ -149,14 +95,11 @@ export function QCDashboard({
         setIsLoading(true);
         try {
           const params: GetQCDocumentsRequest = {
-            quality_control: user.email,
+            qc_assigned: user.email,
             page: currentPage,
             limit: itemsPerPage,
-            doc_type_name: documentType !== 'all' ? documentType : 'All',
-            priority: priorityFilter !== 'all' ? priorityFilter : 'All',
-            status: '3', // Always use status=3 (QC Pending) for QC review queue
-            reviewer: reviewerFilter !== 'all' ? reviewerFilter : 'All',
-            doc_handle_id: docIdFilter !== 'all' ? docIdFilter : undefined,
+            status: statusFilter !== 'all' ? statusFilter : undefined,
+            first_named_insured: accountSearch || undefined,
           };
           
           const response = await documentOperationsAPI.getQCDocuments(params);
@@ -195,7 +138,7 @@ export function QCDashboard({
     };
 
     loadApiData();
-  }, [user?.email, documentType, priorityFilter, reviewerFilter, docIdFilter, currentPage, itemsPerPage]);
+  }, [user?.email, accountSearch, statusFilter, currentPage, itemsPerPage]);
 
   // Load completed documents for work history tab (status=1)
   useEffect(() => {
@@ -204,10 +147,10 @@ export function QCDashboard({
         setIsLoadingCompleted(true);
         try {
           const params: GetQCDocumentsRequest = {
-            quality_control: user.email,
+            qc_assigned: user.email,
             page: 1,
             limit: 100,
-            status: '1', // Fetch records with status=1 (Completed) for QC work history
+            status: '1',
           };
 
           const response = await documentOperationsAPI.getQCDocuments(params);
@@ -229,33 +172,67 @@ export function QCDashboard({
 
   // Convert completed QCDocuments to QCCompletedDocument format for WorkHistory
   const convertCompletedDocumentsToWorkHistory = () => {
-    return completedDocuments.map((doc) => ({
-      id: `${doc.file_name}_${doc.doc_handle_id}`,
-      documentName: doc.file_name,
-      documentType: doc.doc_type_name || 'Unknown',
+    return completedDocuments.map((doc, index) => ({
+      id: doc.id ? doc.id.toString() : `account-${index}`,
+      documentName: doc.first_named_insured,
+      documentType: 'Account',
       reviewer: doc.reviewer_assigned || 'Unknown Reviewer',
-      completedDate: doc.qc_completed_dt?.split(' ')[0] || new Date().toISOString().split('T')[0],
-      reviewedDate: doc.qc_completed_dt?.split(' ')[0] || new Date().toISOString().split('T')[0],
-      fieldsCount: doc.distinct_entity_type_count,
-      approvedCount: 0, // Not available in API response
-      sentBackCount: 0, // Not available in API response
-      passRate: Math.round(doc.avg_confidence_percentage), // Use confidence as pass rate
+      completedDate: new Date().toISOString().split('T')[0],
+      reviewedDate: new Date().toISOString().split('T')[0],
+      fieldsCount: doc.document_count,
+      approvedCount: 0,
+      sentBackCount: 0,
+      passRate: 100,
     }));
   };
 
-  // Convert API documents to original QC queue format
+  // Convert API documents to account-level QC queue format
   const convertApiDocumentsToQCQueue = () => {
-    return apiDocuments.map((doc, index) => ({
-      id: `${doc.file_name}_${doc.doc_handle_id}` || `DOC-${index + 1}`,
-      doc_handle_id: doc.doc_handle_id, // Add doc_handle_id for display
-      document: doc.file_name,
-      type: doc.doc_type_name || 'Unknown',
-      reviewer: doc.reviewer_assigned || 'Unknown Reviewer',
-      reviewedDate: doc.qc_completed_dt?.split(' ')[0] || new Date().toISOString().split('T')[0],
-      fieldsReviewed: doc.distinct_entity_type_count,
-      priority: doc.priority as 'High' | 'Medium' | 'Low',
+    let items = apiDocuments.map((doc, index) => ({
+      id: doc.id ? doc.id.toString() : `account-${index + 1}`,
+      accountName: doc.first_named_insured,
+      documentCount: doc.document_count,
+      descriptionSummary: doc.description_summary,
+      reviewerAssigned: doc.reviewer_assigned,
+      qcAssigned: doc.qc_assigned,
       status: getQCStatusFromApiResponse(doc.status),
+      isActive: doc.is_active,
     }));
+
+    if (accountSearch.trim()) {
+      const q = accountSearch.toLowerCase();
+      items = items.filter(
+        (item) =>
+          item.accountName.toLowerCase().includes(q) ||
+          (item.descriptionSummary?.toLowerCase().includes(q) ?? false)
+      );
+    }
+
+    if (statusFilter !== 'all') {
+      items = items.filter(
+        (item) => (item.status || '').toLowerCase() === statusFilter.toLowerCase()
+      );
+    }
+
+    if (sortField) {
+      items = [...items].sort((a, b) => {
+        let aVal: any = a[sortField];
+        let bVal: any = b[sortField];
+
+        if (sortField === 'documentCount') {
+          aVal = Number(aVal);
+          bVal = Number(bVal);
+        } else {
+          aVal = (aVal ?? '').toString().toLowerCase();
+          bVal = (bVal ?? '').toString().toLowerCase();
+        }
+
+        if (sortDirection === 'asc') return aVal > bVal ? 1 : -1;
+        return aVal < bVal ? 1 : -1;
+      });
+    }
+
+    return items;
   };
 
   // Helper function to convert API status to QC status display
@@ -378,26 +355,7 @@ export function QCDashboard({
   // Use only API data, no fallback to dummy data
   const dataSource = convertApiDocumentsToQCQueue();
   
-  const filteredQueue = dataSource.filter((item) => {
-    const matchesType =
-      documentType === "all" ||
-      item.type
-        .toLowerCase()
-        .includes(documentType.toLowerCase());
-    const matchesPriority =
-      priorityFilter === "all" || item.priority === priorityFilter;
-    const matchesReviewer =
-      reviewerFilter === "all" || item.reviewer === reviewerFilter;
-    const matchesDocId =
-      docIdFilter === "all" || (item as any).doc_handle_id === docIdFilter;
-
-    return (
-      matchesType &&
-      matchesPriority &&
-      matchesReviewer &&
-      matchesDocId
-    );
-  });
+  const filteredQueue = dataSource;
 
   const displayTotalItems = totalRecords || filteredQueue.length;
   const computedTotalPages =
@@ -431,10 +389,8 @@ export function QCDashboard({
   };
 
   const resetFilters = () => {
-    setDocumentType("all");
-    setPriorityFilter("all");
-    setReviewerFilter("all");
-    setDocIdFilter("all");
+    setAccountSearch("");
+    setStatusFilter("all");
     setCurrentPage(1);
   };
 
@@ -466,18 +422,13 @@ export function QCDashboard({
         {activeTab === "Current Queue" ? (
           <>
             {/* Stats */}
-            <DashboardStats stats={stats ? {
-              Assigned_documents: stats["Assigned Documents"],
-              Assigned_files: stats["Assigned_files"],
-              Critical_files: stats["Critical_files"],
-              Completed_today: stats["Completed_today"],
-            } : undefined} />
+            <DashboardStats stats={stats} />
 
             <div className="space-y-6 mt-6">
               {/* Filters */}
               <div className="bg-white dark:bg-[#2a2a2a] p-6 rounded-lg shadow-sm border border-[#E5E7EB] dark:border-[#3a3a3a]">
                 <h3 className="text-[#012F66] dark:text-white mb-4">
-                  Filter Documents
+                  Filter Accounts
                 </h3>
                 <div className="flex flex-wrap gap-4 mb-4">
                   <div className="w-full md:w-auto md:min-w-[150px]">

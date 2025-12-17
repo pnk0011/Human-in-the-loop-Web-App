@@ -10,19 +10,13 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface QueueItem {
   id: string;
-  document: string;
-  type: string;
-  field: string;
-  confidence: number;
-  priority: 'High' | 'Medium' | 'Low';
-  age: string;
-  assignedTo: string;
-  fieldsCount?: number;
+  accountName: string;
+  documentCount: number;
+  descriptionSummary?: string;
+  reviewerAssigned?: string | null;
+  qcAssigned?: string | null;
   status?: 'New' | 'In Progress' | 'Pending Review' | 'On Hold' | 'Completed' | 'Reassigned';
-  extractedValue?: string;
-  fieldDescription?: string;
-  expectedFormat?: string;
-  doc_handle_id?: string;
+  isActive?: boolean;
 }
 
 interface ReviewerDashboardProps {
@@ -42,14 +36,9 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
   const [completedDocuments, setCompletedDocuments] = useState<ReviewerDocument[]>([]);
   const [isLoadingCompleted, setIsLoadingCompleted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [documentType, setDocumentType] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
-  const [docIdFilter, setDocIdFilter] = useState('all');
   const [stats, setStats] = useState<{
-    Assigned_documents: number;
-    Assigned_files: number;
-    Critical_files: number;
-    Completed_today: number;
+    Assigned_accounts: number;
+    Completed_accounts: number;
   } | undefined>();
   
   // Load API data for real documents (fetch status=2 OR status=4)
@@ -59,13 +48,6 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
         setIsLoading(true);
         try {
           // Base params shared by the API request
-          const baseParams: GetReviewerDocumentsRequest = {
-            reviewer: user.email,
-            doc_type_name: documentType !== 'all' ? documentType : 'All',
-            priority: priorityFilter !== 'all' ? priorityFilter : 'All',
-            doc_handle_id: docIdFilter !== 'all' ? docIdFilter : undefined,
-          };
-
           const accumulatedFiles: ReviewerDocument[] = [];
           let collectedStats: typeof stats | undefined;
           let page = 1;
@@ -73,8 +55,8 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
 
           while (true) {
             const response = await documentOperationsAPI.getReviewerDocuments({
-              ...baseParams,
-              status: 'STATUS_IN_2_4',
+              reviewer_assigned: user.email,
+              status: '2',
               page,
               limit: pageSize,
             });
@@ -117,7 +99,7 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
     };
 
     loadApiData();
-  }, [user?.email, documentType, priorityFilter, docIdFilter]);
+  }, [user?.email]);
 
   // Load completed documents for work history tab
   useEffect(() => {
@@ -126,12 +108,10 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
         setIsLoadingCompleted(true);
         try {
           const params: GetReviewerDocumentsRequest = {
-            reviewer: user.email,
+            reviewer_assigned: user.email,
             page: 1,
             limit: 100, // Load more completed documents for history
-            doc_type_name: 'All',
-            priority: 'All',
-            status: '1', // Status '3' means 'Completed'
+            status: '3',
           };
           
           const response = await documentOperationsAPI.getReviewerDocuments(params);
@@ -159,25 +139,17 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
 
   const convertApiDocumentsToQueueItems = (): QueueItem[] => {
     return apiDocuments.map((doc, index) => {
-      const docId = `${doc.file_name}_${doc.doc_handle_id}` || `doc-${index}`;
-      // Use the field count from API response
-      const fieldsToReview = doc.distinct_entity_type_count;
-      
+      const docId = doc.id ? doc.id.toString() : `account-${index}`;
+
       return {
         id: docId,
-        document: doc.file_name,
-        type: doc.doc_type_name || 'Unknown',
-        field: `${fieldsToReview} fields`,
-        confidence: Math.round(doc.avg_confidence_percentage),
-        priority: doc.priority,
-        age: doc.age_assigned || '0d 0h',
-        assignedTo: 'Reviewer', // Set to 'Reviewer' to match filter
-        fieldsCount: fieldsToReview,
+        accountName: doc.first_named_insured,
+        documentCount: doc.document_count,
+        descriptionSummary: doc.description_summary,
+        reviewerAssigned: doc.reviewer_assigned,
+        qcAssigned: doc.qc_assigned,
         status: getStatusFromApiResponse(doc.status),
-        extractedValue: 'See document', // Dummy value
-        fieldDescription: 'Review document fields', // Dummy value
-        expectedFormat: 'Various formats', // Dummy value
-        doc_handle_id: doc.doc_handle_id, // Add doc_handle_id for display in table
+        isActive: doc.is_active,
       };
     });
   };
@@ -201,15 +173,15 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
   // Convert completed API documents to CompletedDocument format for WorkHistory
   const convertCompletedDocumentsToWorkHistory = () => {
     return completedDocuments.map((doc) => ({
-      id: `${doc.file_name}_${doc.doc_handle_id}`,
-      documentName: doc.file_name,
-      documentType: doc.doc_type_name || 'Unknown',
-      completedDate: doc.reviewer_update_dt ? doc.reviewer_update_dt.split(' ')[0] : new Date().toISOString().split('T')[0],
-      fieldsCount: doc.distinct_entity_type_count,
+      id: doc.id ? doc.id.toString() : doc.first_named_insured,
+      documentName: doc.first_named_insured,
+      documentType: 'Account',
+      completedDate: new Date().toISOString().split('T')[0],
+      fieldsCount: doc.document_count,
       acceptedCount: 0, // Not available in API response
       correctedCount: 0, // Not available in API response
       rejectedCount: 0, // Not available in API response
-      accuracy: Math.round(doc.avg_confidence_percentage), // Use confidence as accuracy
+      accuracy: 100,
     }));
   };
 
@@ -237,13 +209,6 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
               onValidateClick={handleValidateClick}
               // Pass API documents converted to QueueItem format
               apiDocuments={convertApiDocumentsToQueueItems()}
-              reviewerEmail={user?.email}
-              documentType={documentType}
-              onDocumentTypeChange={setDocumentType}
-              priorityFilter={priorityFilter}
-              onPriorityFilterChange={setPriorityFilter}
-              docIdFilter={docIdFilter}
-              onDocIdFilterChange={setDocIdFilter}
               isLoading={isLoading}
             />
           </>

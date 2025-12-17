@@ -33,47 +33,89 @@ const StatCard = React.memo(function StatCard({ title, value, subtitle, subtitle
   );
 });
 
+type DashboardStatsShape =
+  | {
+      Assigned_documents?: number;
+      Assigned_files?: number;
+      Critical_files?: number;
+      Files_completed_today?: number;
+      Assigned_accounts?: number;
+      Completed_accounts?: number;
+    }
+  | undefined;
+
 interface DashboardStatsProps {
-  stats?: {
-    Assigned_documents?: number;
-    Assigned_files?: number;
-    Critical_files?: number;
-    Files_completed_today?: number;
-  };
+  stats?: DashboardStatsShape;
 }
 
 export const DashboardStats = React.memo(function DashboardStats({ stats }: DashboardStatsProps) {
-  const statsData = useMemo(() => [
-    {
-      title: "Assigned Documents",
-      value: stats?.Assigned_documents ?? 0,
-      icon: <FileText className="w-6 h-6" />,
-      iconBgColor: "bg-[#FFC018]/10",
-      iconColor: "text-[#FFC018]"
-    },
-    {
-      title: "Assigned Files",
-      value: stats?.Assigned_files ?? 0,
-      icon: <FileText className="w-6 h-6" />,
-      iconBgColor: "bg-[#0292DC]/10",
-      iconColor: "text-[#0292DC]"
-    },
-    {
-      title: "Critical Items",
-      value: stats?.Critical_files ?? 0,
-      icon: <AlertCircle className="w-6 h-6" />,
-      iconBgColor: "bg-[#FF0081]/10",
-      iconColor: "text-[#FF0081]"
-    },
-    {
-      title: "Completed Today",
-      value: stats?.Files_completed_today ?? 0,
-      icon: <CheckCircle2 className="w-6 h-6" />,
-      iconBgColor: "bg-[#10B981]/10",
-      iconColor: "text-[#10B981]"
-    },
-   
-  ], [stats]);
+  const hasAccountStats = Boolean((stats as any)?.Assigned_accounts || (stats as any)?.Completed_accounts);
+
+  const statsData = useMemo(() => {
+    if (hasAccountStats) {
+      return [
+        {
+          title: "Assigned Accounts",
+          value: (stats as any)?.Assigned_accounts ?? 0,
+          icon: <FileText className="w-6 h-6" />,
+          iconBgColor: "bg-[#FFC018]/10",
+          iconColor: "text-[#FFC018]"
+        },
+        {
+          title: "Completed Accounts",
+          value: (stats as any)?.Completed_accounts ?? 0,
+          icon: <CheckCircle2 className="w-6 h-6" />,
+          iconBgColor: "bg-[#10B981]/10",
+          iconColor: "text-[#10B981]"
+        },
+        {
+          title: "Critical Items",
+          value: stats?.Critical_files ?? 0,
+          icon: <AlertCircle className="w-6 h-6" />,
+          iconBgColor: "bg-[#FF0081]/10",
+          iconColor: "text-[#FF0081]"
+        },
+        {
+          title: "Completed Today",
+          value: stats?.Files_completed_today ?? 0,
+          icon: <Clock className="w-6 h-6" />,
+          iconBgColor: "bg-[#0EA5E9]/10",
+          iconColor: "text-[#0EA5E9]"
+        },
+      ];
+    }
+
+    return [
+      {
+        title: "Assigned Documents",
+        value: stats?.Assigned_documents ?? 0,
+        icon: <FileText className="w-6 h-6" />,
+        iconBgColor: "bg-[#FFC018]/10",
+        iconColor: "text-[#FFC018]"
+      },
+      {
+        title: "Assigned Files",
+        value: stats?.Assigned_files ?? 0,
+        icon: <FileText className="w-6 h-6" />,
+        iconBgColor: "bg-[#0292DC]/10",
+        iconColor: "text-[#0292DC]"
+      },
+      {
+        title: "Critical Items",
+        value: stats?.Critical_files ?? 0,
+        icon: <AlertCircle className="w-6 h-6" />,
+        iconBgColor: "bg-[#FF0081]/10",
+        iconColor: "text-[#FF0081]"
+      },
+      {
+        title: "Completed Today",
+        value: stats?.Files_completed_today ?? 0,
+        icon: <CheckCircle2 className="w-6 h-6" />,
+        iconBgColor: "bg-[#10B981]/10",
+        iconColor: "text-[#10B981]"
+      },
+    ];
+  }, [hasAccountStats, stats]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">

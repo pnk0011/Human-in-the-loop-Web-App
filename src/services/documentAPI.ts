@@ -1,24 +1,21 @@
-export interface Document {
-  file_name: string;
-  doc_handle_id: string;
-  doc_type_name: string | null;
-  distinct_entity_type_count: number;
-  avg_confidence_percentage: number;
-  priority: 'High' | 'Medium' | 'Low';
-  latest_update_datetime: string | null;
+export interface AccountDocument {
+  id: number;
+  first_named_insured: string;
+  document_count: number;
+  description_summary: string;
   reviewer_assigned: string | null;
   qc_assigned: string | null;
-  status: string | null;
+  status: string;
+  is_active: boolean;
 }
 
 export interface DocumentsListResponse {
   status: string;
   message: string;
   stats?: {
-    "Total Documents": number;
-    "Total Files": number;
-    "Assigned Files": number;
-    "Completed Files": number;
+    Total_accounts: number;
+    Assigned_accounts: number;
+    Completed_accounts: number;
   };
   pagination?: {
     page: number;
@@ -26,18 +23,15 @@ export interface DocumentsListResponse {
     total_records: number;
     total_pages: number;
   };
-  files?: Document[];
+  files?: AccountDocument[];
   error?: string;
 }
 
 export interface GetDocumentsRequest {
   page?: number;
   limit?: number;
-  file_name?: string;
-  doc_type_name?: string;
-  priority?: string;
+  search_term?: string;
   status?: string;
-  doc_handle_id?: string;
 }
 
 export interface UniqueDocumentIdsResponse {
@@ -87,13 +81,10 @@ class DocumentAPI {
       // Add parameters if they exist
       if (params.page) queryParams.append('page', params.page.toString());
       if (params.limit) queryParams.append('limit', params.limit.toString());
-      if (params.file_name) queryParams.append('file_name', params.file_name);
-      if (params.doc_type_name) queryParams.append('doc_type_name', params.doc_type_name);
-      if (params.priority) queryParams.append('priority', params.priority);
+      if (params.search_term) queryParams.append('search_term', params.search_term);
       if (params.status) queryParams.append('status', params.status);
-      if (params.doc_handle_id) queryParams.append('doc_handle_id', params.doc_handle_id);
 
-      const endpoint = `/get-all-documents?${queryParams.toString()}`;
+      const endpoint = `/admin-get-unique-policies?${queryParams.toString()}`;
       const response = await this.makeRequest<DocumentsListResponse>(endpoint, {
         method: 'GET',
       });

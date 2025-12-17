@@ -6,63 +6,55 @@ const API_KEY = (import.meta as any).env?.VITE_HEADER_KEY || 'jLGO7tJFHxB0bVc0Um
 
 // Assign Reviewer API Interfaces
 export interface AssignReviewerRequest {
-  file_names: string[];
-  reviewer: string;
-  qc_assigned?: string; // Made optional
+  first_named_insured: string[];
+  reviewer_assigned: string;
+  qc_assigned?: string;
   status: string;
 }
 
 export interface AssignReviewerResponse {
-  message: string;
-  reviewer: string;
-  qc_assigned?: string;
   status: string;
-  total_entity_rows_updated: number;
-  updated_files_summary: Array<{
-    file_name: string;
+  message: string;
+  reviewer_assigned?: string;
+  qc_assigned?: string;
+  total_entity_rows_updated?: number;
+  updated_accounts_summary?: Array<{
+    first_named_insured: string;
     rows_updated: number;
   }>;
 }
 
 // Reviewer Dashboard API Interfaces
 export interface GetReviewerDocumentsRequest {
-  reviewer: string;
+  reviewer_assigned: string;
   page?: number;
   limit?: number;
-  doc_type_name?: string;
-  priority?: string;
   status?: string;
-  search?: string; // For searching by file name
-  doc_handle_id?: string;
+  first_named_insured?: string;
 }
 
 export interface ReviewerDocument {
-  file_name: string;
-  doc_handle_id: string;
-  doc_type_name: string | null;
-  distinct_entity_type_count: number;
-  avg_confidence_percentage: number;
-  priority: 'High' | 'Medium' | 'Low';
-  reviewer_update_dt: string;
+  id: number;
+  first_named_insured: string;
+  document_count: number;
+  description_summary: string;
   reviewer_assigned: string;
   qc_assigned: string | null;
-  status: string; // '0', '1', '2', '3'
-  age_assigned: string;
+  status: string;
+  is_active: boolean;
 }
 
 export interface GetReviewerDocumentsResponse {
   status: string;
   message: string;
   stats?: {
-    Assigned_documents: number;
-    Assigned_files: number;
-    Critical_files: number;
-    Completed_today: number;
+    Assigned_accounts: number;
+    Completed_accounts: number;
   };
   pagination?: {
     page: number;
     limit: number;
-    total_records_filtered: number;
+    total_records: number;
     total_pages: number;
   };
   files?: ReviewerDocument[];
@@ -71,7 +63,7 @@ export interface GetReviewerDocumentsResponse {
 
 // Review File API Interfaces
 export interface ReviewFileRequest {
-  file_name: string;
+  first_named_insured: string;
 }
 
 export interface ReviewFileEntity {
@@ -127,28 +119,22 @@ export interface UpdateFileResponse {
 
 // QC API Interfaces
 export interface GetQCDocumentsRequest {
-  quality_control: string;
+  qc_assigned: string;
   page?: number;
   limit?: number;
-  doc_type_name?: string;
-  priority?: string;
   status?: string;
-  reviewer?: string;
-  doc_handle_id?: string;
+  first_named_insured?: string;
 }
 
 export interface QCDocument {
-  file_name: string;
-  doc_handle_id: string;
-  doc_type_name: string | null;
-  distinct_entity_type_count: number;
-  avg_confidence_percentage: number;
-  priority: string;
-  qc_completed_dt: string | null;
-  reviewer_assigned: string;
-  qc_assigned: string;
+  id: number;
+  first_named_insured: string;
+  document_count: number;
+  description_summary: string;
+  reviewer_assigned: string | null;
+  qc_assigned: string | null;
   status: string;
-  age_assigned: string;
+  is_active: boolean;
 }
 
 export interface GetQCDocumentsResponse {
@@ -161,10 +147,8 @@ export interface GetQCDocumentsResponse {
     total_pages: number;
   };
   stats?: {
-    "Assigned Documents": number;
-    "Assigned_files": number;
-    "Critical_files": number;
-    "Completed_today": number;
+    Assigned_accounts: number;
+    Completed_accounts: number;
   };
   files?: QCDocument[];
 }
@@ -183,7 +167,7 @@ export interface ReviewerAssignedToQCResponse {
 }
 
 export interface QCOpenFileRequest {
-  file_name: string;
+  first_named_insured: string;
 }
 
 export interface QCOpenFileResponse {
@@ -259,18 +243,14 @@ class DocumentOperationsAPI {
   // Assign Reviewer API
   async assignReviewer(params: AssignReviewerRequest): Promise<AssignReviewerResponse> {
     try {
-      // Only include qc_assigned if it exists
-      const requestBody: any = {
-        file_names: params.file_names,
-        reviewer: params.reviewer,
+      const requestBody = {
+        first_named_insured: params.first_named_insured,
+        reviewer_assigned: params.reviewer_assigned,
+        qc_assigned: params.qc_assigned,
         status: params.status,
       };
-      
-      if (params.qc_assigned) {
-        requestBody.qc_assigned = params.qc_assigned;
-      }
 
-      const response = await this.makeRequest<AssignReviewerResponse>('/assign-reviewer', {
+      const response = await this.makeRequest<AssignReviewerResponse>('/admin-assign-reviewer', {
         method: 'PUT',
         body: JSON.stringify(requestBody),
       });
@@ -283,34 +263,26 @@ class DocumentOperationsAPI {
   // Get Reviewer Documents API
   async getReviewerDocuments(params: GetReviewerDocumentsRequest): Promise<GetReviewerDocumentsResponse> {
     try {
-      // Build query parameters exactly as specified in the API documentation
       const query = new URLSearchParams();
-      query.append('reviewer', params.reviewer);
+      query.append('reviewer_assigned', params.reviewer_assigned);
       query.append('page', (params.page || 1).toString());
       query.append('limit', (params.limit || 25).toString());
-      query.append('doc_type_name', params.doc_type_name || 'All');
-      query.append('priority', params.priority || 'All');
-      query.append('status', params.status || 'All');
-      
-      // Add search parameter if provided
-      if (params.search) {
-        query.append('file_name', params.search);
-      }
-      
-      // Add doc_handle_id parameter if provided
-      if (params.doc_handle_id) {
-        query.append('doc_handle_id', params.doc_handle_id);
+
+      if (params.status) {
+        query.append('status', params.status);
       }
 
-      const queryString = query.toString();
-      const endpoint = `/get-all-reviewer-documents?${queryString}`;
+      if (params.first_named_insured) {
+        query.append('first_named_insured', params.first_named_insured);
+      }
+
+      const endpoint = `/reviewer-get-assigned-policies?${query.toString()}`;
 
       const response = await this.makeRequest<GetReviewerDocumentsResponse>(endpoint, {
         method: 'GET',
       });
       return response;
     } catch (error: any) {
-      // Mock response for development/fallback
       return {
         status: 'error',
         message: error.message || 'Failed to fetch reviewer documents',
@@ -318,7 +290,7 @@ class DocumentOperationsAPI {
         pagination: {
           page: params.page || 1,
           limit: params.limit || 25,
-          total_records_filtered: 0,
+          total_records: 0,
           total_pages: 0,
         },
       };
@@ -328,7 +300,7 @@ class DocumentOperationsAPI {
   // Review File API
   async reviewFile(params: ReviewFileRequest): Promise<ReviewFileResponse> {
     try {
-      const response = await this.makeRequest<ReviewFileResponse>('/review-open-file', {
+      const response = await this.makeRequest<ReviewFileResponse>('/reviewer-view-policy-documents', {
         method: 'POST',
         body: JSON.stringify(params),
       });
@@ -361,27 +333,26 @@ class DocumentOperationsAPI {
   // QC API Methods
   async getQCDocuments(params: GetQCDocumentsRequest): Promise<GetQCDocumentsResponse> {
     const queryParams = new URLSearchParams({
-      quality_control: params.quality_control,
+      qc_assigned: params.qc_assigned,
       page: (params.page || 1).toString(),
       limit: (params.limit || 25).toString(),
-      doc_type_name: params.doc_type_name || 'All',
-      priority: params.priority || 'All',
-      status: params.status || 'All',
-      reviewer: params.reviewer || 'All',
     });
-    
-    // Add doc_handle_id if provided
-    if (params.doc_handle_id) {
-      queryParams.append('doc_handle_id', params.doc_handle_id);
+
+    if (params.status) {
+      queryParams.append('status', params.status);
     }
 
-    return this.makeRequest<GetQCDocumentsResponse>(`/get-all-qc-documents?${queryParams}`, {
+    if (params.first_named_insured) {
+      queryParams.append('first_named_insured', params.first_named_insured);
+    }
+
+    return this.makeRequest<GetQCDocumentsResponse>(`/qc-get-assigned-policies?${queryParams}`, {
       method: 'GET',
     });
   }
 
   async qcOpenFile(params: QCOpenFileRequest): Promise<QCOpenFileResponse> {
-    return this.makeRequest<QCOpenFileResponse>('/qc-open-file', {
+    return this.makeRequest<QCOpenFileResponse>('/qc-view-policy-documents', {
       method: 'POST',
       body: JSON.stringify(params),
     });

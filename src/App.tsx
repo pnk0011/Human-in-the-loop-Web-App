@@ -116,7 +116,7 @@ const AppContent = React.memo(function AppContent() {
         const { documentOperationsAPI } = await import('./services/documentOperationsAPI');
         
         // Try to fetch real document data from API
-        const response = await documentOperationsAPI.reviewFile({ file_name: item.document });
+        const response = await documentOperationsAPI.reviewFile({ first_named_insured: item.accountName || item.document });
         
         if (response.success && response.data?.document) {
           const apiDoc = response.data.document;
@@ -133,9 +133,9 @@ const AppContent = React.memo(function AppContent() {
           // Only show fields where qc_action is null or "sendback"
           document = {
             id: apiDoc.id || item.id,
-            documentName: apiDoc.documentName || item.document,
-            documentType: apiDoc.documentType || item.type,
-            priority: item.priority,
+            documentName: apiDoc.documentName || item.accountName || item.document,
+            documentType: apiDoc.documentType || 'Account',
+            priority: 'High',
             documentImage: apiDoc.documentImage, // Include document image URL from API
             allFields: allFields, // Store all fields for submission
             fields: visibleFields.map((field, index) => ({
@@ -158,9 +158,9 @@ const AppContent = React.memo(function AppContent() {
         // Fallback to mock data with original look and feel
         document = {
           id: item.id,
-          documentName: item.document,
-          documentType: item.type,
-          priority: item.priority,
+          documentName: item.accountName || item.document,
+          documentType: 'Account',
+          priority: 'High',
           fields: [
             {
               id: "field-1",

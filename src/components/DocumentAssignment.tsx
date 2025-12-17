@@ -14,9 +14,9 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from './ui/pagination';
-import { Users, ChevronUp, ChevronDown, Filter, Loader2, FileText, AlertCircle, RefreshCw } from 'lucide-react';
+import { Users, ChevronUp, ChevronDown, Loader2, FileText, AlertCircle, RefreshCw } from 'lucide-react';
 import { toast } from "sonner";
-import { documentAPI, Document, GetDocumentsRequest } from '../services/documentAPI';
+import { documentAPI, AccountDocument, GetDocumentsRequest } from '../services/documentAPI';
 import { documentOperationsAPI, AssignReviewerRequest } from '../services/documentOperationsAPI';
 
 // Document interface is imported from documentAPI service
@@ -30,22 +30,35 @@ interface User {
   currentLoad: number | string;
 }
 
-type SortField = 'documentName' | 'confidence' | 'priority' | 'uploadDate';
+type SortField = 'accountName' | 'documentCount' | 'status' | 'reviewerAssigned' | 'qcAssigned';
 type SortDirection = 'asc' | 'desc';
+
+interface AccountRow {
+  id: string;
+  accountName: string;
+  documentCount: number;
+  descriptionSummary: string;
+  reviewerAssigned: string | null;
+  qcAssigned: string | null;
+  status: 'Unassigned' | 'Assigned' | 'In Progress' | 'Completed';
+  isActive: boolean;
+}
 
 // Mock documents removed - now using real API data
 
 // Mock users removed - now using real API data
 
 export function DocumentAssignment() {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const emptyStats = {
+    Total_accounts: 0,
+    Assigned_accounts: 0,
+    Completed_accounts: 0,
+  };
+  const [documents, setDocuments] = useState<AccountRow[]>([]);
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [typeFilter, setTypeFilter] = useState('All');
-  const [priorityFilter, setPriorityFilter] = useState('All');
-  const [docIdFilter, setDocIdFilter] = useState('All');
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,20 +73,11 @@ export function DocumentAssignment() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
-  const [stats, setStats] = useState({
-    "Total Documents": 0,
-    "Total Files": 0,
-    "Assigned Files": 0,
-    "Completed Files": 0,
-  });
+  const [stats, setStats] = useState(emptyStats);
   
   // Loading state for reviewers
   const [isLoadingAllReviewers, setIsLoadingAllReviewers] = useState(false);
   
-  // State for unique document IDs
-  const [uniqueDocIds, setUniqueDocIds] = useState<string[]>([]);
-  const [isLoadingDocIds, setIsLoadingDocIds] = useState(false);
-
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -83,33 +87,10 @@ export function DocumentAssignment() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Load unique document IDs on component mount
-  useEffect(() => {
-    const loadUniqueDocIds = async () => {
-      setIsLoadingDocIds(true);
-      try {
-        const response = await documentAPI.getUniqueDocumentIds();
-        
-        // Check for different possible response structures
-        if (response.status === 'success') {
-          // Try different possible field names
-          const docIds = response.doc_handle_ids || [];
-          setUniqueDocIds(Array.isArray(docIds) ? docIds : []);
-        }
-      } catch (error) {
-        // Failed to load unique document IDs
-      } finally {
-        setIsLoadingDocIds(false);
-      }
-    };
-    
-    loadUniqueDocIds();
-  }, []);
-
-  // Load documents on component mount and when filters change
+  // Load accounts on component mount and when filters change
   useEffect(() => {
     loadDocuments();
-  }, [currentPage, debouncedSearchQuery, statusFilter, typeFilter, priorityFilter, docIdFilter, itemsPerPage]);
+  }, [currentPage, debouncedSearchQuery, statusFilter, itemsPerPage]);
 
   const loadDocuments = async () => {
     setIsLoading(true);
@@ -118,33 +99,28 @@ export function DocumentAssignment() {
       const params: GetDocumentsRequest = {
         page: currentPage,
         limit: itemsPerPage,
-        file_name: debouncedSearchQuery || undefined,
-        doc_type_name: typeFilter !== 'All' ? typeFilter : undefined,
-        priority: priorityFilter !== 'All' ? priorityFilter : undefined,
+        search_term: debouncedSearchQuery || undefined,
         status: statusFilter !== 'All' ? statusFilter : undefined,
-        doc_handle_id: docIdFilter !== 'All' ? docIdFilter : undefined,
       };
 
       const response = await documentAPI.getDocuments(params);
       
-      if (response.status === 'success' && response.files) {
+      if (response.status === 'success' && Array.isArray(response.files)) {
         // Set stats from API response
         if (response.stats) {
           setStats(response.stats);
         }
         
         // Convert API response to match component expectations
-        const formattedDocuments = response.files.map(doc => ({
-          ...doc,
-          id: `${doc.file_name}_${doc.doc_handle_id}`, // Use combination of file name and doc_handle_id as unique ID
-          documentName: doc.file_name,
-          documentType: doc.doc_type_name || 'Unknown',
-          fieldsCount: doc.distinct_entity_type_count,
-          confidence: Math.round(doc.avg_confidence_percentage),
-          priority: doc.priority,
-          uploadDate: doc.latest_update_datetime ? doc.latest_update_datetime.split(' ')[0] : new Date().toISOString().split('T')[0], // Extract date part
+        const formattedDocuments: AccountRow[] = response.files.map((doc: AccountDocument) => ({
+          id: doc.id.toString(),
+          accountName: doc.first_named_insured,
+          documentCount: doc.document_count,
+          descriptionSummary: doc.description_summary,
+          reviewerAssigned: doc.reviewer_assigned,
+          qcAssigned: doc.qc_assigned,
           status: getStatusFromApi(doc.status),
-          assignedTo: doc.reviewer_assigned || undefined,
+          isActive: doc.is_active,
         }));
         
         setDocuments(formattedDocuments);
@@ -161,19 +137,21 @@ export function DocumentAssignment() {
           setCurrentPageFromAPI(1);
         }
       } else {
-        toast.error(response.message || 'Failed to load documents');
+        toast.error(response.message || 'Failed to load accounts');
         setDocuments([]);
         setTotalDocuments(0);
         setTotalPages(0);
         setCurrentPageFromAPI(1);
+        setStats(emptyStats);
         setHasApiError(true);
       }
     } catch (error: any) {
-      toast.error('Failed to load documents. Please try again.');
+      toast.error('Failed to load accounts. Please try again.');
       setDocuments([]);
       setTotalDocuments(0);
       setTotalPages(0);
       setCurrentPageFromAPI(1);
+      setStats(emptyStats);
       setHasApiError(true);
     } finally {
       setIsLoading(false);
@@ -281,16 +259,16 @@ export function DocumentAssignment() {
 
     setIsAssigning(true);
     try {
-      // Get file names from selected documents
-      const fileNames = Array.from(selectedDocuments).map(docId => {
+      // Get account names for selected rows
+      const accountNames = Array.from(selectedDocuments).map(docId => {
         const doc = documents.find(d => d.id === docId);
-        return doc?.documentName || docId;
+        return doc?.accountName || docId;
       });
 
       const assignRequest: AssignReviewerRequest = {
-        file_names: fileNames,
-        reviewer: user.email,
-        qc_assigned: user.quality_control || undefined, // Include quality_control from user object
+        first_named_insured: accountNames,
+        reviewer_assigned: user.email,
+        qc_assigned: user.quality_control || undefined,
         status: '2'
       };
 
@@ -300,7 +278,7 @@ export function DocumentAssignment() {
         // Show success toast with document count and reviewer name
         const documentCount = selectedDocuments.size;
         toast.success(
-          `${documentCount} ${documentCount === 1 ? 'document has' : 'documents have'} been successfully assigned to ${user.name}`,
+          `${documentCount} ${documentCount === 1 ? 'account has' : 'accounts have'} been successfully assigned to ${user.name}`,
           {
             duration: 4000,
           }
@@ -310,7 +288,7 @@ export function DocumentAssignment() {
         setDocuments((prev) =>
           prev.map((doc) =>
             selectedDocuments.has(doc.id)
-              ? { ...doc, status: 'Assigned' as const, assignedTo: user.name }
+              ? { ...doc, status: 'Assigned' as const, reviewerAssigned: user.name }
               : doc
           )
         );
@@ -319,13 +297,13 @@ export function DocumentAssignment() {
         setIsAssignDialogOpen(false);
         setSelectedUser('');
         
-        // Reload documents to get updated status from API
+        // Reload accounts to get updated status from API
         loadDocuments();
       } else {
-        toast.error('Failed to assign documents');
+        toast.error('Failed to assign accounts');
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to assign documents');
+      toast.error(error.message || 'Failed to assign accounts');
     } finally {
       setIsAssigning(false);
     }
@@ -351,9 +329,12 @@ export function DocumentAssignment() {
       let aVal: any = a[sortField];
       let bVal: any = b[sortField];
 
-      if (sortField === 'uploadDate') {
-        aVal = new Date(aVal).getTime();
-        bVal = new Date(bVal).getTime();
+      if (sortField === 'documentCount') {
+        aVal = Number(aVal);
+        bVal = Number(bVal);
+      } else {
+        aVal = (aVal ?? '').toString().toLowerCase();
+        bVal = (bVal ?? '').toString().toLowerCase();
       }
 
       if (sortDirection === 'asc') {
@@ -379,25 +360,6 @@ export function DocumentAssignment() {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'High':
-        return 'text-[#FF0081]';
-      case 'Medium':
-        return 'text-[#FFC018]';
-      case 'Low':
-        return 'text-[#0292DC]';
-      default:
-        return 'text-[#80989A]';
-    }
-  };
-
-  const getConfidenceBadgeColor = (confidence: number) => {
-    if (confidence >= 70) return 'bg-[#FFC018] text-white';
-    if (confidence >= 50) return 'bg-[#FFC018] text-white';
-    return 'bg-[#FF0081] text-white';
-  };
-
   // Server-side pagination calculations
   const startIndex = (currentPageFromAPI - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + documents.length, totalDocuments);
@@ -414,42 +376,32 @@ export function DocumentAssignment() {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Documents</div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Accounts</div>
           {isLoading ? (
             <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
           ) : (
-            <div className="text-[#012F66] dark:text-white text-3xl font-bold">{stats["Total Documents"]}</div>
+            <div className="text-[#012F66] dark:text-white text-3xl font-bold">{stats.Total_accounts}</div>
           )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Files</div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Assigned Accounts</div>
           {isLoading ? (
             <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
           ) : (
             <div className="text-[#0292DC] text-3xl font-bold">
-              {stats["Total Files"]}
+              {stats.Assigned_accounts}
             </div>
           )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Assigned Files</div>
-          {isLoading ? (
-            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
-          ) : (
-            <div className="text-[#FFC018] text-3xl font-bold">
-              {stats["Assigned Files"]}
-            </div>
-          )}
-        </div>
-        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Completed Files</div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Completed Accounts</div>
           {isLoading ? (
             <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
           ) : (
             <div className="text-green-600 text-3xl font-bold">
-              {stats["Completed Files"]}
+              {stats.Completed_accounts}
             </div>
           )}
         </div>
@@ -458,12 +410,12 @@ export function DocumentAssignment() {
       {/* Filters and Actions */}
       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-        <h3 className="text-[#012F66] dark:text-white mb-4">Filter Documents</h3>
+        <h3 className="text-[#012F66] dark:text-white mb-4">Filter Accounts</h3>
           <div className="flex flex-wrap items-center gap-4">
             {isLoading && (
               <div className="flex items-center gap-2 text-[#80989A] dark:text-[#a0a0a0]">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Loading documents...</span>
+                <span className="text-sm">Loading accounts...</span>
               </div>
             )}
             {/* <div className="flex items-center gap-2">
@@ -472,7 +424,7 @@ export function DocumentAssignment() {
             </div> */}
             <div className="w-full md:w-auto md:min-w-[150px]">
               <Input
-                placeholder="Search documents..."
+                placeholder="Search accounts..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
@@ -490,78 +442,6 @@ export function DocumentAssignment() {
                   <SelectItem value="1">Assigned</SelectItem>
                   <SelectItem value="2">In Progress</SelectItem>
                   <SelectItem value="3">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full md:w-auto md:min-w-[150px]">
-              <label className="block text-[#012F66] dark:text-white mb-2">Document Type</label>
-              <Select value={typeFilter} onValueChange={(value) => handleFilterChange(setTypeFilter, value)}>
-                <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All Types</SelectItem>
-                  <SelectItem value="Large Claim Review Form">Large Claim Review Form</SelectItem>
-                  <SelectItem value="Actuarial/UW/Pricing Tools">Actuarial/UW/Pricing Tools</SelectItem>
-                  <SelectItem value="Reinsurance">Reinsurance</SelectItem>
-                  <SelectItem value="Indication/Quote">Indication/Quote</SelectItem>
-                  <SelectItem value="Endorsement">Endorsement</SelectItem>
-                  <SelectItem value="Green Card">Green Card</SelectItem>
-                  <SelectItem value="Finance Agreement">Finance Agreement</SelectItem>
-                  <SelectItem value="Policy Form">Policy Form</SelectItem>
-                  <SelectItem value="Additional Risk">Additional Risk</SelectItem>
-                  <SelectItem value="Reporting Endorsement">Reporting Endorsement</SelectItem>
-                  <SelectItem value="zDup - Loss Run">zDup - Loss Run</SelectItem>
-                  <SelectItem value="Loss Run">Loss Run</SelectItem>
-                  <SelectItem value="zDup - Stat Notice/Non-Renewal">zDup - Stat Notice/Non-Renewal</SelectItem>
-                  <SelectItem value="Expiration/Effective/Retro Date">Expiration/Effective/Retro Date</SelectItem>
-                  <SelectItem value="Return Mail">Return Mail</SelectItem>
-                  <SelectItem value="Policy">Policy</SelectItem>
-                  <SelectItem value="Assessments">Assessments</SelectItem>
-                  <SelectItem value="Invoice">Invoice</SelectItem>
-                  <SelectItem value="Application">Application</SelectItem>
-                  <SelectItem value="Stat Notice/Non-Renewal">Stat Notice/Non-Renewal</SelectItem>
-                  <SelectItem value="zDup - Broker of Record (BOR)">zDup - Broker of Record (BOR)</SelectItem>
-                  <SelectItem value="Address (not practice loc)">Address (not practice loc)</SelectItem>
-                  <SelectItem value="zDup - Actuarial/UW/Pricing Tools">zDup - Actuarial/UW/Pricing Tools</SelectItem>
-                  <SelectItem value="zDup - Indication/Quote">zDup - Indication/Quote</SelectItem>
-                  <SelectItem value="Cash Application">Cash Application</SelectItem>
-                  <SelectItem value="Processing Form">Processing Form</SelectItem>
-                  <SelectItem value="Referral/Documentation">Referral/Documentation</SelectItem>
-                  <SelectItem value="Coverage">Coverage</SelectItem>
-                  <SelectItem value="Broker of Record (BOR)">Broker of Record (BOR)</SelectItem>
-                  <SelectItem value="Fund Documentation">Fund Documentation</SelectItem>
-                  <SelectItem value="Cancellation">Cancellation</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full md:w-auto md:min-w-[150px]">
-              <label className="block text-[#012F66] dark:text-white mb-2">Priority</label>
-              <Select value={priorityFilter} onValueChange={(value) => handleFilterChange(setPriorityFilter, value)}>
-                <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white">
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All Priority</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="Low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full md:w-auto md:min-w-[150px]">
-              <label className="block text-[#012F66] dark:text-white mb-2">Document ID</label>
-              <Select value={docIdFilter} onValueChange={(value) => handleFilterChange(setDocIdFilter, value)}>
-                <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white" disabled={isLoadingDocIds}>
-                  <SelectValue placeholder={isLoadingDocIds ? "Loading IDs..." : "Document ID"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All Document IDs</SelectItem>
-                  {uniqueDocIds.map((docId) => (
-                    <SelectItem key={docId} value={docId}>
-                      {docId}
-                    </SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -586,15 +466,12 @@ export function DocumentAssignment() {
                 </SelectContent>
               </Select>
             </div>
-            {(searchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All' || docIdFilter !== 'All') && (
+            {(searchQuery || statusFilter !== 'All') && (
               <Button
                 onClick={() => {
                   setSearchQuery("");
                   setDebouncedSearchQuery("");
                   setStatusFilter("All");
-                  setTypeFilter("All");
-                  setPriorityFilter("All");
-                  setDocIdFilter("All");
                   setCurrentPage(1);
                 }}
                 variant="outline"
@@ -626,7 +503,7 @@ export function DocumentAssignment() {
         </div>
       </div>
 
-      {/* Documents Table */}
+      {/* Accounts Table */}
       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm overflow-hidden border border-[#E5E7EB] dark:border-[#3a3a3a]">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -638,37 +515,40 @@ export function DocumentAssignment() {
                     onCheckedChange={toggleAll}
                   />
                 </th>
+                <th
+                  className="px-6 py-4 text-left text-[#012F66] dark:text-white cursor-pointer hover:bg-[#E5E7EB] dark:hover:bg-[#2a2a2a]"
+                  onClick={() => handleSort('accountName')}
+                >
+                  Account {getSortIcon('accountName')}
+                </th>
+                <th
+                  className="px-6 py-4 text-left text-[#012F66] dark:text-white cursor-pointer hover:bg-[#E5E7EB] dark:hover:bg-[#2a2a2a]"
+                  onClick={() => handleSort('documentCount')}
+                >
+                  Documents {getSortIcon('documentCount')}
+                </th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                  Document ID
+                  Description
                 </th>
                 <th
                   className="px-6 py-4 text-left text-[#012F66] dark:text-white cursor-pointer hover:bg-[#E5E7EB] dark:hover:bg-[#2a2a2a]"
-                  onClick={() => handleSort('documentName')}
+                  onClick={() => handleSort('reviewerAssigned')}
                 >
-                  Filename {getSortIcon('documentName')}
-                </th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Type</th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Fields</th>
-                <th
-                  className="px-6 py-4 text-left text-[#012F66] dark:text-white cursor-pointer hover:bg-[#E5E7EB] dark:hover:bg-[#2a2a2a]"
-                  onClick={() => handleSort('confidence')}
-                >
-                  Avg Confidence {getSortIcon('confidence')}
+                  Reviewer {getSortIcon('reviewerAssigned')}
                 </th>
                 <th
                   className="px-6 py-4 text-left text-[#012F66] dark:text-white cursor-pointer hover:bg-[#E5E7EB] dark:hover:bg-[#2a2a2a]"
-                  onClick={() => handleSort('priority')}
+                  onClick={() => handleSort('qcAssigned')}
                 >
-                  Priority {getSortIcon('priority')}
+                  QC {getSortIcon('qcAssigned')}
                 </th>
                 <th
                   className="px-6 py-4 text-left text-[#012F66] dark:text-white cursor-pointer hover:bg-[#E5E7EB] dark:hover:bg-[#2a2a2a]"
-                  onClick={() => handleSort('uploadDate')}
+                  onClick={() => handleSort('status')}
                 >
-                  Upload Date {getSortIcon('uploadDate')}
+                  Status {getSortIcon('status')}
                 </th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Status</th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Assigned To</th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Active</th>
               </tr>
             </thead>
             <tbody>
@@ -722,31 +602,27 @@ export function DocumentAssignment() {
                     />
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-[#80989A] dark:text-[#a0a0a0] font-mono">{doc.doc_handle_id}</div>
+                    <div className="text-[#012F66] dark:text-white font-semibold">{doc.accountName}</div>
+                    <div className="text-xs text-[#80989A] dark:text-[#a0a0a0]">ID: {doc.id}</div>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="text-[#012F66] dark:text-white">{doc.documentName}</div>
-                  </td>
-                  <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0]">{doc.documentType}</td>
-                  <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.fieldsCount} fields</td>
-                  <td className="px-6 py-4">
-                    <Badge className={getConfidenceBadgeColor(doc.confidence)}>
-                      {doc.confidence}%
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`flex items-center gap-1 ${getPriorityColor(doc.priority)}`}>
-                      <span className="w-2 h-2 rounded-full bg-current"></span>
-                      {doc.priority}
-                    </span>
+                  <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentCount}</td>
+                  <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0] max-w-xs">
+                    {doc.descriptionSummary || '-'}
                   </td>
                   <td className="px-6 py-4 text-[#012F66] dark:text-white">
-                    {new Date(doc.uploadDate).toLocaleDateString()}
+                    {doc.reviewerAssigned || '-'}
+                  </td>
+                  <td className="px-6 py-4 text-[#012F66] dark:text-white">
+                    {doc.qcAssigned || '-'}
                   </td>
                   <td className="px-6 py-4">
                     <Badge className={getStatusBadgeColor(doc.status)}>{doc.status}</Badge>
                   </td>
-                  <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.assignedTo || '-'}</td>
+                  <td className="px-6 py-4">
+                    <Badge className={doc.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}>
+                      {doc.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </td>
                 </tr>
                 ))
               )}
@@ -761,23 +637,20 @@ export function DocumentAssignment() {
               <FileText className="w-12 h-12 text-[#80989A] dark:text-[#a0a0a0]" />
             </div>
             <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
-              No Documents Found
+              No Accounts Found
             </h3>
             <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-6 max-w-md">
-              {debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All' || docIdFilter !== 'All'
-                ? "No documents match your current filters. Try adjusting your search criteria or reset the filters."
-                : "No documents have been uploaded yet."
+              {debouncedSearchQuery || statusFilter !== 'All'
+                ? "No accounts match your current filters. Try adjusting your search criteria or reset the filters."
+                : "No accounts are available yet."
               }
             </p>
-            {(debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All' || docIdFilter !== 'All') && (
+            {(debouncedSearchQuery || statusFilter !== 'All') && (
               <Button
                 onClick={() => {
                   setSearchQuery("");
                   setDebouncedSearchQuery("");
                   setStatusFilter("All");
-                  setTypeFilter("All");
-                  setPriorityFilter("All");
-                  setDocIdFilter("All");
                   setCurrentPage(1);
                 }}
                 variant="outline"
@@ -797,10 +670,10 @@ export function DocumentAssignment() {
               <AlertCircle className="w-12 h-12 text-red-500" />
             </div>
             <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
-              Failed to Load Documents
+              Failed to Load Accounts
             </h3>
             <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-6 max-w-md">
-              There was an error loading the document data. Please check your connection and try again.
+              There was an error loading the account data. Please check your connection and try again.
             </p>
             <div className="flex gap-3">
               <Button
@@ -811,15 +684,12 @@ export function DocumentAssignment() {
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Retry
               </Button>
-              {(debouncedSearchQuery || statusFilter !== 'All' || typeFilter !== 'All' || priorityFilter !== 'All' || docIdFilter !== 'All') && (
+              {(debouncedSearchQuery || statusFilter !== 'All') && (
                 <Button
                   onClick={() => {
                     setSearchQuery("");
                     setDebouncedSearchQuery("");
                     setStatusFilter("All");
-                    setTypeFilter("All");
-                    setPriorityFilter("All");
-                    setDocIdFilter("All");
                     setCurrentPage(1);
                     loadDocuments();
                   }}
@@ -838,7 +708,7 @@ export function DocumentAssignment() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between p-4 border-t border-[#E5E7EB] dark:border-[#3a3a3a]">
             <div className="text-[#80989A] dark:text-[#a0a0a0]">
-              Showing {startIndex + 1} to {endIndex} of {totalDocuments} documents
+              Showing {startIndex + 1} to {endIndex} of {totalDocuments} accounts
               {isLoading && <span className="ml-2">(Loading...)</span>}
             </div>
             <Pagination>
