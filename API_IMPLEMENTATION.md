@@ -175,6 +175,119 @@ Sample Response
 
 }
 
+
+
+=====================================================================================================================
+ New APIs
+
+ 1
+
+ Request Type
+
+GET
+
+API Url
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/admin-get-unique-policies?page=1&limit=10&search_term=LLC&status=2
+
+Request Body
+
+ 
+
+ 
+
+2
+
+Request Type
+
+PUT
+
+API Url
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/admin-assign-reviewer
+
+Request Body
+
+{
+    "first_named_insured": [
+        "ORION MANOR ALF LLC",
+        "CORNERSTONE REALTY HOLDINGS LLC"
+    ],
+    "reviewer_assigned": Binoj.Cherian@medpro.com,
+    "qc_assigned": Pankaj.Singh@medpro.com,
+    "status": "2"
+}
+
+ 
+
+3
+
+Request Type
+
+GET
+
+API Url
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/reviewer-get-assigned-policies?reviewer_assigned=Binoj.Cherian@medpro.com&page=1&limit=25&status=2
+
+Request Body
+
+ 
+
+ 
+
+4
+
+Request Type
+
+POST
+
+API Url
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/reviewer-view-policy-documents
+
+Request Body
+
+{
+  "first_named_insured": "ORION MANOR ALF LLC"
+}
+
+ 
+
+5
+
+Request Type
+
+GET
+
+API Url
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/qc-get-assigned-policies?qc_assigned=Pankaj.Singh@medpro.com&page=1&limit=25&status=3
+
+Request Body
+
+ 
+
+ 
+
+6
+
+Request Type
+
+POST
+
+API Url
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/qc-view-policy-documents
+
+Request Body
+
+{
+  "first_named_insured": "CORNERSTONE REALTY HOLDINGS LLC"
+}
+
+ 
+
  
 
  
