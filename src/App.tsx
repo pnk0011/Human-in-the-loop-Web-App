@@ -106,6 +106,30 @@ const AppContent = React.memo(function AppContent() {
     setTheme((prev) => (prev === "light" ? "dark" : "light"));
   }, []);
 
+  const buildFieldsFromObject = (obj: Record<string, any>) => {
+    const skipKeys = new Set([
+      'id','document_id','document_name','doc_handle','doc_type_name','extraction_type','create_date_time','processed_flag',
+      'input_s3_uri','document_s3_uri','first_named_insured','description','supplemental_description'
+    ]);
+    const fields: any[] = [];
+    Object.entries(obj || {}).forEach(([key, value]) => {
+      if (skipKeys.has(key)) return;
+      if (key.endsWith('_confidence') || key.endsWith('_page_no')) return;
+      if (value === undefined || value === null || value === '') return;
+      const confidence = obj[`${key}_confidence`];
+      fields.push({
+        id: `${key}`,
+        fieldName: key.replace(/_/g, ' '),
+        fieldDescription: key.replace(/_/g, ' '),
+        extractedValue: String(value).trim(),
+        confidence: Math.round(Number(confidence) * 100) || 0,
+        expectedFormat: '',
+        location: { x: 0, y: 0, width: 0, height: 0 },
+      });
+    });
+    return fields;
+  };
+
   const handleValidateClick = useCallback(async (item: any) => {
     return withLoading(async () => {
       // Try to load real API data first, fallback to mock data
@@ -118,36 +142,26 @@ const AppContent = React.memo(function AppContent() {
         // Try to fetch real document data from API
         const response = await documentOperationsAPI.reviewFile({ first_named_insured: item.accountName || item.document });
         
-        if (response.success && response.data?.document) {
-          const apiDoc = response.data.document;
-          
-          // Filter fields to show only those where qc_action is null or "sendback"
-          const visibleFields = apiDoc.fields.filter(field => 
-            !field.qc_action || field.qc_action === 'sendback'
-          );
-          
-          // Store all fields for submission (including those with qc_action not null)
-          const allFields = apiDoc.fields;
-          
-          // Transform API response to component format
-          // Only show fields where qc_action is null or "sendback"
+        if (response?.documents && response.documents.length > 0) {
+          const docPayload = response.documents[0];
+          const exposureFields = buildFieldsFromObject((docPayload.exposure_data || [])[0] || {});
+          const accountFields = buildFieldsFromObject((docPayload.account_data || [])[0] || {});
+          const lossFields = buildFieldsFromObject((docPayload.loss_data || [])[0] || {});
+
+          const defaultFields = exposureFields.length ? exposureFields : accountFields.length ? accountFields : lossFields;
+
           document = {
-            id: apiDoc.id || item.id,
-            documentName: apiDoc.documentName || item.accountName || item.document,
-            documentType: apiDoc.documentType || 'Account',
+            id: docPayload.doc_handle || item.id,
+            documentName: response.first_named_insured || item.accountName || item.document,
+            documentType: 'Account',
             priority: 'High',
-            documentImage: apiDoc.documentImage, // Include document image URL from API
-            allFields: allFields, // Store all fields for submission
-            fields: visibleFields.map((field, index) => ({
-              id: `field-${index + 1}`,
-              fieldName: field.entity_type,
-              fieldDescription: `AI extracted ${field.entity_type.toLowerCase()} from document`,
-              extractedValue: field.updated_entity_value || field.entity_value,
-              confidence: field.confidence,
-              expectedFormat: 'Text',
-              qcComment: field.qc_comment || undefined, // Include QC comment if available
-              location: { x: 48, y: 175 + (index * 40), width: 180, height: 24 },
-            })),
+            documentImage: docPayload.presigned_url,
+            tabbedFields: [
+              { key: 'loss', label: 'Loss Data', fields: lossFields },
+              { key: 'account', label: 'Account Data', fields: accountFields },
+              { key: 'exposure', label: 'Exposure Data', fields: exposureFields },
+            ],
+            fields: defaultFields,
           };
         } else {
           throw new Error('API response failed');
@@ -161,55 +175,12 @@ const AppContent = React.memo(function AppContent() {
           documentName: item.accountName || item.document,
           documentType: 'Account',
           priority: 'High',
-          fields: [
-            {
-              id: "field-1",
-              fieldName: "Total Amount Due",
-              fieldDescription:
-                "The total amount to be paid for this invoice",
-              extractedValue: "$12,847.50",
-              confidence: 67,
-              expectedFormat: "$X,XXX.XX",
-              location: { x: 48, y: 415, width: 220, height: 28 },
-            },
-            {
-              id: "field-2",
-              fieldName: "Policy Number",
-              fieldDescription: "The unique policy identifier",
-              extractedValue: "POL-2024-5678",
-              confidence: 85,
-              expectedFormat: "POL-YYYY-XXXX",
-              location: { x: 48, y: 175, width: 180, height: 24 },
-            },
-            {
-              id: "field-3",
-              fieldName: "Effective Date",
-              fieldDescription:
-                "The date when the policy becomes effective",
-              extractedValue: "January 1, 2025",
-              confidence: 92,
-              expectedFormat: "Month DD, YYYY",
-              location: { x: 48, y: 265, width: 160, height: 24 },
-            },
-            {
-              id: "field-4",
-              fieldName: "Invoice Number",
-              fieldDescription: "The unique invoice identifier",
-              extractedValue: "INV-2024-0947",
-              confidence: 78,
-              expectedFormat: "INV-YYYY-XXXX",
-              location: { x: 48, y: 155, width: 180, height: 24 },
-            },
-            {
-              id: "field-5",
-              fieldName: "Due Date",
-              fieldDescription: "The date when payment is due",
-              extractedValue: "April 15, 2024",
-              confidence: 88,
-              expectedFormat: "Month DD, YYYY",
-              location: { x: 48, y: 245, width: 160, height: 24 },
-            },
+          tabbedFields: [
+            { key: 'loss', label: 'Loss Data', fields: [] },
+            { key: 'account', label: 'Account Data', fields: [] },
+            { key: 'exposure', label: 'Exposure Data', fields: [] },
           ],
+          fields: [],
         };
       }
 

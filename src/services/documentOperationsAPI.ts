@@ -66,35 +66,20 @@ export interface ReviewFileRequest {
   first_named_insured: string;
 }
 
-export interface ReviewFileEntity {
-  entity_type: string;
-  entity_value: string;
-  updated_entity_value?: string | null;
-  reviewer_action?: 'accept' | 'correct' | 'reject' | null;
-  qc_action?: 'approve' | 'reject' | 'sendback' | null;
-  qc_comment?: string | null;
-  confidence: number;
-  begin_offset?: string;
-  end_offset?: string;
-}
-
-export interface ReviewFileDocument {
-  id: string;
-  documentName: string;
-  documentType: string | null;
-  priority: string;
-  fields: ReviewFileEntity[];
-  documentImage: string;
-  reviewer_updated_dt: string;
-  reviewer: string;
-  qc_action?: string | null;
+export interface ReviewerPolicyDocument {
+  doc_handle: string;
+  presigned_url: string;
+  exposure_data?: Record<string, any>[];
+  account_data?: Record<string, any>[];
+  loss_data?: Record<string, any>[];
 }
 
 export interface ReviewFileResponse {
-  success: boolean;
-  data?: {
-    document: ReviewFileDocument;
-  };
+  status?: string;
+  message?: string;
+  first_named_insured?: string;
+  document_count?: number;
+  documents?: ReviewerPolicyDocument[];
   error?: string;
 }
 

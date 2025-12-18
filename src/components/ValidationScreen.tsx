@@ -54,6 +54,7 @@ interface ValidationDocument {
   documentType: string;
   priority: "High" | "Medium" | "Low";
   fields: ExtractedField[];
+  tabbedFields?: { key: string; label: string; fields: ExtractedField[] }[];
   documentImage?: string; // URL to the document image
 }
 
@@ -90,8 +91,13 @@ export function ValidationScreen({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages] = useState(3);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const tabbedFields = document.tabbedFields && document.tabbedFields.length > 0
+    ? document.tabbedFields.filter((t) => t.fields && t.fields.length > 0)
+    : [{ key: 'default', label: 'Fields', fields: document.fields }];
+  const allFields = tabbedFields.flatMap((t) => t.fields);
+  const [activeTab, setActiveTab] = useState(tabbedFields[0]?.key || 'default');
   const [selectedFieldId, setSelectedFieldId] =
-    useState<string>(document.fields[0]?.id || "");
+    useState<string>(allFields[0]?.id || "");
   const [validatedToday] = useState(47);
   const [avgTime] = useState("0:32");
   const [accuracy] = useState(94);
@@ -105,14 +111,17 @@ export function ValidationScreen({
     Record<string, FieldValidation>
   >(
     Object.fromEntries(
-      document.fields.map((field) => [
+      allFields.map((field) => [
         field.id,
         { fieldId: field.id, action: null },
       ]),
     ),
   );
 
-  const selectedField = document.fields.find(
+  const currentTab = tabbedFields.find((t) => t.key === activeTab) || tabbedFields[0];
+  const currentFields = currentTab?.fields || [];
+
+  const selectedField = allFields.find(
     (f) => f.id === selectedFieldId,
   );
   const currentValidation = fieldValidations[selectedFieldId];
@@ -136,19 +145,19 @@ export function ValidationScreen({
         }
       } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
-        const currentIndex = document.fields.findIndex(
+        const currentIndex = currentFields.findIndex(
           (f) => f.id === selectedFieldId,
         );
         if (
           e.key === "ArrowDown" &&
-          currentIndex < document.fields.length - 1
+          currentIndex < currentFields.length - 1
         ) {
           setSelectedFieldId(
-            document.fields[currentIndex + 1].id,
+            currentFields[currentIndex + 1].id,
           );
         } else if (e.key === "ArrowUp" && currentIndex > 0) {
           setSelectedFieldId(
-            document.fields[currentIndex - 1].id,
+            currentFields[currentIndex - 1].id,
           );
         }
       }
@@ -157,7 +166,7 @@ export function ValidationScreen({
     window.addEventListener("keydown", handleKeyPress);
     return () =>
       window.removeEventListener("keydown", handleKeyPress);
-  }, [selectedFieldId, fieldValidations, document.fields]);
+  }, [selectedFieldId, fieldValidations, currentFields]);
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(prev + 25, 400));
@@ -233,7 +242,7 @@ export function ValidationScreen({
         validation.action === "correct" &&
         !validation.correctedValue
       ) {
-        const field = document.fields.find(
+        const field = allFields.find(
           (f) => f.id === validation.fieldId,
         );
         alert(
@@ -469,12 +478,30 @@ export function ValidationScreen({
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
             {/* Fields List */}
             <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-4 border-[#E5E7EB] dark:border-[#3a3a3a]">
-              <h3 className="text-[#012F66] dark:text-white mb-3">
-                Fields to Validate ({document.fields.length})
-              </h3>
-              <ScrollArea className="h-[180px]">
+              {tabbedFields.length > 1 && (
+                <div className="flex items-center gap-2 mb-3">
+                  {tabbedFields.map((tab) => (
+                    <Button
+                      key={tab.key}
+                      variant={activeTab === tab.key ? "default" : "outline"}
+                      size="sm"
+                      className={activeTab === tab.key ? "bg-[#0292DC] text-white" : "border-[#D0D5DD] dark:border-[#3a3a3a] text-[#012F66] dark:text-white"}
+                      onClick={() => {
+                        setActiveTab(tab.key);
+                        const nextFields = tab.fields;
+                        if (nextFields.length > 0) {
+                          setSelectedFieldId(nextFields[0].id);
+                        }
+                      }}
+                    >
+                      {tab.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              <ScrollArea className="h-[260px]">
                 <div className="space-y-2 pr-4">
-                  {document.fields.map((field, index) => (
+                  {currentFields.map((field, index) => (
                     <div
                       key={field.id}
                       onClick={() => setSelectedFieldId(field.id)}

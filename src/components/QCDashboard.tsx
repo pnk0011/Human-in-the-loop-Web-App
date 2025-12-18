@@ -62,14 +62,14 @@ export function QCDashboard({
   const [isLoadingCompleted, setIsLoadingCompleted] = useState(false);
 
   // Legacy filter placeholders (document-level filters removed in new account flow)
-  const documentType = 'all';
-  const priorityFilter = 'all';
-  const reviewerFilter = 'all';
-  const docIdFilter = 'all';
-  const isLoadingReviewers = false;
-  const reviewers: string[] = [];
-  const isLoadingDocIds = false;
-  const uniqueDocIds: string[] = [];
+  const [documentType, setDocumentType] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [reviewerFilter, setReviewerFilter] = useState('all');
+  const [docIdFilter, setDocIdFilter] = useState('all');
+  const [isLoadingReviewers] = useState(false);
+  const [reviewers] = useState<string[]>([]);
+  const [isLoadingDocIds] = useState(false);
+  const [uniqueDocIds] = useState<string[]>([]);
 
   // Handle validate click with per-item loading state
   const handleValidateClick = async (item: any) => {
@@ -616,60 +616,40 @@ export function QCDashboard({
                     <thead className="bg-[#F9FAFB] dark:bg-[#1a1a1a] border-b border-[#E5E7EB] dark:border-[#3a3a3a]">
                       <tr>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                          Document ID
-                        </th>
-                        <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                           <button
-                            onClick={() =>
-                              handleSort("document")
-                            }
+                            onClick={() => handleSort("account")}
                             className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            Filename{" "}
-                            <SortIcon field="document" />
-                          </button>
-                        </th>
-                        <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                          File Type
-                        </th>
-                        <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                          <button
-                            onClick={() =>
-                              handleSort("reviewer")
-                            }
-                            className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
-                          >
-                            Reviewer{" "}
-                            <SortIcon field="reviewer" />
+                            Account <SortIcon field="account" />
                           </button>
                         </th>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                           <button
-                            onClick={() =>
-                              handleSort("reviewedDate")
-                            }
+                            onClick={() => handleSort("documentCount")}
                             className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            Reviewed Date{" "}
-                            <SortIcon field="reviewedDate" />
+                            Documents <SortIcon field="documentCount" />
                           </button>
-                        </th>
-                        <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                          Fields
                         </th>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                           <button
-                            onClick={() =>
-                              handleSort("priority")
-                            }
+                            onClick={() => handleSort("status")}
                             className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            Priority{" "}
-                            <SortIcon field="priority" />
+                            Status <SortIcon field="status" />
                           </button>
                         </th>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                          Status
+                          Summary
+                        </th>
+                        <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                          Reviewer
+                        </th>
+                        <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                          QC
+                        </th>
+                        <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                          Active
                         </th>
                         <th className="px-6 py-4 text-right text-[#012F66] dark:text-white">
                           Action
@@ -752,59 +732,38 @@ export function QCDashboard({
                           className="hover:bg-[#F9FAFB]/50 dark:hover:bg-[#3a3a3a]/50 transition-colors"
                         >
                           <td className="px-6 py-5">
-                            <div className="text-[#80989A] dark:text-[#a0a0a0] font-mono">
-                              {(item as any).doc_handle_id || '-'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-5">
                             <div className="flex items-center gap-3">
                               <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-[#0292DC]/10 to-[#012F66]/10 rounded-lg flex items-center justify-center">
                                 <FileText className="w-5 h-5 text-[#0292DC]" />
                               </div>
                               <div>
-                                <div className="text-[#012F66] dark:text-white">
-                                  {item.document}
+                                <div className="text-[#012F66] dark:text-white font-semibold">
+                                  {item.accountName}
                                 </div>
+                                <div className="text-xs text-[#80989A] dark:text-[#a0a0a0]">#{item.id}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-5">
-                            <span className="text-[#80989A] dark:text-[#a0a0a0]">
-                              {item.type}
-                            </span>
-                          </td>
-                          <td className="px-6 py-5">
-                            <span className="text-[#012F66] dark:text-white">
-                              {item.reviewer}
-                            </span>
-                          </td>
-                          <td className="px-6 py-5">
-                            <span className="text-[#80989A] dark:text-[#a0a0a0]">
-                              {item.reviewedDate}
-                            </span>
-                          </td>
-                          <td className="px-6 py-5 text-[#012F66] dark:text-white">
-                            <span className="flex items-center gap-2">
-                              <span className="w-8 h-8 rounded-full bg-[#0292DC]/10 text-[#0292DC] flex items-center justify-center">
-                                {item.fieldsReviewed}
-                              </span>
-                              <span className="text-[#80989A] dark:text-[#a0a0a0]">
-                                fields
-                              </span>
-                            </span>
-                          </td>
-                          <td className="px-6 py-5">
-                            <span
-                              className={`flex items-center gap-2 ${getPriorityColor(item.priority)}`}
-                            >
-                              <span className="w-2.5 h-2.5 rounded-full bg-current"></span>
-                              {item.priority}
-                            </span>
-                          </td>
+                          <td className="px-6 py-5 text-[#012F66] dark:text-white">{item.documentCount}</td>
                           <td className="px-6 py-5">
                             <Badge className={getQCStatusBadgeColor(item.status)}>
                               {item.status}
                             </Badge>
+                          </td>
+                          <td className="px-6 py-5 text-[#80989A] dark:text-[#a0a0a0] max-w-xs">
+                            {item.descriptionSummary || '-'}
+                          </td>
+                          <td className="px-6 py-5 text-[#012F66] dark:text-white">
+                            {item.reviewer_assigned || '-'}
+                          </td>
+                          <td className="px-6 py-5 text-[#012F66] dark:text-white">
+                            {item.qc_assigned || '-'}
+                          </td>
+                          <td className="px-6 py-5">
+                            <span className="inline-flex items-center gap-2 text-sm font-medium text-[#012F66] dark:text-white">
+                              <span className={`w-2.5 h-2.5 rounded-full ${item.is_active ? 'bg-green-500' : 'bg-gray-400'}`} />
+                              {item.is_active ? 'Active' : 'Inactive'}
+                            </span>
                           </td>
                           <td className="px-6 py-5 text-right">
                             <Button

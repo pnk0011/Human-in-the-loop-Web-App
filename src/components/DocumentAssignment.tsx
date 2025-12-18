@@ -50,9 +50,9 @@ interface AccountRow {
 
 export function DocumentAssignment() {
   const emptyStats = {
-    Total_accounts: 0,
-    Assigned_accounts: 0,
-    Completed_accounts: 0,
+    Total_policies: 0,
+    Assigned_policies: 0,
+    Completed_policies: 0,
   };
   const [documents, setDocuments] = useState<AccountRow[]>([]);
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
@@ -378,30 +378,30 @@ export function DocumentAssignment() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Accounts</div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Policies</div>
           {isLoading ? (
             <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
           ) : (
-            <div className="text-[#012F66] dark:text-white text-3xl font-bold">{stats.Total_accounts}</div>
+            <div className="text-[#012F66] dark:text-white text-3xl font-bold">{stats.Total_policies}</div>
           )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Assigned Accounts</div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Assigned Policies</div>
           {isLoading ? (
             <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
           ) : (
             <div className="text-[#0292DC] text-3xl font-bold">
-              {stats.Assigned_accounts}
+              {stats.Assigned_policies}
             </div>
           )}
         </div>
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Completed Accounts</div>
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Completed Policies</div>
           {isLoading ? (
             <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
           ) : (
             <div className="text-green-600 text-3xl font-bold">
-              {stats.Completed_accounts}
+              {stats.Completed_policies}
             </div>
           )}
         </div>

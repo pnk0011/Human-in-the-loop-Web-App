@@ -13,9 +13,9 @@ export interface DocumentsListResponse {
   status: string;
   message: string;
   stats?: {
-    Total_accounts: number;
-    Assigned_accounts: number;
-    Completed_accounts: number;
+    Total_policies: number;
+    Assigned_policies: number;
+    Completed_policies: number;
   };
   pagination?: {
     page: number;
