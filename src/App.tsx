@@ -23,6 +23,12 @@ interface ExtractedField {
   };
 }
 
+interface DocumentAttachment {
+  doc_handle: string;
+  presigned_url: string;
+  tabbedFields: { key: string; label: string; fields: ExtractedField[] }[];
+}
+
 interface ValidationDocument {
   id: string;
   documentName: string;
@@ -31,6 +37,8 @@ interface ValidationDocument {
   fields: ExtractedField[];
   documentImage?: string; // URL to the document image
   allFields?: any[]; // Store all fields from API for submission (including those with qc_action not null)
+  attachments?: DocumentAttachment[]; // Multiple documents for reviewer validation
+  tabbedFields?: { key: string; label: string; fields: ExtractedField[] }[];
 }
 
 interface QCValidationDocument extends ValidationDocument {
@@ -115,13 +123,13 @@ const AppContent = React.memo(function AppContent() {
     Object.entries(obj || {}).forEach(([key, value]) => {
       if (skipKeys.has(key)) return;
       if (key.endsWith('_confidence') || key.endsWith('_page_no')) return;
-      if (value === undefined || value === null || value === '') return;
+      if (value === undefined || value === null) return;
       const confidence = obj[`${key}_confidence`];
       fields.push({
         id: `${key}`,
         fieldName: key.replace(/_/g, ' '),
         fieldDescription: key.replace(/_/g, ' '),
-        extractedValue: String(value).trim(),
+        extractedValue: String(value ?? '').trim(),
         confidence: Math.round(Number(confidence) * 100) || 0,
         expectedFormat: '',
         location: { x: 0, y: 0, width: 0, height: 0 },
@@ -143,25 +151,36 @@ const AppContent = React.memo(function AppContent() {
         const response = await documentOperationsAPI.reviewFile({ first_named_insured: item.accountName || item.document });
         
         if (response?.documents && response.documents.length > 0) {
-          const docPayload = response.documents[0];
-          const exposureFields = buildFieldsFromObject((docPayload.exposure_data || [])[0] || {});
-          const accountFields = buildFieldsFromObject((docPayload.account_data || [])[0] || {});
-          const lossFields = buildFieldsFromObject((docPayload.loss_data || [])[0] || {});
+          // Build attachments array from all documents
+          const attachments: DocumentAttachment[] = response.documents.map((docPayload: any) => {
+            const exposureFields = buildFieldsFromObject((docPayload.exposure_data || [])[0] || {});
+            const accountFields = buildFieldsFromObject((docPayload.account_data || [])[0] || {});
+            const lossFields = buildFieldsFromObject((docPayload.loss_data || [])[0] || {});
 
-          const defaultFields = exposureFields.length ? exposureFields : accountFields.length ? accountFields : lossFields;
+            return {
+              doc_handle: docPayload.doc_handle,
+              presigned_url: docPayload.presigned_url,
+              tabbedFields: [
+                { key: 'loss', label: 'Loss Data', fields: lossFields },
+                { key: 'account', label: 'Account Data', fields: accountFields },
+                { key: 'exposure', label: 'Exposure Data', fields: exposureFields },
+              ],
+            };
+          });
+
+          // Use first document as default
+          const firstDoc = attachments[0];
+          const firstDocFields = firstDoc.tabbedFields.find(t => t.fields.length > 0)?.fields || [];
 
           document = {
-            id: docPayload.doc_handle || item.id,
+            id: response.first_named_insured || item.id,
             documentName: response.first_named_insured || item.accountName || item.document,
             documentType: 'Account',
             priority: 'High',
-            documentImage: docPayload.presigned_url,
-            tabbedFields: [
-              { key: 'loss', label: 'Loss Data', fields: lossFields },
-              { key: 'account', label: 'Account Data', fields: accountFields },
-              { key: 'exposure', label: 'Exposure Data', fields: exposureFields },
-            ],
-            fields: defaultFields,
+            documentImage: firstDoc.presigned_url,
+            tabbedFields: firstDoc.tabbedFields,
+            fields: firstDocFields,
+            attachments: attachments,
           };
         } else {
           throw new Error('API response failed');

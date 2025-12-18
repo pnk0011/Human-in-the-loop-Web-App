@@ -48,6 +48,12 @@ interface ExtractedField {
   };
 }
 
+interface DocumentAttachment {
+  doc_handle: string;
+  presigned_url: string;
+  tabbedFields: { key: string; label: string; fields: ExtractedField[] }[];
+}
+
 interface ValidationDocument {
   id: string;
   documentName: string;
@@ -56,6 +62,7 @@ interface ValidationDocument {
   fields: ExtractedField[];
   tabbedFields?: { key: string; label: string; fields: ExtractedField[] }[];
   documentImage?: string; // URL to the document image
+  attachments?: DocumentAttachment[]; // Multiple documents for reviewer validation
 }
 
 interface FieldValidation {
@@ -91,9 +98,21 @@ export function ValidationScreen({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages] = useState(3);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const tabbedFields = document.tabbedFields && document.tabbedFields.length > 0
+  
+  // State for current attachment
+  const [selectedAttachmentIndex, setSelectedAttachmentIndex] = useState(0);
+  
+  // Get current attachment data
+  const currentAttachment = document.attachments && document.attachments.length > 0
+    ? document.attachments[selectedAttachmentIndex]
+    : null;
+  
+  const tabbedFields = currentAttachment
+    ? currentAttachment.tabbedFields.filter((t) => t.fields && t.fields.length > 0)
+    : document.tabbedFields && document.tabbedFields.length > 0
     ? document.tabbedFields.filter((t) => t.fields && t.fields.length > 0)
     : [{ key: 'default', label: 'Fields', fields: document.fields }];
+  
   const allFields = tabbedFields.flatMap((t) => t.fields);
   const [activeTab, setActiveTab] = useState(tabbedFields[0]?.key || 'default');
   const [selectedFieldId, setSelectedFieldId] =
@@ -118,13 +137,48 @@ export function ValidationScreen({
     ),
   );
 
+  // Update fieldValidations when allFields changes (e.g., when switching attachments)
+  useEffect(() => {
+    setFieldValidations((prev) => {
+      const newValidations = { ...prev };
+      // Add new fields that don't exist in the current validations
+      allFields.forEach((field) => {
+        if (!newValidations[field.id]) {
+          newValidations[field.id] = { fieldId: field.id, action: null };
+        }
+      });
+      return newValidations;
+    });
+  }, [allFields]);
+
+  // Update activeTab and selectedFieldId when attachment changes
+  useEffect(() => {
+    if (tabbedFields.length > 0) {
+      const tabExists = tabbedFields.find(t => t.key === activeTab);
+      if (!tabExists) {
+        // Current tab doesn't exist in new attachment, switch to first tab
+        setActiveTab(tabbedFields[0].key);
+      }
+    }
+  }, [selectedAttachmentIndex]);
+
+  useEffect(() => {
+    if (allFields.length > 0) {
+      const fieldExists = allFields.find(f => f.id === selectedFieldId);
+      if (!fieldExists) {
+        // Current field doesn't exist in new attachment, switch to first field
+        setSelectedFieldId(allFields[0].id);
+      }
+    }
+  }, [selectedAttachmentIndex]);
+
   const currentTab = tabbedFields.find((t) => t.key === activeTab) || tabbedFields[0];
   const currentFields = currentTab?.fields || [];
 
   const selectedField = allFields.find(
     (f) => f.id === selectedFieldId,
   );
-  const currentValidation = fieldValidations[selectedFieldId];
+  const currentValidation = fieldValidations[selectedFieldId] || { fieldId: selectedFieldId, action: null };
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -177,14 +231,31 @@ export function ValidationScreen({
   };
 
   const handleDownloadDocument = () => {
-    if (document.documentImage) {
+    const imageUrl = currentAttachment ? currentAttachment.presigned_url : document.documentImage;
+    if (imageUrl) {
       const link = window.document.createElement('a');
-      link.href = document.documentImage;
+      link.href = imageUrl;
       link.download = document.documentName || 'document';
       link.target = '_blank';
       window.document.body.appendChild(link);
       link.click();
       window.document.body.removeChild(link);
+    }
+  };
+
+  const handleAttachmentChange = (index: number) => {
+    setSelectedAttachmentIndex(index);
+    // Reset to first tab and first field of the new attachment
+    const newAttachment = document.attachments?.[index];
+    if (newAttachment) {
+      const newTabbedFields = newAttachment.tabbedFields.filter((t) => t.fields && t.fields.length > 0);
+      if (newTabbedFields.length > 0) {
+        setActiveTab(newTabbedFields[0].key);
+        const firstFields = newTabbedFields[0].fields;
+        if (firstFields.length > 0) {
+          setSelectedFieldId(firstFields[0].id);
+        }
+      }
     }
   };
 
@@ -283,7 +354,7 @@ export function ValidationScreen({
 
   const getFieldStatusIcon = (fieldId: string) => {
     const validation = fieldValidations[fieldId];
-    if (!validation.action) return null;
+    if (!validation || !validation.action) return null;
 
     if (validation.action === "accept") {
       return (
@@ -315,8 +386,13 @@ export function ValidationScreen({
           className={`${
             isFullscreen
               ? "fixed inset-0 z-50 p-2 bg-[#F5F7FA] dark:bg-[#1a1a1a]"
-              : "flex-1 min-w-0 min-h-0"
+              : "min-h-0 flex-none"
           }`}
+          style={
+            isFullscreen
+              ? undefined
+              : { width: "calc(100% - 380px)" } // keep left panel width stable beside 360px right panel + padding
+          }
         >
           <div className="bg-[#E5E7EB] dark:bg-[#2a2a2a] rounded-lg h-full flex flex-col min-h-0">
             {/* Document Display */}
@@ -338,97 +414,100 @@ export function ValidationScreen({
                     : 'auto',
                 }}
               >
-                {document.documentImage ? (
-                  /* Real Document Image from API */
-                  <div className="relative w-full h-full" style={{ maxWidth: '100%', overflow: 'hidden', height: '100%' }}>
-                    {/* Check if it's a PDF, Word, Excel, or CSV document */}
-                    {document.documentImage.includes('.pdf') || 
-                     document.documentImage.includes('.doc') || 
-                     document.documentImage.includes('.docx') ||
-                     document.documentImage.includes('.xls') ||
-                     document.documentImage.includes('.xlsx') ||
-                     document.documentImage.includes('.msg') ||
-                     document.documentImage.includes('.csv') ||
-                     (document.documentName && (
-                       document.documentName.includes('.pdf') ||
-                       document.documentName.includes('.doc') ||
-                       document.documentName.includes('.docx') ||
-                       document.documentName.includes('.xls') ||
-                       document.documentName.includes('.xlsx') ||
-                       document.documentName.includes('.msg') ||
-                       document.documentName.includes('.csv')
-                     )) ? (
-                      /* PDF/Word/Excel/CSV Document - Use PDFViewer component */
-                      <PDFViewer 
-                        url={document.documentImage}
-                        fileName={document.documentName}
-                        className="h-full w-full"
-                      />
-                    ) : (
-                      /* Image Document - Use img tag */
-                      <img
-                        src={document.documentImage}
-                        alt={document.documentName}
-                        className="max-w-full h-auto border border-gray-300 dark:border-gray-600 rounded"
-                        style={{ maxHeight: '80vh' }}
-                        crossOrigin="anonymous"
-                        onLoad={() => {
-                          // Document image loaded successfully
-                        }}
-                        onError={(e) => {
-                          // Failed to load document image
-                          // Hide the image and show error message
-                          e.currentTarget.style.display = 'none';
-                          const errorElement = e.currentTarget.nextElementSibling;
-                          if (errorElement) {
-                            errorElement.classList.remove('hidden');
-                          }
-                        }}
-                      />
-                    )}
+                {(() => {
+                  const documentUrl = currentAttachment ? currentAttachment.presigned_url : document.documentImage;
+                  return documentUrl ? (
+                    /* Real Document Image from API */
+                    <div className="relative w-full h-full" style={{ maxWidth: '100%', overflow: 'hidden', height: '100%' }}>
+                      {/* Check if it's a PDF, Word, Excel, or CSV document */}
+                      {documentUrl.includes('.pdf') || 
+                       documentUrl.includes('.doc') || 
+                       documentUrl.includes('.docx') ||
+                       documentUrl.includes('.xls') ||
+                       documentUrl.includes('.xlsx') ||
+                       documentUrl.includes('.msg') ||
+                       documentUrl.includes('.csv') ||
+                       (document.documentName && (
+                         document.documentName.includes('.pdf') ||
+                         document.documentName.includes('.doc') ||
+                         document.documentName.includes('.docx') ||
+                         document.documentName.includes('.xls') ||
+                         document.documentName.includes('.xlsx') ||
+                         document.documentName.includes('.msg') ||
+                         document.documentName.includes('.csv')
+                       )) ? (
+                        /* PDF/Word/Excel/CSV Document - Use PDFViewer component */
+                        <PDFViewer 
+                          url={documentUrl}
+                          fileName={document.documentName}
+                          className="h-full w-full"
+                        />
+                      ) : (
+                        /* Image Document - Use img tag */
+                        <img
+                          src={documentUrl}
+                          alt={document.documentName}
+                          className="max-w-full h-auto border border-gray-300 dark:border-gray-600 rounded"
+                          style={{ maxHeight: '80vh' }}
+                          crossOrigin="anonymous"
+                          onLoad={() => {
+                            // Document image loaded successfully
+                          }}
+                          onError={(e) => {
+                            // Failed to load document image
+                            // Hide the image and show error message
+                            e.currentTarget.style.display = 'none';
+                            const errorElement = e.currentTarget.nextElementSibling;
+                            if (errorElement) {
+                              errorElement.classList.remove('hidden');
+                            }
+                          }}
+                        />
+                      )}
                     
-                    {/* Error Message (hidden by default) */}
-                    <div className="hidden flex flex-col items-center justify-center p-12 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                      <div className="w-16 h-16 bg-red-100 dark:bg-red-800 rounded-full flex items-center justify-center mb-4">
-                        <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {/* Error Message (hidden by default) */}
+                      <div className="hidden flex flex-col items-center justify-center p-12 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                        <div className="w-16 h-16 bg-red-100 dark:bg-red-800 rounded-full flex items-center justify-center mb-4">
+                          <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+                          Document Failed to Load
+                        </h3>
+                        <p className="text-red-600 dark:text-red-300 text-center mb-4 max-w-md">
+                          Unable to load the document from the provided URL. This may be due to network issues, access restrictions, or CORS policy limitations.
+                        </p>
+                        {/* <div className="text-sm text-red-500 dark:text-red-400 bg-red-100 dark:bg-red-800 px-3 py-2 rounded font-mono break-all max-w-md mb-4">
+                          {documentUrl}
+                        </div> */}
+                        <Button
+                          onClick={handleDownloadDocument}
+                          className="bg-[#0292DC] hover:bg-[#012F66] text-white"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download Document
+                        </Button>
+                      </div>
+
+                    </div>
+                  ) : (
+                    /* Error Message when no image URL provided */
+                    <div className="flex flex-col items-center justify-center p-12 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                      <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-800 rounded-full flex items-center justify-center mb-4">
+                        <svg className="w-8 h-8 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                         </svg>
                       </div>
-                      <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
-                        Document Failed to Load
+                      <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+                        No Document Available
                       </h3>
-                      <p className="text-red-600 dark:text-red-300 text-center mb-4 max-w-md">
-                        Unable to load the document from the provided URL. This may be due to network issues, access restrictions, or CORS policy limitations.
+                      <p className="text-yellow-600 dark:text-yellow-300 text-center mb-4 max-w-md">
+                        No document URL was provided by the API. The document may not have been processed yet or there may be an issue with the document processing.
                       </p>
-                      {/* <div className="text-sm text-red-500 dark:text-red-400 bg-red-100 dark:bg-red-800 px-3 py-2 rounded font-mono break-all max-w-md mb-4">
-                        {document.documentImage}
-                      </div> */}
-                      <Button
-                        onClick={handleDownloadDocument}
-                        className="bg-[#0292DC] hover:bg-[#012F66] text-white"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download Document
-                      </Button>
                     </div>
-
-                  </div>
-                ) : (
-                  /* Error Message when no image URL provided */
-                  <div className="flex flex-col items-center justify-center p-12 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                    <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-800 rounded-full flex items-center justify-center mb-4">
-                      <svg className="w-8 h-8 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
-                      No Document Available
-                    </h3>
-                    <p className="text-yellow-600 dark:text-yellow-300 text-center mb-4 max-w-md">
-                      No document URL was provided by the API. The document may not have been processed yet or there may be an issue with the document processing.
-                    </p>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
 
@@ -475,9 +554,49 @@ export function ValidationScreen({
 
         {/* Right Panel */}
         <div className="w-[360px] flex-shrink-0 h-full flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1" style={{ width: '360px' }}>
+            {/* Attachments List */}
+            {document.attachments && document.attachments.length > 1 && (
+              <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-4 border-[#E5E7EB] dark:border-[#3a3a3a]">
+                <h4 className="text-[#012F66] dark:text-white mb-3 font-semibold">
+                  Documents ({document.attachments.length})
+                </h4>
+                <div className="space-y-2">
+                  {document.attachments.map((attachment, index) => (
+                    <div
+                      key={attachment.doc_handle}
+                      onClick={() => handleAttachmentChange(index)}
+                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        selectedAttachmentIndex === index
+                          ? "border-[#0292DC] bg-[#0292DC]/5"
+                          : "border-[#E5E7EB] hover:border-[#0292DC] bg-white dark:bg-[#1a1a1a]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#012F66] dark:text-white font-medium">
+                              Document #{index + 1}
+                            </span>
+                          </div>
+                          <div className="text-xs text-[#80989A] dark:text-[#a0a0a0] mt-1">
+                            {attachment.doc_handle}
+                          </div>
+                        </div>
+                        {selectedAttachmentIndex === index && (
+                          <div className="flex-shrink-0">
+                            <CheckCircle2 className="w-5 h-5 text-[#0292DC]" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Fields List */}
-            <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-4 border-[#E5E7EB] dark:border-[#3a3a3a]">
+            <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-4 border-[#E5E7EB] dark:border-[#3a3a3a]" style={{ maxHeight: '450px' , overflow: 'scroll' }}>
               {tabbedFields.length > 1 && (
                 <div className="flex items-center gap-2 mb-3">
                   {tabbedFields.map((tab) => (
