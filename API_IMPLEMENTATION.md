@@ -1,3 +1,68 @@
+Request Type
+
+PUT
+
+API Url
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/reviewer-update-policy-documents
+
+Request Body
+
+ {
+
+    "table_name": "subdata.hil_loss_extraction",
+
+    "action": "Approved",
+
+    "id": 106,
+
+    "data": {
+
+        "reviewer_comments": "Verified manually",
+
+        "qc_comments": "Test"
+
+    }
+
+}
+
+ 
+
+2
+
+Request Type
+
+PUT
+
+API Url
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/qc-update-policy-documents
+
+Request Body
+
+{
+
+    "table_name": "subdata.hil_loss_extraction",
+
+    "action": "Approved",
+
+    "id": 106,
+
+    "data": {
+
+        "reviewer_comments": "Verified manually",
+
+        "qc_comments": "Not Correct"
+
+    }
+
+}
+
+
+
+
+
+==========================================================================================================================
 https://dtljpaytvdo6y.cloudfront.net/
 
 Admin (GetAllDocuments)
