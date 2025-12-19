@@ -356,6 +356,9 @@ export function ValidationScreen({
 
   const handleAttachmentChange = (index: number) => {
     setSelectedAttachmentIndex(index);
+    // Clear field edits/notes when switching documents
+    setCorrectedValues({});
+    setVariantNotes({});
     // Reset to first tab and first field of the new attachment
     const newAttachment = document.attachments?.[index];
     if (newAttachment) {
@@ -483,6 +486,8 @@ export function ValidationScreen({
         data: dataPayload,
       });
       alert("Data set saved successfully.");
+      // clear inputs for this data set after save
+      setCorrectedValues((prev) => ({ ...prev, [currentKey]: {} }));
     } catch (error: any) {
       alert(error?.message || "Failed to save data set.");
     } finally {
@@ -763,6 +768,8 @@ export function ValidationScreen({
                       className={activeTab === tab.key ? "bg-[#0292DC] text-white" : "border-[#D0D5DD] dark:border-[#3a3a3a] text-[#012F66] dark:text-white"}
                       onClick={() => {
                         setActiveTab(tab.key);
+                        // clear inputs for new tab/variant
+                        setCorrectedValues((prev) => ({ ...prev, [`${tab.key}-${tabVariantIndex[tab.key] ?? 0}`]: {} }));
                         const variantIdx = tabVariantIndex[tab.key] ?? 0;
                         const nextFields = (tab.variants?.[variantIdx] && tab.variants[variantIdx].length > 0)
                           ? tab.variants[variantIdx]
@@ -786,6 +793,8 @@ export function ValidationScreen({
                     onValueChange={(val) => {
                       const idx = Number(val);
                       setTabVariantIndex((prev) => ({ ...prev, [currentTab.key]: idx }));
+                      // clear inputs for new variant selection
+                      setCorrectedValues((prev) => ({ ...prev, [`${currentTab.key}-${idx}`]: {} }));
                       const variantFields = currentTab.variants?.[idx] || [];
                       if (variantFields.length > 0) {
                         setSelectedFieldId(variantFields[0].id);
