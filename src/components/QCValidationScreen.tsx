@@ -81,6 +81,7 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedFieldId, setSelectedFieldId] = useState<string>(document.fields[0]?.id || '');
+  const [datasetNote, setDatasetNote] = useState<string>('');
 
   // Track QC decisions for each field
   const [qcDecisions, setQcDecisions] = useState<Record<string, QCDecision>>(
@@ -447,102 +448,16 @@ export function QCValidationScreen({ document, queueCount, onBack, onSubmit, onL
               </ScrollArea>
             </div>
 
-            {/* AI Extraction */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-[#0292DC]" />
-                <span className="text-[#80989A]">Original AI Extraction</span>
-              </div>
-            
-              <div className="mb-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[#80989A]">Confidence</span>
-                  <span className="text-[#012F66]">{selectedField.confidence}%</span>
-                </div>
-              </div>
-
-              <div className="bg-[#F5F7FA] p-4 rounded border border-[#D0D5DD] mb-4">
-                <p className="text-[#012F66]">{selectedField.extractedValue}</p>
-              </div>
-
-              {/* Reviewer's Decision */}
-              <div className="border-t border-[#D0D5DD] pt-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-2 h-2 rounded-full bg-[#FFC018]" />
-                  <span className="text-[#80989A]">Reviewer's Validation</span>
-                </div>
-
-                <div className="mb-3">
-                  {getReviewerActionBadge(reviewerValidation.action)}
-                </div>
-
-                {reviewerValidation.action === 'correct' && reviewerValidation.correctedValue && (
-                  <div className="mb-3">
-                    <p className="text-[#80989A] mb-1">Corrected Value:</p>
-                    <div className="bg-[#FFC018]/10 p-3 rounded border border-[#FFC018]">
-                      <p className="text-[#012F66]">{reviewerValidation.correctedValue}</p>
-                    </div>
-                  </div>
-                )}
-
-                {reviewerValidation.action === 'reject' && reviewerValidation.rejectReason && (
-                  <div className="mb-3">
-                    <p className="text-[#80989A] mb-1">Rejection Reason:</p>
-                    <div className="bg-[#FF0081]/10 p-3 rounded border border-[#FF0081]">
-                      <p className="text-[#012F66]">{reviewerValidation.rejectReason}</p>
-                    </div>
-                  </div>
-                )}
-
-                {reviewerValidation.note && (
-                  <div >
-                    <p className="text-[#80989A] mb-1">Reviewer Notes:</p>
-                    <div className="bg-[#F5F7FA] p-3 rounded border border-[#D0D5DD]">
-                      <p
-                        className="text-[#012F66] whitespace-pre-wrap break-words break-all max-w-full"
-                        style={{ overflowWrap: 'anywhere', wordBreak: 'break-word'  }}
-                      >
-                        {reviewerValidation.note}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* QC Decision Section */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h4 className="text-[#012F66] mb-4">QC Decision</h4>
-
-              <div className="flex gap-2 mb-4">
-                <Button
-                  variant={currentDecision.decision === 'approve' ? 'default' : 'outline'}
-                  onClick={() => handleDecisionChange('approve')}
-                  className={currentDecision.decision === 'approve' ? 'flex-1 bg-green-600 hover:bg-green-700 text-white' : 'flex-1 border-green-600 text-green-600 hover:bg-green-50'}
-                >
-                  <ThumbsUp className="w-4 h-4 mr-2" />
-                  Approve
-                </Button>
-                <Button
-                  variant={currentDecision.decision === 'sendback' ? 'default' : 'outline'}
-                  onClick={() => handleDecisionChange('sendback')}
-                  className={currentDecision.decision === 'sendback' ? 'flex-1 bg-[#FF0081] hover:bg-[#FF0081]/90 text-white' : 'flex-1 border-[#FF0081] text-[#FF0081] hover:bg-[#FF0081]/10'}
-                >
-                  <ThumbsDown className="w-4 h-4 mr-2" />
-                  Send Back
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[#012F66]">QC Notes (Optional)</label>
-                <Textarea
-                  value={currentDecision.qcNote || ''}
-                  onChange={(e) => handleQcNoteChange(e.target.value)}
-                  placeholder="Add any QC feedback..."
-                  rows={4}
-                  className="border-[#D0D5DD]"
-                />
-              </div>
+            {/* Notes for this data set */}
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <label className="text-[#012F66] mb-2 block">Notes for this data set</label>
+              <Textarea
+                value={datasetNote}
+                onChange={(e) => setDatasetNote(e.target.value)}
+                placeholder="Add notes specific to this data set..."
+                rows={3}
+                className="border-[#D0D5DD]"
+              />
             </div>
 
           </div>

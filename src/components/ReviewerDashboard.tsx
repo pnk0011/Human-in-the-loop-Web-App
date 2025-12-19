@@ -65,8 +65,9 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
               break;
             }
 
-            if (response.files?.length) {
-              accumulatedFiles.push(...response.files);
+            const list = response.files || [];
+            if (list.length) {
+              accumulatedFiles.push(...list);
             }
 
             if (!collectedStats && response.stats) {

@@ -9,10 +9,13 @@ import { Toaster } from "./components/ui/sonner";
 
 interface ExtractedField {
   id: string;
+  sourceId?: number | string;
   fieldName: string;
   fieldDescription: string;
   extractedValue: string;
   confidence: number;
+  pageNo?: string | number | null;
+  rowId?: number;
   expectedFormat?: string;
   qcComment?: string; // QC comment from previous review
   location: {
@@ -26,7 +29,7 @@ interface ExtractedField {
 interface DocumentAttachment {
   doc_handle: string;
   presigned_url: string;
-  tabbedFields: { key: string; label: string; fields: ExtractedField[] }[];
+  tabbedFields: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
 }
 
 interface ValidationDocument {
@@ -38,7 +41,7 @@ interface ValidationDocument {
   documentImage?: string; // URL to the document image
   allFields?: any[]; // Store all fields from API for submission (including those with qc_action not null)
   attachments?: DocumentAttachment[]; // Multiple documents for reviewer validation
-  tabbedFields?: { key: string; label: string; fields: ExtractedField[] }[];
+  tabbedFields?: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
 }
 
 interface QCValidationDocument extends ValidationDocument {
@@ -69,7 +72,7 @@ interface QCDecision {
   qcNote?: string;
 }
 
-const AppContent = React.memo(function AppContent() {
+const AppContent = function AppContent() {
   const { user, isAuthenticated, logout } = useAuth();
   const [currentView, setCurrentView] = useState<
     | "dashboard"
@@ -116,21 +119,26 @@ const AppContent = React.memo(function AppContent() {
 
   const buildFieldsFromObject = (obj: Record<string, any>) => {
     const skipKeys = new Set([
-      'id','document_id','document_name','doc_handle','doc_type_name','extraction_type','create_date_time','processed_flag',
-      'input_s3_uri','document_s3_uri','first_named_insured','description','supplemental_description'
+      'document_id','document_name','doc_handle','doc_type_name','extraction_type','create_date_time','processed_flag',
+      'input_s3_uri','document_s3_uri','first_named_insured','description','supplemental_description',
+      'qc_status','qc_comment','qc_comments','reviewer_status','reviewer_comment','reviewer_comments'
     ]);
     const fields: any[] = [];
     Object.entries(obj || {}).forEach(([key, value]) => {
       if (skipKeys.has(key)) return;
       if (key.endsWith('_confidence') || key.endsWith('_page_no')) return;
-      if (value === undefined || value === null) return;
+      if (value === undefined) return; // include null/empty so users can validate missing data
       const confidence = obj[`${key}_confidence`];
+      const pageNo = obj[`${key}_page_no`];
       fields.push({
         id: `${key}`,
+        sourceId: obj.id ?? obj.ID ?? obj.Id ?? undefined,
         fieldName: key.replace(/_/g, ' '),
         fieldDescription: key.replace(/_/g, ' '),
         extractedValue: String(value ?? '').trim(),
         confidence: Math.round(Number(confidence) * 100) || 0,
+        pageNo: pageNo ?? null,
+        rowId: typeof obj.id === 'number' ? obj.id : Number(obj.id) || undefined,
         expectedFormat: '',
         location: { x: 0, y: 0, width: 0, height: 0 },
       });
@@ -153,24 +161,36 @@ const AppContent = React.memo(function AppContent() {
         if (response?.documents && response.documents.length > 0) {
           // Build attachments array from all documents
           const attachments: DocumentAttachment[] = response.documents.map((docPayload: any) => {
-            const exposureFields = buildFieldsFromObject((docPayload.exposure_data || [])[0] || {});
-            const accountFields = buildFieldsFromObject((docPayload.account_data || [])[0] || {});
-            const lossFields = buildFieldsFromObject((docPayload.loss_data || [])[0] || {});
+            const exposureVariants = (docPayload.exposure_data || []).map((item: any) => buildFieldsFromObject(item || {}));
+            const accountVariants = (docPayload.account_data || []).map((item: any) => buildFieldsFromObject(item || {}));
+            const lossVariants = (docPayload.loss_data || []).map((item: any) => buildFieldsFromObject(item || {}));
+
+            const firstExposure = exposureVariants[0] || [];
+            const firstAccount = accountVariants[0] || [];
+            const firstLoss = lossVariants[0] || [];
 
             return {
               doc_handle: docPayload.doc_handle,
               presigned_url: docPayload.presigned_url,
               tabbedFields: [
-                { key: 'loss', label: 'Loss Data', fields: lossFields },
-                { key: 'account', label: 'Account Data', fields: accountFields },
-                { key: 'exposure', label: 'Exposure Data', fields: exposureFields },
+                { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants },
+                { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants },
+                { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants },
               ],
             };
           });
 
           // Use first document as default
           const firstDoc = attachments[0];
-          const firstDocFields = firstDoc.tabbedFields.find(t => t.fields.length > 0)?.fields || [];
+          const firstDocFields = firstDoc.tabbedFields.find(t => {
+            const variant = (t.variants && t.variants[0]) || t.fields;
+            return variant && variant.length > 0;
+          });
+          const defaultFields = firstDocFields
+            ? (firstDocFields.variants && firstDocFields.variants[0] && firstDocFields.variants[0].length
+                ? firstDocFields.variants[0]
+                : firstDocFields.fields || [])
+            : [];
 
           document = {
             id: response.first_named_insured || item.id,
@@ -179,7 +199,7 @@ const AppContent = React.memo(function AppContent() {
             priority: 'High',
             documentImage: firstDoc.presigned_url,
             tabbedFields: firstDoc.tabbedFields,
-            fields: firstDocFields,
+            fields: defaultFields,
             attachments: attachments,
           };
         } else {
@@ -218,7 +238,7 @@ const AppContent = React.memo(function AppContent() {
         const { documentOperationsAPI } = await import('./services/documentOperationsAPI');
         
         // Try to fetch real QC document data from API
-        const response = await documentOperationsAPI.qcOpenFile({ file_name: item.document });
+        const response = await documentOperationsAPI.qcOpenFile({ first_named_insured: item.document });
         
         if (response.success && response.data?.document) {
           const apiDoc = response.data.document;
@@ -621,88 +641,67 @@ const AppContent = React.memo(function AppContent() {
   const currentTheme = useMemo(() => theme, [theme]);
   const isLoading = useMemo(() => appLoading || isNavigating, [appLoading, isNavigating]);
 
-  return (
-    <ErrorBoundary>
-      <div className="size-full">
-        {isInitializing ? (
-          <LoadingPage text="Initializing application..." />
-        ) : !isLoggedInState ? (
-          <LazyComponents.LoginPage
-            theme={currentTheme}
-            onToggleTheme={toggleTheme}
-          />
-        ) : currentUserRole === "Admin" ? (
-          <LazyComponents.AdminDashboard
+  const body = (
+    <div className="size-full">
+      {isInitializing ? (
+        <LoadingPage text="Initializing application..." />
+      ) : !isLoggedInState ? (
+        <LazyComponents.LoginPage
+          theme={currentTheme}
+          onToggleTheme={toggleTheme}
+        />
+      ) : currentUserRole === "Admin" ? (
+        <LazyComponents.AdminDashboard
+          onLogout={handleLogout}
+          theme={currentTheme}
+          onToggleTheme={toggleTheme}
+        />
+      ) : currentUserRole === "QC" ? (
+        currentView === "dashboard" ? (
+          <LazyComponents.QCDashboard
+            onValidateClick={handleQCValidateClick}
+            onViewHistoryClick={handleViewQCHistory}
             onLogout={handleLogout}
             theme={currentTheme}
             onToggleTheme={toggleTheme}
           />
-        ) : currentUserRole === "QC" ? (
-          currentView === "dashboard" ? (
-            <LazyComponents.QCDashboard
-              onValidateClick={handleQCValidateClick}
-              onViewHistoryClick={handleViewQCHistory}
-              onLogout={handleLogout}
-              theme={currentTheme}
-              onToggleTheme={toggleTheme}
-            />
-          ) : currentView === "qc-history-view" && selectedQCDocument ? (
-            <LazyComponents.QCValidationScreen
-              document={selectedQCDocument}
-              queueCount={qcQueueCount}
-              onBack={handleBackToDashboard}
-              onSubmit={handleSubmitQCReview}
-              onLogout={handleLogout}
-              theme={currentTheme}
-              onToggleTheme={toggleTheme}
-              isReadOnly={isReadOnlyView}
-            />
-          ) : currentView === "qc-validation" && selectedQCDocument ? (
-            <LazyComponents.QCValidationScreen
-              document={selectedQCDocument}
-              queueCount={qcQueueCount}
-              onBack={handleBackToDashboard}
-              onSubmit={handleSubmitQCReview}
-              onLogout={handleLogout}
-              theme={currentTheme}
-              onToggleTheme={toggleTheme}
-            />
-          ) : null
-        ) : currentUserRole === "Reviewer" ? (
-          currentView === "dashboard" ? (
-            <LazyComponents.ReviewerDashboard
-              onValidateClick={handleValidateClick}
-              onViewHistoryClick={handleViewHistory}
-              onLogout={handleLogout}
-              theme={currentTheme}
-              onToggleTheme={toggleTheme}
-            />
-          ) : currentView === "validation" && selectedDocument ? (
-            <LazyComponents.ValidationScreen
-              document={selectedDocument}
-              queueCount={queueCount}
-              onBack={handleBackToDashboard}
-              onSubmit={handleSubmitValidation}
-              onLogout={handleLogout}
-              theme={currentTheme}
-              onToggleTheme={toggleTheme}
-            />
-          ) : currentView === "history-view" && selectedDocument ? (
-            <LazyComponents.ValidationScreen
-              document={selectedDocument}
-              queueCount={queueCount}
-              onBack={handleBackToDashboard}
-              onSubmit={handleSubmitValidation}
-              onLogout={handleLogout}
-              theme={currentTheme}
-              onToggleTheme={toggleTheme}
-              isReadOnly={isReadOnlyView}
-            />
-          ) : null
-        ) : currentView === "dashboard" ? (
-          <LazyComponents.Dashboard
+        ) : currentView === "qc-history-view" && selectedQCDocument ? (
+          <LazyComponents.QCValidationScreen
+            document={selectedQCDocument}
+            queueCount={qcQueueCount}
+            onBack={handleBackToDashboard}
+            onSubmit={handleSubmitQCReview}
+            onLogout={handleLogout}
+            theme={currentTheme}
+            onToggleTheme={toggleTheme}
+            isReadOnly={isReadOnlyView}
+          />
+        ) : currentView === "qc-validation" && selectedQCDocument ? (
+          <LazyComponents.QCValidationScreen
+            document={selectedQCDocument}
+            queueCount={qcQueueCount}
+            onBack={handleBackToDashboard}
+            onSubmit={handleSubmitQCReview}
+            onLogout={handleLogout}
+            theme={currentTheme}
+            onToggleTheme={toggleTheme}
+          />
+        ) : null
+      ) : currentUserRole === "Reviewer" ? (
+        currentView === "dashboard" ? (
+          <LazyComponents.ReviewerDashboard
             onValidateClick={handleValidateClick}
             onViewHistoryClick={handleViewHistory}
+            onLogout={handleLogout}
+            theme={currentTheme}
+            onToggleTheme={toggleTheme}
+          />
+        ) : currentView === "validation" && selectedDocument ? (
+          <LazyComponents.ValidationScreen
+            document={selectedDocument}
+            queueCount={queueCount}
+            onBack={handleBackToDashboard}
+            onSubmit={handleSubmitValidation}
             onLogout={handleLogout}
             theme={currentTheme}
             onToggleTheme={toggleTheme}
@@ -718,31 +717,58 @@ const AppContent = React.memo(function AppContent() {
             onToggleTheme={toggleTheme}
             isReadOnly={isReadOnlyView}
           />
-        ) : selectedDocument ? (
-          <LazyComponents.ValidationScreen
-            document={selectedDocument}
-            queueCount={queueCount}
-            onBack={handleBackToDashboard}
-            onSubmit={handleSubmitValidation}
-            onLogout={handleLogout}
-            theme={currentTheme}
-            onToggleTheme={toggleTheme}
-          />
-        ) : null}
-        
-        {isLoading && <LoadingOverlay />}
-      </div>
-      <Toaster />
-    </ErrorBoundary>
+        ) : null
+      ) : currentView === "dashboard" ? (
+        <LazyComponents.Dashboard
+          onValidateClick={handleValidateClick}
+          onViewHistoryClick={handleViewHistory}
+          onLogout={handleLogout}
+          theme={currentTheme}
+          onToggleTheme={toggleTheme}
+        />
+      ) : currentView === "history-view" && selectedDocument ? (
+        <LazyComponents.ValidationScreen
+          document={selectedDocument}
+          queueCount={queueCount}
+          onBack={handleBackToDashboard}
+          onSubmit={handleSubmitValidation}
+          onLogout={handleLogout}
+          theme={currentTheme}
+          onToggleTheme={toggleTheme}
+          isReadOnly={isReadOnlyView}
+        />
+      ) : selectedDocument ? (
+        <LazyComponents.ValidationScreen
+          document={selectedDocument}
+          queueCount={queueCount}
+          onBack={handleBackToDashboard}
+          onSubmit={handleSubmitValidation}
+          onLogout={handleLogout}
+          theme={currentTheme}
+          onToggleTheme={toggleTheme}
+        />
+      ) : null}
+      
+      {isLoading && <LoadingOverlay />}
+    </div>
   );
-});
 
-const App = React.memo(function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary
+      children={
+        <>
+          {body}
+          <Toaster />
+        </>
+      }
+    />
   );
-});
+};
+
+function App() {
+  return (
+    <AuthProvider children={<AppContent />} />
+  );
+}
 
 export default App;

@@ -105,14 +105,15 @@ export function DocumentAssignment() {
 
       const response = await documentAPI.getDocuments(params);
       
-      if (response.status === 'success' && Array.isArray(response.files)) {
+      const apiList = (response as any).policies || response.files;
+      if (response.status === 'success' && Array.isArray(apiList)) {
         // Set stats from API response
         if (response.stats) {
           setStats(response.stats);
         }
         
         // Convert API response to match component expectations
-        const formattedDocuments: AccountRow[] = response.files.map((doc: AccountDocument) => ({
+        const formattedDocuments: AccountRow[] = apiList.map((doc: AccountDocument) => ({
           id: doc.id.toString(),
           accountName: doc.first_named_insured,
           documentCount: doc.document_count,

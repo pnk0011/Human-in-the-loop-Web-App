@@ -50,6 +50,8 @@ export interface GetReviewerDocumentsResponse {
   stats?: {
     Assigned_accounts: number;
     Completed_accounts: number;
+    Assigned_policies?: number;
+    Completed_policies?: number;
   };
   pagination?: {
     page: number;
@@ -58,6 +60,7 @@ export interface GetReviewerDocumentsResponse {
     total_pages: number;
   };
   files?: ReviewerDocument[];
+  policies?: ReviewerDocument[]; // new key from API
   error?: string;
 }
 
@@ -80,6 +83,20 @@ export interface ReviewFileResponse {
   first_named_insured?: string;
   document_count?: number;
   documents?: ReviewerPolicyDocument[];
+  error?: string;
+}
+
+// Reviewer update policy documents (save field corrections)
+export interface ReviewerUpdatePolicyRequest {
+  table_name: string;
+  action: string;
+  id: number | string;
+  data: Record<string, any>;
+}
+
+export interface ReviewerUpdatePolicyResponse {
+  status?: string;
+  message?: string;
   error?: string;
 }
 
@@ -263,10 +280,26 @@ class DocumentOperationsAPI {
 
       const endpoint = `/reviewer-get-assigned-policies?${query.toString()}`;
 
-      const response = await this.makeRequest<GetReviewerDocumentsResponse>(endpoint, {
+      const raw = await this.makeRequest<GetReviewerDocumentsResponse>(endpoint, {
         method: 'GET',
       });
-      return response;
+      const normalized: GetReviewerDocumentsResponse = { ...raw };
+
+      // Normalize list key
+      const list = (raw as any).policies || raw.files || [];
+      normalized.files = list;
+
+      // Normalize stats keys
+      if (raw.stats) {
+        normalized.stats = {
+          Assigned_accounts: raw.stats.Assigned_accounts ?? raw.stats.Assigned_policies ?? 0,
+          Completed_accounts: raw.stats.Completed_accounts ?? raw.stats.Completed_policies ?? 0,
+          Assigned_policies: raw.stats.Assigned_policies,
+          Completed_policies: raw.stats.Completed_policies,
+        };
+      }
+
+      return normalized;
     } catch (error: any) {
       return {
         status: 'error',
@@ -294,6 +327,22 @@ class DocumentOperationsAPI {
       return {
         success: false,
         error: error.message || 'Failed to fetch file details',
+      };
+    }
+  }
+
+  async reviewerUpdatePolicyDocuments(params: ReviewerUpdatePolicyRequest): Promise<ReviewerUpdatePolicyResponse> {
+    try {
+      const response = await this.makeRequest<ReviewerUpdatePolicyResponse>('/reviewer-update-policy-documents', {
+        method: 'PUT',
+        body: JSON.stringify(params),
+      });
+      return response;
+    } catch (error: any) {
+      return {
+        status: 'error',
+        message: error.message || 'Failed to update policy documents',
+        error: error.message,
       };
     }
   }

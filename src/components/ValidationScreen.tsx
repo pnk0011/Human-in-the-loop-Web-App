@@ -31,13 +31,16 @@ import {
 import { LoadingSpinner, LoadingOverlay } from "./LoadingComponents";
 import { useLoading } from "../hooks/useLoading";
 import { PDFViewer } from "./PDFViewer";
+import { documentOperationsAPI } from "../services/documentOperationsAPI";
 
 interface ExtractedField {
   id: string;
+  sourceId?: number | string;
   fieldName: string;
   fieldDescription: string;
   extractedValue: string;
   confidence: number;
+  pageNo?: string | number | null;
   expectedFormat?: string;
   qcComment?: string; // QC comment from previous review
   location: {
@@ -51,7 +54,7 @@ interface ExtractedField {
 interface DocumentAttachment {
   doc_handle: string;
   presigned_url: string;
-  tabbedFields: { key: string; label: string; fields: ExtractedField[] }[];
+  tabbedFields: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
 }
 
 interface ValidationDocument {
@@ -60,7 +63,7 @@ interface ValidationDocument {
   documentType: string;
   priority: "High" | "Medium" | "Low";
   fields: ExtractedField[];
-  tabbedFields?: { key: string; label: string; fields: ExtractedField[] }[];
+  tabbedFields?: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
   documentImage?: string; // URL to the document image
   attachments?: DocumentAttachment[]; // Multiple documents for reviewer validation
 }
@@ -101,29 +104,54 @@ export function ValidationScreen({
   
   // State for current attachment
   const [selectedAttachmentIndex, setSelectedAttachmentIndex] = useState(0);
+  const [variantNotes, setVariantNotes] = useState<Record<string, string>>({});
+  const [correctedValues, setCorrectedValues] = useState<Record<string, Record<string, string>>>({});
+  const [isSavingDataset, setIsSavingDataset] = useState(false);
+  const [fieldEdits, setFieldEdits] = useState<Record<string, { correctedValue: string; comments: string; status?: 'idle' | 'saving' | 'saved' | 'error'; error?: string }>>({});
   
   // Get current attachment data
   const currentAttachment = document.attachments && document.attachments.length > 0
     ? document.attachments[selectedAttachmentIndex]
     : null;
   
-  const tabbedFields = currentAttachment
-    ? currentAttachment.tabbedFields.filter((t) => t.fields && t.fields.length > 0)
+  const [tabVariantIndex, setTabVariantIndex] = useState<Record<string, number>>({});
+
+  const baseTabs = currentAttachment
+    ? currentAttachment.tabbedFields
     : document.tabbedFields && document.tabbedFields.length > 0
-    ? document.tabbedFields.filter((t) => t.fields && t.fields.length > 0)
+    ? document.tabbedFields
     : [{ key: 'default', label: 'Fields', fields: document.fields }];
+
+  // Hide tabs with no data (no fields and no variant with fields)
+  const tabbedFields = baseTabs.filter((t) => {
+    const variants = t.variants || [];
+    const hasVariantData = variants.some((v) => v && v.length > 0);
+    const hasFields = t.fields && t.fields.length > 0;
+    return hasVariantData || hasFields;
+  });
+
+  const effectiveTabs = tabbedFields.length > 0 ? tabbedFields : baseTabs;
   
-  const allFields = tabbedFields.flatMap((t) => t.fields);
-  const [activeTab, setActiveTab] = useState(tabbedFields[0]?.key || 'default');
+  const allFields = React.useMemo(() => {
+    return effectiveTabs.flatMap((t) => {
+      const variantIdx = tabVariantIndex[t.key] ?? 0;
+      const variant = t.variants?.[variantIdx];
+      return variant && variant.length ? variant : t.fields;
+    });
+  }, [effectiveTabs, tabVariantIndex]);
+  const [activeTab, setActiveTab] = useState(effectiveTabs[0]?.key || 'default');
   const [selectedFieldId, setSelectedFieldId] =
     useState<string>(allFields[0]?.id || "");
   const [validatedToday] = useState(47);
   const [avgTime] = useState("0:32");
   const [accuracy] = useState(94);
-  
-  // Loading states
-  const { loading: validationLoading, withLoading } = useLoading({ delay: 200 });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const currentTab = effectiveTabs.find((t) => t.key === activeTab) || effectiveTabs[0];
+  const currentVariantIndex = tabVariantIndex[currentTab.key] ?? 0;
+  const currentVariantKey = `${currentTab.key}-${currentVariantIndex}`;
+  const currentFields = currentTab?.variants?.[currentVariantIndex]?.length
+    ? currentTab.variants[currentVariantIndex]
+    : currentTab?.fields || [];
 
   // Track validation state for each field
   const [fieldValidations, setFieldValidations] = useState<
@@ -136,6 +164,15 @@ export function ValidationScreen({
       ]),
     ),
   );
+
+  const selectedField = allFields.find(
+    (f) => f.id === selectedFieldId,
+  );
+  const currentValidation = fieldValidations[selectedFieldId] || { fieldId: selectedFieldId, action: null };
+  
+  // Loading states
+  const { loading: validationLoading, withLoading } = useLoading({ delay: 200 });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Update fieldValidations when allFields changes (e.g., when switching attachments)
   useEffect(() => {
@@ -153,11 +190,11 @@ export function ValidationScreen({
 
   // Update activeTab and selectedFieldId when attachment changes
   useEffect(() => {
-    if (tabbedFields.length > 0) {
-      const tabExists = tabbedFields.find(t => t.key === activeTab);
+    if (effectiveTabs.length > 0) {
+      const tabExists = effectiveTabs.find(t => t.key === activeTab);
       if (!tabExists) {
         // Current tab doesn't exist in new attachment, switch to first tab
-        setActiveTab(tabbedFields[0].key);
+        setActiveTab(effectiveTabs[0].key);
       }
     }
   }, [selectedAttachmentIndex]);
@@ -170,15 +207,89 @@ export function ValidationScreen({
         setSelectedFieldId(allFields[0].id);
       }
     }
-  }, [selectedAttachmentIndex]);
+  }, [selectedAttachmentIndex, allFields]);
 
-  const currentTab = tabbedFields.find((t) => t.key === activeTab) || tabbedFields[0];
-  const currentFields = currentTab?.fields || [];
+  // Ensure field edit state exists for selected field and variant
+  useEffect(() => {
+    if (!selectedField) return;
+    const editKey = `${currentVariantKey}-${selectedField.id}`;
+    setFieldEdits((prev) => {
+      if (prev[editKey]) return prev;
+      return {
+        ...prev,
+        [editKey]: {
+          correctedValue: selectedField.extractedValue || '',
+          comments: '',
+          status: 'idle',
+        },
+      };
+    });
+  }, [selectedFieldId, currentVariantKey, selectedField]);
 
-  const selectedField = allFields.find(
-    (f) => f.id === selectedFieldId,
-  );
-  const currentValidation = fieldValidations[selectedFieldId] || { fieldId: selectedFieldId, action: null };
+  const currentFieldEditKey = `${currentVariantKey}-${selectedFieldId}`;
+  const currentFieldEdit = fieldEdits[currentFieldEditKey] || { correctedValue: '', comments: '', status: 'idle' };
+
+  const handleFieldEditChange = (type: 'value' | 'comments', newVal: string) => {
+    setFieldEdits((prev) => ({
+      ...prev,
+      [currentFieldEditKey]: {
+        ...currentFieldEdit,
+        [type === 'value' ? 'correctedValue' : 'comments']: newVal,
+        status: 'idle',
+        error: undefined,
+      },
+    }));
+  };
+
+  const handleSaveFieldEdit = async () => {
+    if (!selectedField) return;
+    if (!selectedField.rowId) {
+      setFieldEdits((prev) => ({
+        ...prev,
+        [currentFieldEditKey]: { ...currentFieldEdit, status: 'error', error: 'Missing field id to update' },
+      }));
+      return;
+    }
+
+    const tableMap: Record<string, string> = {
+      loss: 'subdata.hil_loss_extraction',
+      account: 'subdata.hil_account_extraction',
+      exposure: 'subdata.hil_exposure_extraction',
+    };
+    const tableName = tableMap[currentTab.key] || '';
+
+    setFieldEdits((prev) => ({
+      ...prev,
+      [currentFieldEditKey]: { ...currentFieldEdit, status: 'saving', error: undefined },
+    }));
+
+    try {
+      const { documentOperationsAPI } = await import('../services/documentOperationsAPI');
+      const payload = {
+        table_name: tableName,
+        action: 'Approved',
+        id: selectedField.rowId,
+        data: {
+          reviewer_comments: currentFieldEdit.comments || '',
+          corrected_value: currentFieldEdit.correctedValue,
+          qc_comments: '',
+        },
+      };
+      const resp = await documentOperationsAPI.reviewerUpdatePolicyDocuments(payload);
+      if (resp.status === 'error' || resp.error) {
+        throw new Error(resp.message || resp.error || 'Failed to save');
+      }
+      setFieldEdits((prev) => ({
+        ...prev,
+        [currentFieldEditKey]: { ...currentFieldEdit, status: 'saved', error: undefined },
+      }));
+    } catch (err: any) {
+      setFieldEdits((prev) => ({
+        ...prev,
+        [currentFieldEditKey]: { ...currentFieldEdit, status: 'error', error: err?.message || 'Failed to save' },
+      }));
+    }
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -271,22 +382,22 @@ export function ValidationScreen({
     }));
   };
 
-  const handleCorrectedValueChange = (value: string) => {
-    setFieldValidations((prev) => ({
-      ...prev,
-      [selectedFieldId]: {
-        ...prev[selectedFieldId],
-        correctedValue: value,
-      },
-    }));
-  };
-
   const handleNoteChange = (note: string) => {
     setFieldValidations((prev) => ({
       ...prev,
       [selectedFieldId]: {
         ...prev[selectedFieldId],
         note,
+      },
+    }));
+  };
+
+  const handleCorrectedValueChange = (fieldId: string, value: string) => {
+    setCorrectedValues((prev) => ({
+      ...prev,
+      [currentVariantKey]: {
+        ...(prev[currentVariantKey] || {}),
+        [fieldId]: value,
       },
     }));
   };
@@ -331,6 +442,51 @@ export function ValidationScreen({
     } finally {
       // Reset loading state after submission
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveDataset = async () => {
+    const currentKey = currentVariantKey;
+    const changes = correctedValues[currentKey] || {};
+    const fieldsToSave = currentFields.filter((f) => changes[f.id] !== undefined);
+    if (fieldsToSave.length === 0 && !variantNotes[currentKey]) {
+      alert("No changes to save for this data set.");
+      return;
+    }
+
+    const tableMap: Record<string, string> = {
+      loss: "subdata.hil_loss_extraction",
+      exposure: "subdata.hil_exposure_extraction",
+      account: "subdata.hil_account_extraction",
+      default: "subdata.hil_account_extraction",
+    };
+
+    const tableName = tableMap[currentTab.key] || tableMap.default;
+    setIsSavingDataset(true);
+    try {
+      const dataPayload: Record<string, any> = {};
+      fieldsToSave.forEach((field) => {
+        dataPayload[field.id] = changes[field.id];
+      });
+      dataPayload.reviewer_comments = variantNotes[currentKey] || "";
+      dataPayload.qc_comments = "";
+
+      const targetId =
+        fieldsToSave[0]?.sourceId ||
+        fieldsToSave[0]?.id ||
+        currentKey;
+
+      await documentOperationsAPI.reviewerUpdatePolicyDocuments({
+        table_name: tableName,
+        action: "Approved",
+        id: targetId,
+        data: dataPayload,
+      });
+      alert("Data set saved successfully.");
+    } catch (error: any) {
+      alert(error?.message || "Failed to save data set.");
+    } finally {
+      setIsSavingDataset(false);
     }
   };
 
@@ -607,7 +763,10 @@ export function ValidationScreen({
                       className={activeTab === tab.key ? "bg-[#0292DC] text-white" : "border-[#D0D5DD] dark:border-[#3a3a3a] text-[#012F66] dark:text-white"}
                       onClick={() => {
                         setActiveTab(tab.key);
-                        const nextFields = tab.fields;
+                        const variantIdx = tabVariantIndex[tab.key] ?? 0;
+                        const nextFields = (tab.variants?.[variantIdx] && tab.variants[variantIdx].length > 0)
+                          ? tab.variants[variantIdx]
+                          : tab.fields;
                         if (nextFields.length > 0) {
                           setSelectedFieldId(nextFields[0].id);
                         }
@@ -618,6 +777,54 @@ export function ValidationScreen({
                   ))}
                 </div>
               )}
+
+              {/* Variant selector for current tab if multiple variants */}
+              {currentTab?.variants && currentTab.variants.length > 1 && (
+                <div className="mb-3">
+                  <Select
+                    value={String(currentVariantIndex)}
+                    onValueChange={(val) => {
+                      const idx = Number(val);
+                      setTabVariantIndex((prev) => ({ ...prev, [currentTab.key]: idx }));
+                      const variantFields = currentTab.variants?.[idx] || [];
+                      if (variantFields.length > 0) {
+                        setSelectedFieldId(variantFields[0].id);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full border-[#D0D5DD] dark:border-[#3a3a3a]">
+                      <SelectValue placeholder="Select data set" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currentTab.variants.map((_, idx) => (
+                        <SelectItem key={`${currentTab.key}-${idx}`} value={String(idx)}>
+                          {currentTab.label} Set #{idx + 1}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Notes per data set */}
+              {currentTab && (
+                <div className="mb-3 space-y-2">
+                  <label className="text-[#012F66] dark:text-white">Notes for this data set</label>
+                  <Textarea
+                    value={variantNotes[currentVariantKey] || ''}
+                    onChange={(e) =>
+                      setVariantNotes((prev) => ({
+                        ...prev,
+                        [currentVariantKey]: e.target.value,
+                      }))
+                    }
+                    placeholder="Add notes specific to this data set..."
+                    rows={3}
+                    className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white resize-none"
+                  />
+                </div>
+              )}
+
               <ScrollArea className="h-[260px]">
                 <div className="space-y-2 pr-4">
                   {currentFields.map((field, index) => (
@@ -652,9 +859,23 @@ export function ValidationScreen({
                             >
                               {field.confidence}%
                             </Badge>
-                            <span className="text-[#80989A]">
-                              {field.extractedValue}
-                            </span>
+                        <span className="text-[#80989A]">
+                          {field.extractedValue || '—'}
+                        </span>
+                          </div>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-[#80989A]">
+                        <span>Page: {field.pageNo ?? '—'}</span>
+                        <span className="mx-1">|</span>
+                        <span>Confidence: {field.confidence}%</span>
+                      </div>
+                          <div className="mt-2 space-y-1">
+                            <p className="text-xs text-[#80989A]">Original: {field.extractedValue || '—'}</p>
+                            <Input
+                              value={(correctedValues[currentVariantKey]?.[field.id]) ?? ''}
+                              onChange={(e) => handleCorrectedValueChange(field.id, e.target.value)}
+                              placeholder="Enter corrected value"
+                              className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white"
+                            />
                           </div>
                         </div>
                         <div className="flex-shrink-0">
@@ -682,44 +903,6 @@ export function ValidationScreen({
               )}
             </div> */}
 
-            {/* AI Extraction */}
-            <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-[#0292DC]" />
-                <span className="text-[#80989A] dark:text-[#a0a0a0]">
-                  AI Extraction
-                </span>
-              </div>
-
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[#80989A] dark:text-[#a0a0a0]">
-                    Confidence
-                  </span>
-                  <span className="text-[#012F66] dark:text-white">
-                    {selectedField.confidence}%
-                  </span>
-                </div>
-                <div className="relative h-2 bg-[#E5E7EB] dark:bg-[#1a1a1a] rounded-full overflow-hidden">
-                  <div
-                    className={`absolute left-0 top-0 h-full ${getConfidenceColor(selectedField.confidence)} transition-all`}
-                    style={{
-                      width: `${selectedField.confidence}%`,
-                    }}
-                  />
-                </div>
-                <span className="text-[#80989A] dark:text-[#a0a0a0] mt-1 block">
-                  {getConfidenceLabel(selectedField.confidence)}
-                </span>
-              </div>
-
-              <div className="bg-[#F5F7FA] dark:bg-[#1a1a1a] p-4 rounded border border-[#D0D5DD] dark:border-[#3a3a3a]">
-                <p className="text-[#012F66] dark:text-white">
-                  {selectedField.extractedValue}
-                </p>
-              </div>
-            </div>
-
             {/* QC Comment (if available) */}
             {selectedField.qcComment && (
               <div className="bg-[#FFC018]/10 border border-[#FFC018] rounded-lg p-4">
@@ -735,115 +918,18 @@ export function ValidationScreen({
               </div>
             )}
 
-            {/* Validation Actions */}
-            <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
-              <h4 className="text-[#012F66] dark:text-white mb-4">
-                Your Validation
-              </h4>
-
-              <div className="flex gap-2 mb-4">
-                <Button
-                  variant={
-                    currentValidation.action === "accept"
-                      ? "default"
-                      : "outline"
-                  }
-                  onClick={() => handleActionChange("accept")}
-                  className={
-                    currentValidation.action === "accept"
-                      ? "flex-1 bg-green-600 hover:bg-green-700 text-white"
-                      : "flex-1 border-green-600 text-green-600 hover:bg-green-50"
-                  }
-                >
-                  <Check className="w-4 h-4 mr-2" />
-                  Accept
-                </Button>
-                <Button
-                  variant={
-                    currentValidation.action === "correct"
-                      ? "default"
-                      : "outline"
-                  }
-                  onClick={() => handleActionChange("correct")}
-                  className={
-                    currentValidation.action === "correct"
-                      ? "flex-1 bg-[#FFC018] hover:bg-[#FFC018]/90 text-white"
-                      : "flex-1 border-[#FFC018] text-[#FFC018] hover:bg-[#FFC018]/10"
-                  }
-                >
-                  <Edit3 className="w-4 h-4 mr-2" />
-                  Correct
-                </Button>
-                <Button
-                  variant={
-                    currentValidation.action === "reject"
-                      ? "default"
-                      : "outline"
-                  }
-                  onClick={() => handleActionChange("reject")}
-                  className={
-                    currentValidation.action === "reject"
-                      ? "flex-1 bg-[#FF0081] hover:bg-[#FF0081]/90 text-white"
-                      : "flex-1 border-[#FF0081] text-[#FF0081] hover:bg-[#FF0081]/10"
-                  }
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Reject
-                </Button>
-              </div>
-
-              {/* Correction Input */}
-              {currentValidation.action === "correct" && (
-                <div className="mb-4 space-y-2">
-                  <label className="text-[#012F66] dark:text-white">
-                    Corrected Value
-                  </label>
-                  <Input
-                    value={currentValidation.correctedValue || ""}
-                    onChange={(e) =>
-                      handleCorrectedValueChange(e.target.value)
-                    }
-                    placeholder="Enter the correct value"
-                    className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white"
-                  />
-                </div>
-              )}
-
-              {/* Notes */}
-              <div className="space-y-2">
-                <label className="text-[#012F66] dark:text-white">
-                  Notes (Optional)
-                </label>
-                <Textarea
-                  value={currentValidation.note || ""}
-                  onChange={(e) =>
-                    handleNoteChange(e.target.value)
-                  }
-                  placeholder="Add any relevant notes about this field..."
-                  rows={3}
-                  className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white resize-none"
-                />
-              </div>
-            </div>
-
           </div>
 
-          {/* Submit Button */}
+          {/* Save Dataset Button */}
           <Button
-            onClick={handleSubmitAll}
-            disabled={getValidatedFieldsCount() === 0 || isSubmitting}
+            onClick={handleSaveDataset}
+            disabled={isSavingDataset}
             className="mt-4 w-full bg-[#0292DC] hover:bg-[#012F66] text-white flex-shrink-0"
           >
-            {isSubmitting ? (
-              <LoadingSpinner size="sm" text="Submitting..." />
+            {isSavingDataset ? (
+              <LoadingSpinner size="sm" text="Saving..." />
             ) : (
-              <>
-                Submit All Validations ({getValidatedFieldsCount()}/
-                {document.fields.length})
-                <span className="ml-2 text-xs opacity-70">
-                  (⌘Enter)
-                </span>
-              </>
+              "Save Data Set"
             )}
           </Button>
         </div>

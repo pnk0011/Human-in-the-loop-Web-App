@@ -23,7 +23,8 @@ export interface DocumentsListResponse {
     total_records: number;
     total_pages: number;
   };
-  files?: AccountDocument[];
+  files?: AccountDocument[]; // legacy key
+  policies?: AccountDocument[]; // new key from API
   error?: string;
 }
 
