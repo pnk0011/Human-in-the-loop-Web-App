@@ -59,8 +59,6 @@ type SortDirection = 'asc' | 'desc';
 
 export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: externalIsLoading }: ValidationQueueProps = {}) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [activeFilter, setActiveFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
@@ -94,15 +92,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
     );
   }
 
-  if (statusFilter !== 'all') {
-    filteredData = filteredData.filter(item => (item.status || '').toLowerCase() === statusFilter.toLowerCase());
-  }
-
-  if (activeFilter !== 'all') {
-    const mustBeActive = activeFilter === 'active';
-    filteredData = filteredData.filter(item => (item.isActive ?? false) === mustBeActive);
-  }
-  
+  // Status/active filters removed per request
   // Sort to prioritize Reassigned status documents at the top
   // Then apply manual sorting if sortField is set
   filteredData = [...filteredData].sort((a, b) => {
@@ -185,8 +175,6 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
 
   const resetFilters = () => {
     setSearchQuery('');
-    setStatusFilter('all');
-    setActiveFilter('all');
     setCurrentPage(1);
   };
 
@@ -194,7 +182,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
     <div className="space-y-6">
       {/* Filters */}
       <div className="bg-white dark:bg-[#2a2a2a] p-6 rounded-lg shadow-sm border border-[#E5E7EB] dark:border-[#3a3a3a]">
-        <h3 className="text-[#012F66] dark:text-white mb-4">Filter Accounts</h3>
+        <h3 className="text-[#012F66] dark:text-white mb-4">Filter Policies</h3>
         <div className="flex flex-wrap gap-4 mb-4">
           <div className="w-full md:max-w-xs">
             <label className="block text-[#012F66] dark:text-white mb-2">Search</label>
@@ -207,37 +195,6 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
               placeholder="Search by account or summary"
               className="w-full px-3 py-2 rounded-md border border-[#D0D5DD] dark:border-[#4a4a4a] bg-white dark:bg-[#3a3a3a] text-[#012F66] dark:text-white"
             />
-          </div>
-
-          <div className="w-full md:w-auto md:min-w-[150px]">
-            <label className="block text-[#012F66] dark:text-white mb-2">Status</label>
-            <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}>
-              <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="New">New</SelectItem>
-                <SelectItem value="In Progress">In Progress</SelectItem>
-                <SelectItem value="Pending Review">Pending Review</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-                <SelectItem value="Reassigned">Reassigned</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="w-full md:w-auto md:min-w-[150px]">
-            <label className="block text-[#012F66] dark:text-white mb-2">Active</label>
-            <Select value={activeFilter} onValueChange={(value) => { setActiveFilter(value); setCurrentPage(1); }}>
-              <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
-                <SelectValue placeholder="Active state" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="w-full md:w-auto md:min-w-[150px]">
@@ -306,7 +263,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
                     onClick={() => handleSort('account')}
                     className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                   >
-                    Account <SortIcon field="account" />
+                            Policy <SortIcon field="account" />
                   </button>
                 </th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
@@ -317,16 +274,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
                     Documents <SortIcon field="documentCount" />
                   </button>
                 </th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                  <button
-                    onClick={() => handleSort('status')}
-                    className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    Status <SortIcon field="status" />
-                  </button>
-                </th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Summary</th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Active</th>
                 <th className="px-6 py-4 text-right text-[#012F66] dark:text-white">Action</th>
               </tr>
             </thead>
@@ -345,16 +293,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-12"></div>
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-16"></div>
-                    </td>
-                    <td className="px-6 py-5">
                       <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-40"></div>
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-28"></div>
                     </td>
                     <td className="px-6 py-5">
                       <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-28"></div>
@@ -370,13 +309,13 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
               ) : filteredData.length === 0 ? (
                 // Empty state when no documents found after API data is loaded
                 <tr>
-                  <td colSpan={6} className="px-6 py-16 text-center">
+                  <td colSpan={5} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center justify-center" style={{ padding: '20px' }}>
                       <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
                         <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
                       </div>
                       <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
-                        No Accounts Found
+                        No Policies Found
                       </h3>
                       <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-4 max-w-md">
                         {apiDocuments && apiDocuments.length === 0 && dataSource.length === 0
@@ -384,7 +323,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
                           : "No accounts match your current filters. Try adjusting your search criteria or reset the filters."
                         }
                       </p>
-                      {(searchQuery || statusFilter !== 'all' || activeFilter !== 'all' || (apiDocuments && apiDocuments.length === 0 && dataSource.length === 0)) && (
+                      {(searchQuery || (apiDocuments && apiDocuments.length === 0 && dataSource.length === 0)) && (
                         <Button
                           onClick={resetFilters}
                           variant="outline"
@@ -411,20 +350,8 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
                       </div>
                     </td>
                     <td className="px-6 py-5 text-[#012F66] dark:text-white">{item.documentCount}</td>
-                    <td className="px-6 py-5">
-                      {(() => {
-                        const statusInfo = formatStatus(item.status);
-                        return <Badge className={statusInfo.className}>{statusInfo.label}</Badge>;
-                      })()}
-                    </td>
                     <td className="px-6 py-5 text-[#80989A] dark:text-[#a0a0a0] max-w-xs">
                       {item.descriptionSummary || '-'}
-                    </td>
-                    <td className="px-6 py-5">
-                      <span className="inline-flex items-center gap-2 text-sm font-medium text-[#012F66] dark:text-white">
-                        <Activity className={`w-4 h-4 ${item.isActive ? 'text-[#0292DC]' : 'text-[#80989A]'}`} />
-                        {item.isActive ? 'Active' : 'Inactive'}
-                      </span>
                     </td>
                     <td className="px-6 py-5 text-right">
                       <Button
@@ -452,7 +379,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
         {/* Pagination */}
         <div className="px-6 py-4 border-t border-[#E5E7EB] dark:border-[#3a3a3a] flex items-center justify-between">
           <div className="text-[#80989A] dark:text-[#a0a0a0]">
-            {totalItems > 0 ? `Showing ${startIndex + 1}-${endIndex} of ${totalItems} items` : 'No items'}
+                      {totalItems > 0 ? `Showing ${startIndex + 1}-${endIndex} of ${totalItems} items` : 'No policies'}
           </div>
           <div className="flex gap-2">
             <Button

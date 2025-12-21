@@ -203,7 +203,6 @@ export const DashboardHeader = React.memo(function DashboardHeader({
 }) {
   const tabs = useMemo(() => [
     { value: "Current Queue", label: "Current Queue" },
-    { value: "Work History", label: "Work History" }
   ], []);
 
   return (
@@ -256,7 +255,6 @@ export const QCHeader = React.memo(function QCHeader({
 }) {
   const tabs = useMemo(() => [
     { value: "Current Queue", label: "Current Queue" },
-    { value: "Work History", label: "Work History" }
   ], []);
 
   return (

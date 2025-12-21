@@ -48,7 +48,14 @@ interface ExtractedField {
 interface DocumentAttachment {
   doc_handle: string;
   presigned_url: string;
-  tabbedFields: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
+  status?: string | number;
+  tabbedFields: {
+    key: string;
+    label: string;
+    fields: ExtractedField[];
+    variants?: ExtractedField[][];
+    variantMeta?: { qc_status?: string | null; qc_comments?: string | null; qc_comment?: string | null }[];
+  }[];
 }
 
 interface QCValidationDocument {
@@ -56,8 +63,9 @@ interface QCValidationDocument {
   documentName: string;
   documentType: string;
   priority: "High" | "Medium" | "Low";
+  status?: string | number;
   fields: ExtractedField[];
-  tabbedFields?: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
+  tabbedFields?: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][]; variantMeta?: { qc_status?: string | null; qc_comments?: string | null; qc_comment?: string | null; reviewer_status?: string | null; reviewer_comments?: string | null }[] }[];
   documentImage?: string;
   attachments?: DocumentAttachment[];
 }
@@ -140,6 +148,16 @@ export function QCValidationScreen({
   const currentTab = effectiveTabs.find((t) => t.key === activeTab) || effectiveTabs[0];
   const currentVariantIndex = tabVariantIndex[currentTab.key] ?? 0;
   const currentVariantKey = `${currentTab.key}-${currentVariantIndex}`;
+  const currentVariantMeta = currentTab?.variantMeta?.[currentVariantIndex];
+  const normalizedQcStatus = currentVariantMeta?.qc_status?.toString().toLowerCase();
+  const isVariantFinalized =
+    normalizedQcStatus === 'approved' || normalizedQcStatus === 'declined';
+  const docStatus = String(
+    (document.attachments?.[selectedAttachmentIndex] as any)?.status ??
+    (document as any)?.status ??
+    '',
+  );
+  const isDocNotOpen = docStatus !== '3';
   const currentFields = currentTab?.variants?.[currentVariantIndex]?.length
     ? currentTab.variants[currentVariantIndex]
     : currentTab?.fields || [];
@@ -199,6 +217,37 @@ export function QCValidationScreen({
     setVariantNotes({});
   }, [selectedAttachmentIndex]);
 
+  // Sync QC metadata (status/comments) from API response into UI
+  useEffect(() => {
+    if (!currentVariantMeta) return;
+
+    const hasFinalStatus =
+      currentVariantMeta.qc_status &&
+      ['approved', 'declined'].includes(currentVariantMeta.qc_status.toString().toLowerCase());
+
+    setDatasetDecisions((prev) => {
+      const existing = prev[currentVariantKey];
+      if (existing || !hasFinalStatus) return prev;
+      return {
+        ...prev,
+        [currentVariantKey]:
+          currentVariantMeta.qc_status?.toString().toLowerCase() === 'approved'
+            ? 'approve'
+            : 'reject',
+      };
+    });
+
+    setVariantNotes((prev) => {
+      const existing = prev[currentVariantKey];
+      const incoming = currentVariantMeta.qc_comments ?? currentVariantMeta.qc_comment;
+      if (existing || !incoming) return prev;
+      return {
+        ...prev,
+        [currentVariantKey]: String(incoming),
+      };
+    });
+  }, [currentVariantKey, currentVariantMeta]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -256,6 +305,7 @@ export function QCValidationScreen({
   };
 
   const handleDatasetDecision = (decision: 'approve' | 'reject') => {
+    if (isDocNotOpen) return;
     setDatasetDecisions((prev) => ({
       ...prev,
       [currentVariantKey]: decision,
@@ -264,6 +314,9 @@ export function QCValidationScreen({
 
   const handleSaveDataset = async () => {
     const currentKey = currentVariantKey;
+    if (isDocNotOpen) {
+      return;
+    }
     const decision = datasetDecisions[currentKey];
     
     if (!decision) {
@@ -289,7 +342,7 @@ export function QCValidationScreen({
       // Get the row ID from the first field in the current dataset
       const targetId = currentFields[0]?.sourceId || currentFields[0]?.rowId || currentFields[0]?.id || currentKey;
 
-      await documentOperationsAPI.reviewerUpdatePolicyDocuments({
+      await documentOperationsAPI.qcUpdatePolicyDocuments({
         table_name: tableName,
         action: decision === 'approve' ? 'Approved' : 'Declined',
         id: targetId,
@@ -600,16 +653,37 @@ export function QCValidationScreen({
               {/* Dataset Decision */}
               {currentTab && (
                 <div className="mb-3 space-y-2">
+                  {(currentVariantMeta?.qc_status || currentVariantMeta?.qc_comments || currentVariantMeta?.qc_comment) && (
+                    <div className="p-3 rounded-lg border border-[#D0D5DD] dark:border-[#3a3a3a] bg-[#f8fafc] dark:bg-[#232323]">
+                      {currentVariantMeta?.qc_status && (
+                        <div className="flex items-center justify-between text-sm text-[#012F66] dark:text-white font-semibold">
+                          <span>Existing QC Status</span>
+                          <Badge className="bg-[#0292DC] text-white">
+                            {currentVariantMeta.qc_status}
+                          </Badge>
+                        </div>
+                      )}
+                      {(currentVariantMeta?.qc_comments || currentVariantMeta?.qc_comment) && (
+                        <div className="mt-2 text-sm text-[#012F66] dark:text-white">
+                          <p className="font-medium">QC Comment</p>
+                          <p className="text-[#475467] dark:text-[#cfcfcf]">
+                            {currentVariantMeta.qc_comments || currentVariantMeta.qc_comment}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <label className="text-[#012F66] dark:text-white font-semibold">QC Decision</label>
                   <div className="flex gap-2">
                     <Button
                       type="button"
                       onClick={() => handleDatasetDecision('approve')}
+                      disabled={isDocNotOpen}
                       className={`flex-1 ${
                         datasetDecisions[currentVariantKey] === 'approve'
                           ? 'bg-green-600 hover:bg-green-700 text-white'
                           : 'bg-white hover:bg-green-50 text-green-600 border-2 border-green-600 dark:bg-[#2a2a2a] dark:text-green-500'
-                      }`}
+                      } disabled:opacity-60 disabled:cursor-not-allowed`}
                     >
                       {datasetDecisions[currentVariantKey] === 'approve' && (
                         <CheckCircle2 className="w-4 h-4 mr-2" />
@@ -619,11 +693,12 @@ export function QCValidationScreen({
                     <Button
                       type="button"
                       onClick={() => handleDatasetDecision('reject')}
+                      disabled={isDocNotOpen}
                       className={`flex-1 ${
                         datasetDecisions[currentVariantKey] === 'reject'
                           ? 'bg-[#0292DC] hover:bg-[#007bb6] text-white border-2 border-[#0292DC]'
                           : 'bg-white hover:bg-[#0292DC]/10 text-[#0292DC] border-2 border-[#0292DC] dark:bg-[#2a2a2a] dark:text-[#61c6ff] dark:border-[#61c6ff] dark:hover:bg-[#61c6ff26]'
-                      }`}
+                      } disabled:opacity-60 disabled:cursor-not-allowed`}
                     >
                       {datasetDecisions[currentVariantKey] === 'reject' && (
                         <CheckCircle2 className="w-4 h-4 mr-2" />
@@ -640,6 +715,7 @@ export function QCValidationScreen({
                   <label className="text-[#012F66] dark:text-white">QC Notes (Optional)</label>
                   <Textarea
                     value={variantNotes[currentVariantKey] || ''}
+                    disabled={isDocNotOpen}
                     onChange={(e) =>
                       setVariantNotes((prev) => ({
                         ...prev,
@@ -648,7 +724,7 @@ export function QCValidationScreen({
                     }
                     placeholder="Add QC notes for this data set..."
                     rows={3}
-                    className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white resize-none"
+                    className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white resize-none disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
               )}
@@ -733,7 +809,7 @@ export function QCValidationScreen({
           {/* Submit QC Decision Button */}
           <Button
             onClick={handleSaveDataset}
-            disabled={isSavingDataset || !datasetDecisions[currentVariantKey]}
+            disabled={isSavingDataset || !datasetDecisions[currentVariantKey] || isDocNotOpen}
             className="mt-4 w-full bg-[#0292DC] hover:bg-[#012F66] text-white flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSavingDataset ? (

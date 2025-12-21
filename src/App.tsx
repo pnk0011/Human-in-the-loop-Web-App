@@ -26,11 +26,29 @@ interface ExtractedField {
   };
 }
 
+interface VariantMeta {
+  qc_status?: string | null;
+  qc_comments?: string | null;
+  qc_comment?: string | null;
+  reviewer_status?: string | null;
+  reviewer_comments?: string | null;
+}
+
 interface DocumentAttachment {
   doc_handle: string;
   presigned_url: string;
   readOnly?: boolean;
-  tabbedFields: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
+  status?: string | number;
+  qc_status?: string | null;
+  qc_comments?: string | null;
+  qc_comment?: string | null;
+  tabbedFields: {
+    key: string;
+    label: string;
+    fields: ExtractedField[];
+    variants?: ExtractedField[][];
+    variantMeta?: VariantMeta[];
+  }[];
 }
 
 interface ValidationDocument {
@@ -38,11 +56,12 @@ interface ValidationDocument {
   documentName: string;
   documentType: string;
   priority: "High" | "Medium" | "Low";
+  status?: string | number;
   fields: ExtractedField[];
   documentImage?: string; // URL to the document image
   allFields?: any[]; // Store all fields from API for submission (including those with qc_action not null)
   attachments?: DocumentAttachment[]; // Multiple documents for reviewer validation
-  tabbedFields?: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
+  tabbedFields?: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][]; variantMeta?: VariantMeta[] }[];
 }
 
 // QC validation document is now the same as reviewer validation document
@@ -110,13 +129,14 @@ const AppContent = function AppContent() {
   const buildFieldsFromObject = (obj: Record<string, any>) => {
     const skipKeys = new Set([
       'document_id','document_name','doc_handle','doc_type_name','extraction_type','create_date_time','processed_flag',
-      'input_s3_uri','document_s3_uri','first_named_insured','description','supplemental_description',
+      'input_s3_uri','document_s3_uri','first_named_insured','description','supplemental_description','id',
       'qc_status','qc_comment','qc_comments','reviewer_status','reviewer_comment','reviewer_comments'
     ]);
     const fields: any[] = [];
     Object.entries(obj || {}).forEach(([key, value]) => {
       if (skipKeys.has(key)) return;
       if (key.endsWith('_confidence') || key.endsWith('_page_no')) return;
+      if (key.endsWith('_correction')) return;
       if (value === undefined) return; // include null/empty so users can validate missing data
       const confidence = obj[`${key}_confidence`];
       const pageNo = obj[`${key}_page_no`];
@@ -151,9 +171,32 @@ const AppContent = function AppContent() {
         if (response?.documents && response.documents.length > 0) {
           // Build attachments array from all documents
           const attachments: DocumentAttachment[] = response.documents.map((docPayload: any) => {
-            const exposureVariants = (docPayload.exposure_data || []).map((item: any) => buildFieldsFromObject(item || {}));
-            const accountVariants = (docPayload.account_data || []).map((item: any) => buildFieldsFromObject(item || {}));
-            const lossVariants = (docPayload.loss_data || []).map((item: any) => buildFieldsFromObject(item || {}));
+            const exposureData = docPayload.exposure_data || [];
+            const accountData = docPayload.account_data || [];
+            const lossData = docPayload.loss_data || [];
+
+            const exposureVariants = exposureData.map((item: any) => buildFieldsFromObject(item || {}));
+            const accountVariants = accountData.map((item: any) => buildFieldsFromObject(item || {}));
+            const lossVariants = lossData.map((item: any) => buildFieldsFromObject(item || {}));
+
+            const exposureVariantMeta = exposureData.map((item: any) => ({
+              qc_status: item?.qc_status ?? null,
+              qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+              reviewer_status: item?.reviewer_status ?? null,
+              reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+            }));
+            const accountVariantMeta = accountData.map((item: any) => ({
+              qc_status: item?.qc_status ?? null,
+              qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+              reviewer_status: item?.reviewer_status ?? null,
+              reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+            }));
+            const lossVariantMeta = lossData.map((item: any) => ({
+              qc_status: item?.qc_status ?? null,
+              qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+              reviewer_status: item?.reviewer_status ?? null,
+              reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+            }));
 
             const firstExposure = exposureVariants[0] || [];
             const firstAccount = accountVariants[0] || [];
@@ -162,11 +205,15 @@ const AppContent = function AppContent() {
             return {
               doc_handle: docPayload.doc_handle,
               presigned_url: docPayload.presigned_url,
-              readOnly: String(docPayload?.status) === "3",
+              readOnly: ["1", "3"].includes(String(docPayload?.status)),
+              status: docPayload.status,
+              qc_status: docPayload.qc_status ?? null,
+              qc_comments: docPayload.qc_comments ?? docPayload.qc_comment ?? null,
+              qc_comment: docPayload.qc_comment ?? null,
               tabbedFields: [
-                { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants },
-                { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants },
-                { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants },
+                { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants, variantMeta: lossVariantMeta },
+                { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants, variantMeta: accountVariantMeta },
+                { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants, variantMeta: exposureVariantMeta },
               ],
             };
           });
@@ -208,7 +255,7 @@ const AppContent = function AppContent() {
           priority: 'High',
           tabbedFields: [
             { key: 'loss', label: 'Loss Data', fields: [] },
-            { key: 'account', label: 'Account Data', fields: [] },
+            { key: 'account', label: 'Policy Data', fields: [] },
             { key: 'exposure', label: 'Exposure Data', fields: [] },
           ],
           fields: [],
@@ -235,9 +282,32 @@ const AppContent = function AppContent() {
         if (response?.documents && response.documents.length > 0) {
           // Build attachments array from all documents (same structure as reviewer)
           const attachments: DocumentAttachment[] = response.documents.map((docPayload: any) => {
-            const exposureVariants = (docPayload.exposure_data || []).map((item: any) => buildFieldsFromObject(item || {}));
-            const accountVariants = (docPayload.account_data || []).map((item: any) => buildFieldsFromObject(item || {}));
-            const lossVariants = (docPayload.loss_data || []).map((item: any) => buildFieldsFromObject(item || {}));
+            const exposureData = docPayload.exposure_data || [];
+            const accountData = docPayload.account_data || [];
+            const lossData = docPayload.loss_data || [];
+
+            const exposureVariants = exposureData.map((item: any) => buildFieldsFromObject(item || {}));
+            const accountVariants = accountData.map((item: any) => buildFieldsFromObject(item || {}));
+            const lossVariants = lossData.map((item: any) => buildFieldsFromObject(item || {}));
+
+            const exposureVariantMeta = exposureData.map((item: any) => ({
+              qc_status: item?.qc_status ?? null,
+              qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+              reviewer_status: item?.reviewer_status ?? null,
+              reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+            }));
+            const accountVariantMeta = accountData.map((item: any) => ({
+              qc_status: item?.qc_status ?? null,
+              qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+              reviewer_status: item?.reviewer_status ?? null,
+              reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+            }));
+            const lossVariantMeta = lossData.map((item: any) => ({
+              qc_status: item?.qc_status ?? null,
+              qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+              reviewer_status: item?.reviewer_status ?? null,
+              reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+            }));
 
             const firstExposure = exposureVariants[0] || [];
             const firstAccount = accountVariants[0] || [];
@@ -246,10 +316,11 @@ const AppContent = function AppContent() {
             return {
               doc_handle: docPayload.doc_handle,
               presigned_url: docPayload.presigned_url,
+              status: docPayload.status,
               tabbedFields: [
-                { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants },
-                { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants },
-                { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants },
+                { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants, variantMeta: lossVariantMeta },
+                { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants, variantMeta: accountVariantMeta },
+                { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants, variantMeta: exposureVariantMeta },
               ],
             };
           });
@@ -275,6 +346,7 @@ const AppContent = function AppContent() {
             tabbedFields: firstDoc.tabbedFields,
             fields: defaultFields,
             attachments: attachments,
+            status: response.documents?.[0]?.status,
           };
         } else {
           throw new Error('QC API response failed');
@@ -290,7 +362,7 @@ const AppContent = function AppContent() {
           priority: 'High',
           tabbedFields: [
             { key: 'loss', label: 'Loss Data', fields: [] },
-            { key: 'account', label: 'Account Data', fields: [] },
+            { key: 'account', label: 'Policy Data', fields: [] },
             { key: 'exposure', label: 'Exposure Data', fields: [] },
           ],
           fields: [],
@@ -376,7 +448,7 @@ const AppContent = function AppContent() {
         priority: "Medium",
         tabbedFields: [
           { key: 'loss', label: 'Loss Data', fields: [] },
-          { key: 'account', label: 'Account Data', fields: [] },
+          { key: 'account', label: 'Policy Data', fields: [] },
           { key: 'exposure', label: 'Exposure Data', fields: [] },
         ],
         fields: [],

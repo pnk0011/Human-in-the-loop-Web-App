@@ -51,11 +51,22 @@ interface ExtractedField {
   };
 }
 
+interface VariantMeta {
+  qc_status?: string | null;
+  qc_comments?: string | null;
+  reviewer_status?: string | null;
+  reviewer_comments?: string | null;
+}
+
 interface DocumentAttachment {
   doc_handle: string;
   presigned_url: string;
   readOnly?: boolean;
-  tabbedFields: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
+  status?: string | number;
+  qc_status?: string | null;
+  qc_comments?: string | null;
+  qc_comment?: string | null;
+  tabbedFields: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][]; variantMeta?: VariantMeta[] }[];
 }
 
 interface ValidationDocument {
@@ -63,8 +74,9 @@ interface ValidationDocument {
   documentName: string;
   documentType: string;
   priority: "High" | "Medium" | "Low";
+  status?: string | number;
   fields: ExtractedField[];
-  tabbedFields?: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
+  tabbedFields?: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][]; variantMeta?: VariantMeta[] }[];
   documentImage?: string; // URL to the document image
   attachments?: DocumentAttachment[]; // Multiple documents for reviewer validation
 }
@@ -148,9 +160,27 @@ export function ValidationScreen({
   const [avgTime] = useState("0:32");
   const [accuracy] = useState(94);
 
+  // Log attachment status changes once per distinct status signature to avoid noisy render-time logs
+  const attachmentStatusSignature = React.useMemo(
+    () =>
+      JSON.stringify(
+        (document.attachments || []).map(
+          (a) => `${a.doc_handle}:${String(a.status ?? '').trim()}`,
+        ),
+      ),
+    [document.attachments],
+  );
+
+  useEffect(() => {
+    (document.attachments || []).forEach((attachment, index) => {
+      const normalized = String(attachment.status ?? '').trim();
+    });
+  }, [attachmentStatusSignature, document.attachments]);
+
   const currentTab = effectiveTabs.find((t) => t.key === activeTab) || effectiveTabs[0];
   const currentVariantIndex = tabVariantIndex[currentTab.key] ?? 0;
   const currentVariantKey = `${currentTab.key}-${currentVariantIndex}`;
+  const currentVariantMeta = (currentTab as any)?.variantMeta?.[currentVariantIndex];
   const currentFields = currentTab?.variants?.[currentVariantIndex]?.length
     ? currentTab.variants[currentVariantIndex]
     : currentTab?.fields || [];
@@ -478,6 +508,7 @@ export function ValidationScreen({
       const dataPayload: Record<string, any> = {};
       fieldsToSave.forEach((field) => {
         dataPayload[field.id] = changes[field.id];
+        dataPayload[`${field.id}_correction`] = "true";
       });
       dataPayload.reviewer_comments = variantNotes[currentKey] || "";
       dataPayload.qc_comments = "";
@@ -725,13 +756,37 @@ export function ValidationScreen({
         <div className="w-[360px] flex-shrink-0 h-full flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto space-y-4 pr-1" style={{ width: '360px' }}>
             {/* Attachments List */}
-            {document.attachments && document.attachments.length > 1 && (
+            {document.attachments && document.attachments.length > 0 && (
               <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-4 border-[#E5E7EB] dark:border-[#3a3a3a]">
                 <h4 className="text-[#012F66] dark:text-white mb-3 font-semibold">
                   Documents ({document.attachments.length})
                 </h4>
                 <div className="space-y-2">
-                  {document.attachments.map((attachment, index) => (
+                  {document.attachments.map((attachment, index) => {
+                    const status = String(attachment.status ?? document.status ?? '').trim();
+                    let statusBadge = null;
+                    const commonChip = "px-2 py-1 rounded text-xs font-semibold text-white";
+                    if (status == '1') {
+                      statusBadge = (
+                        <span className={`${commonChip} bg-green-600`}>
+                          Completed
+                        </span>
+                      );
+                    } else if (status == '3') {
+                      statusBadge = (
+                        <span className={`${commonChip}`} style={{ backgroundColor: '#fcba03' }}>
+                          QC Pending
+                        </span>
+                      );
+                    } else if (status == '4') {
+                      statusBadge = (
+                        <span className={`${commonChip}`} style={{ backgroundColor: '#ff0081' }}>
+                          Re-assigned
+                        </span>
+                      );
+                    }
+                    
+                    return (
                     <div
                       key={attachment.doc_handle}
                       onClick={() => handleAttachmentChange(index)}
@@ -747,6 +802,7 @@ export function ValidationScreen({
                             <span className="text-[#012F66] dark:text-white font-medium">
                               Document #{index + 1}
                             </span>
+                            {statusBadge}
                           </div>
                           <div className="text-xs text-[#80989A] dark:text-[#a0a0a0] mt-1">
                             {attachment.doc_handle}
@@ -759,7 +815,8 @@ export function ValidationScreen({
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -823,26 +880,83 @@ export function ValidationScreen({
                 </div>
               )}
 
-              {/* Notes per data set */}
-              {currentTab && (
-                <div className="mb-3 space-y-2">
-                  <label className="text-[#012F66] dark:text-white">Notes for this data set</label>
-                  <Textarea
-                    value={variantNotes[currentVariantKey] || ''}
-                    onChange={(e) =>
-                      setVariantNotes((prev) => ({
-                        ...prev,
-                        [currentVariantKey]: e.target.value,
-                      }))
-                    }
-                    placeholder="Add notes specific to this data set..."
-                    rows={3}
-                  readOnly={readOnlyMode}
-                  disabled={readOnlyMode}
-                    className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white resize-none"
-                  />
-                </div>
-              )}
+                {/* QC metadata if available (fallback to attachment-level qc status/comments) */}
+                {(() => {
+                  const qcMeta =
+                    currentVariantMeta ||
+                    (currentAttachment
+                      ? {
+                          qc_status: currentAttachment.qc_status,
+                          qc_comments: currentAttachment.qc_comments ?? currentAttachment.qc_comment,
+                        }
+                      : null);
+
+                  if (!qcMeta || (!qcMeta.qc_status && !qcMeta.qc_comments && !(qcMeta as any).qc_comment)) {
+                    return null;
+                  }
+
+                  return (
+                  <div className="mb-3 p-3 rounded-lg border border-[#D0D5DD] dark:border-[#3a3a3a] bg-[#f8fafc] dark:bg-[#232323]">
+                    {qcMeta.qc_status && (
+                      <div className="flex items-center justify-between text-sm text-[#012F66] dark:text-white font-semibold">
+                        <span>QC Status</span>
+                        <span className="text-[#5b21b6] dark:text-[#c4b5fd]">{qcMeta.qc_status}</span>
+                      </div>
+                    )}
+                    {(qcMeta.qc_comments || (qcMeta as any).qc_comment) && (
+                      <div className="mt-2 text-sm text-[#012F66] dark:text-white">
+                        <p className="font-medium">QC Comment</p>
+                        <p className="text-[#475467] dark:text-[#cfcfcf]">
+                          {qcMeta.qc_comments || (qcMeta as any).qc_comment}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  );
+                })()}
+
+                {/* Reviewer metadata if available */}
+                {currentVariantMeta && (currentVariantMeta.reviewer_status || currentVariantMeta.reviewer_comments) && (
+                  <div className="mb-3 p-3 rounded-lg border border-[#D0D5DD] dark:border-[#3a3a3a] bg-[#f8fafc] dark:bg-[#232323]">
+                    {currentVariantMeta.reviewer_status && (
+                      <div className="flex items-center justify-between text-sm text-[#012F66] dark:text-white font-semibold">
+                        <span>Reviewer Status</span>
+                        <Badge className="bg-[#0292DC] text-white">
+                          {currentVariantMeta.reviewer_status}
+                        </Badge>
+                      </div>
+                    )}
+                    {currentVariantMeta.reviewer_comments && (
+                      <div className="mt-2 text-sm text-[#012F66] dark:text-white">
+                        <p className="font-medium">Reviewer Comment</p>
+                        <p className="text-[#475467] dark:text-[#cfcfcf]">
+                          {currentVariantMeta.reviewer_comments}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Notes per data set */}
+                {currentTab && (
+                  <div className="mb-3 space-y-2">
+                    <label className="text-[#012F66] dark:text-white">Notes for this data set</label>
+                    <Textarea
+                      value={variantNotes[currentVariantKey] || ''}
+                      onChange={(e) =>
+                        setVariantNotes((prev) => ({
+                          ...prev,
+                          [currentVariantKey]: e.target.value,
+                        }))
+                      }
+                      placeholder="Add notes specific to this data set..."
+                      rows={3}
+                      readOnly={readOnlyMode}
+                      disabled={readOnlyMode}
+                      className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white resize-none"
+                    />
+                  </div>
+                )}
 
               <ScrollArea className="h-[260px]">
                 <div className="space-y-2 pr-4">

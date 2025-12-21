@@ -72,6 +72,7 @@ export interface ReviewFileRequest {
 export interface ReviewerPolicyDocument {
   doc_handle: string;
   presigned_url: string;
+  status?: string | number;
   exposure_data?: Record<string, any>[];
   account_data?: Record<string, any>[];
   loss_data?: Record<string, any>[];
@@ -330,6 +331,22 @@ class DocumentOperationsAPI {
   async reviewerUpdatePolicyDocuments(params: ReviewerUpdatePolicyRequest): Promise<ReviewerUpdatePolicyResponse> {
     try {
       const response = await this.makeRequest<ReviewerUpdatePolicyResponse>('/reviewer-update-policy-documents', {
+        method: 'PUT',
+        body: JSON.stringify(params),
+      });
+      return response;
+    } catch (error: any) {
+      return {
+        status: 'error',
+        message: error.message || 'Failed to update policy documents',
+        error: error.message,
+      };
+    }
+  }
+
+  async qcUpdatePolicyDocuments(params: ReviewerUpdatePolicyRequest): Promise<ReviewerUpdatePolicyResponse> {
+    try {
+      const response = await this.makeRequest<ReviewerUpdatePolicyResponse>('/qc-update-policy-documents', {
         method: 'PUT',
         body: JSON.stringify(params),
       });

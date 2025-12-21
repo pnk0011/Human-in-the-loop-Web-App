@@ -176,7 +176,7 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
     return completedDocuments.map((doc) => ({
       id: doc.id ? doc.id.toString() : doc.first_named_insured,
       documentName: doc.first_named_insured,
-      documentType: 'Account',
+      documentType: 'Policy',
       completedDate: new Date().toISOString().split('T')[0],
       fieldsCount: doc.document_count,
       acceptedCount: 0, // Not available in API response

@@ -37,6 +37,8 @@ interface AccountRow {
   id: string;
   accountName: string;
   documentCount: number;
+  documentsAssigned: number;
+  documentsCompleted: number;
   descriptionSummary: string;
   reviewerAssigned: string | null;
   qcAssigned: string | null;
@@ -117,6 +119,8 @@ export function DocumentAssignment() {
           id: doc.id.toString(),
           accountName: doc.first_named_insured,
           documentCount: doc.document_count,
+          documentsAssigned: (doc as any).documents_assigned ?? 0,
+          documentsCompleted: (doc as any).documents_completed ?? 0,
           descriptionSummary: doc.description_summary,
           reviewerAssigned: doc.reviewer_assigned,
           qcAssigned: doc.qc_assigned,
@@ -411,7 +415,7 @@ export function DocumentAssignment() {
       {/* Filters and Actions */}
       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-        <h3 className="text-[#012F66] dark:text-white mb-4">Filter Accounts</h3>
+        <h3 className="text-[#012F66] dark:text-white mb-4">Filter Policies</h3>
           <div className="flex flex-wrap items-center gap-4">
             {isLoading && (
               <div className="flex items-center gap-2 text-[#80989A] dark:text-[#a0a0a0]">
@@ -504,7 +508,7 @@ export function DocumentAssignment() {
         </div>
       </div>
 
-      {/* Accounts Table */}
+      {/* Policies Table */}
       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm overflow-hidden border border-[#E5E7EB] dark:border-[#3a3a3a]">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -520,13 +524,19 @@ export function DocumentAssignment() {
                   className="px-6 py-4 text-left text-[#012F66] dark:text-white cursor-pointer hover:bg-[#E5E7EB] dark:hover:bg-[#2a2a2a]"
                   onClick={() => handleSort('accountName')}
                 >
-                  Account {getSortIcon('accountName')}
+                  Policy {getSortIcon('accountName')}
                 </th>
                 <th
                   className="px-6 py-4 text-left text-[#012F66] dark:text-white cursor-pointer hover:bg-[#E5E7EB] dark:hover:bg-[#2a2a2a]"
                   onClick={() => handleSort('documentCount')}
                 >
-                  Documents {getSortIcon('documentCount')}
+                  Total Documents {getSortIcon('documentCount')}
+                </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Assigned Documents
+                </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Completed Documents
                 </th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                   Description
@@ -549,7 +559,6 @@ export function DocumentAssignment() {
                 >
                   Status {getSortIcon('status')}
                 </th>
-                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Active</th>
               </tr>
             </thead>
             <tbody>
@@ -573,19 +582,19 @@ export function DocumentAssignment() {
                       <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16"></div>
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-12"></div>
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16"></div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16"></div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-16"></div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24"></div>
@@ -606,23 +615,20 @@ export function DocumentAssignment() {
                     <div className="text-[#012F66] dark:text-white font-semibold">{doc.accountName}</div>
                     <div className="text-xs text-[#80989A] dark:text-[#a0a0a0]">ID: {doc.id}</div>
                   </td>
-                  <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentCount}</td>
+                    <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentCount}</td>
+                    <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentsAssigned}</td>
+                    <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentsCompleted}</td>
                   <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0] max-w-xs">
                     {doc.descriptionSummary || '-'}
                   </td>
                   <td className="px-6 py-4 text-[#012F66] dark:text-white">
                     {doc.reviewerAssigned || '-'}
                   </td>
-                  <td className="px-6 py-4 text-[#012F66] dark:text-white">
+                    <td className="px-6 py-4 text-[#012F66] dark:text-white">
                     {doc.qcAssigned || '-'}
                   </td>
                   <td className="px-6 py-4">
                     <Badge className={getStatusBadgeColor(doc.status)}>{doc.status}</Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge className={doc.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}>
-                      {doc.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
                   </td>
                 </tr>
                 ))
@@ -638,7 +644,7 @@ export function DocumentAssignment() {
               <FileText className="w-12 h-12 text-[#80989A] dark:text-[#a0a0a0]" />
             </div>
             <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
-              No Accounts Found
+              No Policies Found
             </h3>
             <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-6 max-w-md">
               {debouncedSearchQuery || statusFilter !== 'All'
@@ -671,7 +677,7 @@ export function DocumentAssignment() {
               <AlertCircle className="w-12 h-12 text-red-500" />
             </div>
             <h3 className="text-lg font-semibold text-[#012F66] dark:text-white mb-2">
-              Failed to Load Accounts
+              Failed to Load Policies
             </h3>
             <p className="text-[#80989A] dark:text-[#a0a0a0] text-center mb-6 max-w-md">
               There was an error loading the account data. Please check your connection and try again.

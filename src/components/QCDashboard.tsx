@@ -62,14 +62,9 @@ export function QCDashboard({
   const [isLoadingCompleted, setIsLoadingCompleted] = useState(false);
 
   // Legacy filter placeholders (document-level filters removed in new account flow)
-  const [documentType, setDocumentType] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
   const [reviewerFilter, setReviewerFilter] = useState('all');
-  const [docIdFilter, setDocIdFilter] = useState('all');
   const [isLoadingReviewers] = useState(false);
   const [reviewers] = useState<string[]>([]);
-  const [isLoadingDocIds] = useState(false);
-  const [uniqueDocIds] = useState<string[]>([]);
 
   // Handle validate click with per-item loading state
   const handleValidateClick = async (item: any) => {
@@ -175,7 +170,7 @@ export function QCDashboard({
     return completedDocuments.map((doc, index) => ({
       id: doc.id ? doc.id.toString() : `account-${index}`,
       documentName: doc.first_named_insured,
-      documentType: 'Account',
+      documentType: 'Policy',
       reviewer: doc.reviewer_assigned || 'Unknown Reviewer',
       completedDate: new Date().toISOString().split('T')[0],
       reviewedDate: new Date().toISOString().split('T')[0],
@@ -394,19 +389,6 @@ export function QCDashboard({
     setCurrentPage(1);
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "High":
-        return "text-[#FF0081]";
-      case "Medium":
-        return "text-[#FFC018]";
-      case "Low":
-        return "text-[#80989A]";
-      default:
-        return "text-[#80989A]";
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a]">
       <QCHeader 
@@ -428,85 +410,9 @@ export function QCDashboard({
               {/* Filters */}
               <div className="bg-white dark:bg-[#2a2a2a] p-6 rounded-lg shadow-sm border border-[#E5E7EB] dark:border-[#3a3a3a]">
                 <h3 className="text-[#012F66] dark:text-white mb-4">
-                  Filter Accounts
+                  Filter Policies
                 </h3>
                 <div className="flex flex-wrap gap-4 mb-4">
-                  <div className="w-full md:w-auto md:min-w-[150px]">
-                    <label className="block text-[#012F66] dark:text-white mb-2">
-                      Document Type
-                    </label>
-                    <Select
-                      value={documentType}
-                      onValueChange={setDocumentType}
-                    >
-                      <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
-                        <SelectValue placeholder="All Types" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">
-                          All Types
-                        </SelectItem>
-                        <SelectItem value="Large Claim Review Form">Large Claim Review Form</SelectItem>
-                        <SelectItem value="Actuarial/UW/Pricing Tools">Actuarial/UW/Pricing Tools</SelectItem>
-                        <SelectItem value="Reinsurance">Reinsurance</SelectItem>
-                        <SelectItem value="Indication/Quote">Indication/Quote</SelectItem>
-                        <SelectItem value="Endorsement">Endorsement</SelectItem>
-                        <SelectItem value="Green Card">Green Card</SelectItem>
-                        <SelectItem value="Finance Agreement">Finance Agreement</SelectItem>
-                        <SelectItem value="Policy Form">Policy Form</SelectItem>
-                        <SelectItem value="Additional Risk">Additional Risk</SelectItem>
-                        <SelectItem value="Reporting Endorsement">Reporting Endorsement</SelectItem>
-                        <SelectItem value="zDup - Loss Run">zDup - Loss Run</SelectItem>
-                        <SelectItem value="Loss Run">Loss Run</SelectItem>
-                        <SelectItem value="zDup - Stat Notice/Non-Renewal">zDup - Stat Notice/Non-Renewal</SelectItem>
-                        <SelectItem value="Expiration/Effective/Retro Date">Expiration/Effective/Retro Date</SelectItem>
-                        <SelectItem value="Return Mail">Return Mail</SelectItem>
-                        <SelectItem value="Policy">Policy</SelectItem>
-                        <SelectItem value="Assessments">Assessments</SelectItem>
-                        <SelectItem value="Invoice">Invoice</SelectItem>
-                        <SelectItem value="Application">Application</SelectItem>
-                        <SelectItem value="Stat Notice/Non-Renewal">Stat Notice/Non-Renewal</SelectItem>
-                        <SelectItem value="zDup - Broker of Record (BOR)">zDup - Broker of Record (BOR)</SelectItem>
-                        <SelectItem value="Address (not practice loc)">Address (not practice loc)</SelectItem>
-                        <SelectItem value="zDup - Actuarial/UW/Pricing Tools">zDup - Actuarial/UW/Pricing Tools</SelectItem>
-                        <SelectItem value="zDup - Indication/Quote">zDup - Indication/Quote</SelectItem>
-                        <SelectItem value="Cash Application">Cash Application</SelectItem>
-                        <SelectItem value="Processing Form">Processing Form</SelectItem>
-                        <SelectItem value="Referral/Documentation">Referral/Documentation</SelectItem>
-                        <SelectItem value="Coverage">Coverage</SelectItem>
-                        <SelectItem value="Broker of Record (BOR)">Broker of Record (BOR)</SelectItem>
-                        <SelectItem value="Fund Documentation">Fund Documentation</SelectItem>
-                        <SelectItem value="Cancellation">Cancellation</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="w-full md:w-auto md:min-w-[150px]">
-                    <label className="block text-[#012F66] dark:text-white mb-2">
-                      Priority
-                    </label>
-                    <Select
-                      value={priorityFilter}
-                      onValueChange={setPriorityFilter}
-                    >
-                      <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
-                        <SelectValue placeholder="All Priorities" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">
-                          All Priorities
-                        </SelectItem>
-                        <SelectItem value="High">
-                          High
-                        </SelectItem>
-                        <SelectItem value="Medium">
-                          Medium
-                        </SelectItem>
-                        <SelectItem value="Low">Low</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
                   <div className="w-full md:w-auto md:min-w-[150px]">
                     <label className="block text-[#012F66] dark:text-white mb-2">
                       Reviewer
@@ -533,29 +439,6 @@ export function QCDashboard({
 
 
 
-                  <div className="w-full md:w-auto md:min-w-[150px]">
-                    <label className="block text-[#012F66] dark:text-white mb-2">
-                      Document ID
-                    </label>
-                    <Select
-                      value={docIdFilter}
-                      onValueChange={setDocIdFilter}
-                    >
-                      <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white" disabled={isLoadingDocIds}>
-                        <SelectValue placeholder={isLoadingDocIds ? "Loading IDs..." : "All Document IDs"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">
-                          All Document IDs
-                        </SelectItem>
-                        {uniqueDocIds.map((docId) => (
-                          <SelectItem key={docId} value={docId}>
-                            {docId}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                   <div className="w-full md:w-auto md:min-w-[150px]">
                     <label className="block text-[#012F66] dark:text-white mb-2">
                       Show
@@ -620,7 +503,7 @@ export function QCDashboard({
                             onClick={() => handleSort("account")}
                             className="hover:text-[#0292DC] transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            Account <SortIcon field="account" />
+                            Policy <SortIcon field="account" />
                           </button>
                         </th>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
@@ -645,12 +528,6 @@ export function QCDashboard({
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                           Reviewer
                         </th>
-                        <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                          QC
-                        </th>
-                        <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
-                          Active
-                        </th>
                         <th className="px-6 py-4 text-right text-[#012F66] dark:text-white">
                           Action
                         </th>
@@ -665,9 +542,6 @@ export function QCDashboard({
                             className="hover:bg-[#F9FAFB]/50 dark:hover:bg-[#3a3a3a]/50 transition-colors"
                           >
                             <td className="px-6 py-5">
-                              <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24 font-mono"></div>
-                            </td>
-                            <td className="px-6 py-5">
                               <div className="flex items-center gap-3">
                                 <div className="flex-shrink-0 w-10 h-10 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-lg animate-pulse"></div>
                                 <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-32"></div>
@@ -677,19 +551,13 @@ export function QCDashboard({
                               <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
                             </td>
                             <td className="px-6 py-5">
-                              <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24"></div>
-                            </td>
-                            <td className="px-6 py-5">
                               <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-20"></div>
                             </td>
                             <td className="px-6 py-5">
-                              <div className="h-8 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-16"></div>
+                              <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-24"></div>
                             </td>
                             <td className="px-6 py-5">
                               <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16"></div>
-                            </td>
-                            <td className="px-6 py-5">
-                              <div className="h-6 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded-full animate-pulse w-20"></div>
                             </td>
                             <td className="px-6 py-5">
                               <div className="h-8 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16 ml-auto"></div>
@@ -699,7 +567,7 @@ export function QCDashboard({
                       ) : paginatedQueue.length === 0 ? (
                         // Empty state when no documents found
                         <tr>
-                          <td colSpan={9} className="px-6 py-16 text-center">
+                          <td colSpan={6} className="px-6 py-16 text-center">
                             <div className="flex flex-col items-center justify-center" style={{ padding: '20px' }}>
                               <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
                                 <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
@@ -713,7 +581,7 @@ export function QCDashboard({
                                   : "No documents match your current filters. Try adjusting your search criteria or reset the filters."
                                 }
                               </p>
-                              {(documentType !== 'all' || priorityFilter !== 'all' || reviewerFilter !== 'all' || docIdFilter !== 'all' || (apiDocuments.length === 0 && !isLoading)) && (
+                              {(reviewerFilter !== 'all' || (apiDocuments.length === 0 && !isLoading)) && (
                                 <Button
                                   onClick={resetFilters}
                                   variant="outline"
@@ -754,16 +622,7 @@ export function QCDashboard({
                             {item.descriptionSummary || '-'}
                           </td>
                           <td className="px-6 py-5 text-[#012F66] dark:text-white">
-                            {item.reviewer_assigned || '-'}
-                          </td>
-                          <td className="px-6 py-5 text-[#012F66] dark:text-white">
-                            {item.qc_assigned || '-'}
-                          </td>
-                          <td className="px-6 py-5">
-                            <span className="inline-flex items-center gap-2 text-sm font-medium text-[#012F66] dark:text-white">
-                              <span className={`w-2.5 h-2.5 rounded-full ${item.is_active ? 'bg-green-500' : 'bg-gray-400'}`} />
-                              {item.is_active ? 'Active' : 'Inactive'}
-                            </span>
+                            {item.reviewerAssigned || item.reviewer_assigned || '-'}
                           </td>
                           <td className="px-6 py-5 text-right">
                             <Button
