@@ -7,7 +7,6 @@ import {
 } from "./ui/tabs";
 import { DocumentAssignment } from "./DocumentAssignment";
 import { UserManagement } from "./UserManagement";
-import { AdminAnalytics } from "./AdminAnalytics";
 import { AdminHeader } from "./AppHeader";
 
 interface AdminDashboardProps {
@@ -29,8 +28,7 @@ export const AdminDashboard = React.memo(function AdminDashboard({
 
   const tabsData = useMemo(() => [
     { value: "assignment", label: "Document Assignment" },
-    { value: "users", label: "User Management" },
-    { value: "analytics", label: "Analytics & Progress" }
+    { value: "users", label: "User Management" }
   ], []);
 
   return (
@@ -62,10 +60,6 @@ export const AdminDashboard = React.memo(function AdminDashboard({
 
           <TabsContent value="users">
             <UserManagement />
-          </TabsContent>
-
-          <TabsContent value="analytics">
-            <AdminAnalytics />
           </TabsContent>
         </Tabs>
       </main>

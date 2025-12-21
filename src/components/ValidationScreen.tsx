@@ -54,6 +54,7 @@ interface ExtractedField {
 interface DocumentAttachment {
   doc_handle: string;
   presigned_url: string;
+  readOnly?: boolean;
   tabbedFields: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
 }
 
@@ -113,6 +114,7 @@ export function ValidationScreen({
   const currentAttachment = document.attachments && document.attachments.length > 0
     ? document.attachments[selectedAttachmentIndex]
     : null;
+  const readOnlyMode = isReadOnly || currentAttachment?.readOnly;
   
   const [tabVariantIndex, setTabVariantIndex] = useState<Record<string, number>>({});
 
@@ -293,6 +295,7 @@ export function ValidationScreen({
 
   // Keyboard shortcuts
   useEffect(() => {
+    if (readOnlyMode) return;
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
         if (e.key === "a") {
@@ -331,7 +334,7 @@ export function ValidationScreen({
     window.addEventListener("keydown", handleKeyPress);
     return () =>
       window.removeEventListener("keydown", handleKeyPress);
-  }, [selectedFieldId, fieldValidations, currentFields]);
+  }, [selectedFieldId, fieldValidations, currentFields, readOnlyMode]);
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(prev + 25, 400));
@@ -376,6 +379,7 @@ export function ValidationScreen({
   const handleActionChange = (
     action: "accept" | "correct" | "reject",
   ) => {
+    if (readOnlyMode) return;
     setFieldValidations((prev) => ({
       ...prev,
       [selectedFieldId]: {
@@ -386,6 +390,7 @@ export function ValidationScreen({
   };
 
   const handleNoteChange = (note: string) => {
+    if (readOnlyMode) return;
     setFieldValidations((prev) => ({
       ...prev,
       [selectedFieldId]: {
@@ -396,6 +401,7 @@ export function ValidationScreen({
   };
 
   const handleCorrectedValueChange = (fieldId: string, value: string) => {
+    if (readOnlyMode) return;
     setCorrectedValues((prev) => ({
       ...prev,
       [currentVariantKey]: {
@@ -408,6 +414,7 @@ export function ValidationScreen({
 
 
   const handleSubmitAll = async () => {
+    if (readOnlyMode) return;
     const validations = Object.values(fieldValidations);
 
     // Check if all fields have been validated
@@ -449,6 +456,7 @@ export function ValidationScreen({
   };
 
   const handleSaveDataset = async () => {
+    if (readOnlyMode) return;
     const currentKey = currentVariantKey;
     const changes = correctedValues[currentKey] || {};
     const fieldsToSave = currentFields.filter((f) => changes[f.id] !== undefined);
@@ -829,6 +837,8 @@ export function ValidationScreen({
                     }
                     placeholder="Add notes specific to this data set..."
                     rows={3}
+                  readOnly={readOnlyMode}
+                  disabled={readOnlyMode}
                     className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white resize-none"
                   />
                 </div>
@@ -883,6 +893,8 @@ export function ValidationScreen({
                               value={(correctedValues[currentVariantKey]?.[field.id]) ?? ''}
                               onChange={(e) => handleCorrectedValueChange(field.id, e.target.value)}
                               placeholder="Enter corrected value"
+                              readOnly={readOnlyMode}
+                              disabled={readOnlyMode}
                               className="border-[#D0D5DD] dark:border-[#4a4a4a] dark:bg-[#3a3a3a] dark:text-white"
                             />
                           </div>
@@ -932,7 +944,7 @@ export function ValidationScreen({
           {/* Save Dataset Button */}
           <Button
             onClick={handleSaveDataset}
-            disabled={isSavingDataset}
+            disabled={isSavingDataset || readOnlyMode}
             className="mt-4 w-full bg-[#0292DC] hover:bg-[#012F66] text-white flex-shrink-0"
           >
             {isSavingDataset ? (

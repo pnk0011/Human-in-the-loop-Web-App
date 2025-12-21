@@ -151,8 +151,11 @@ export interface GetQCDocumentsResponse {
   stats?: {
     Assigned_accounts: number;
     Completed_accounts: number;
+    Policy_Assigned?: number;
+    Total_Filtered_Records?: number;
   };
   files?: QCDocument[];
+  policies?: QCDocument[]; // new key from API
 }
 
 export interface ReviewerWithQC {
@@ -173,19 +176,12 @@ export interface QCOpenFileRequest {
 }
 
 export interface QCOpenFileResponse {
-  success: boolean;
-  data: {
-    document: {
-      id: string;
-      documentName: string;
-      documentType: string | null;
-      priority: string;
-      fields: QCDocumentField[];
-      documentImage: string;
-      qc_updated_dt: string;
-      reviewer: string;
-    };
-  };
+  status?: string;
+  message?: string;
+  first_named_insured?: string;
+  document_count?: number;
+  documents?: ReviewerPolicyDocument[];
+  error?: string;
 }
 
 export interface QCDocumentField {
@@ -325,7 +321,7 @@ class DocumentOperationsAPI {
       return response;
     } catch (error: any) {
       return {
-        success: false,
+        status: 'error',
         error: error.message || 'Failed to fetch file details',
       };
     }
@@ -380,15 +376,33 @@ class DocumentOperationsAPI {
       queryParams.append('first_named_insured', params.first_named_insured);
     }
 
-    return this.makeRequest<GetQCDocumentsResponse>(`/qc-get-assigned-policies?${queryParams}`, {
+    const raw = await this.makeRequest<GetQCDocumentsResponse>(`/qc-get-assigned-policies?${queryParams}`, {
       method: 'GET',
     });
+
+    const normalized: GetQCDocumentsResponse = { ...raw };
+    const list = (raw as any).policies || raw.files || [];
+    normalized.files = list;
+
+    if (raw.stats) {
+      normalized.stats = {
+        Assigned_accounts: raw.stats.Assigned_accounts ?? raw.stats.Policy_Assigned ?? 0,
+        Completed_accounts: raw.stats.Completed_accounts ?? 0,
+        Policy_Assigned: raw.stats.Policy_Assigned,
+        Total_Filtered_Records: raw.stats.Total_Filtered_Records,
+      };
+    }
+
+    return normalized;
   }
 
   async qcOpenFile(params: QCOpenFileRequest): Promise<QCOpenFileResponse> {
+    // API expects { first_named_insured: string }
     return this.makeRequest<QCOpenFileResponse>('/qc-view-policy-documents', {
       method: 'POST',
-      body: JSON.stringify(params),
+      body: JSON.stringify({
+        first_named_insured: params.first_named_insured,
+      }),
     });
   }
 

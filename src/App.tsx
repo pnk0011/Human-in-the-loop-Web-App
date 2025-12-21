@@ -29,6 +29,7 @@ interface ExtractedField {
 interface DocumentAttachment {
   doc_handle: string;
   presigned_url: string;
+  readOnly?: boolean;
   tabbedFields: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
 }
 
@@ -44,19 +45,8 @@ interface ValidationDocument {
   tabbedFields?: { key: string; label: string; fields: ExtractedField[]; variants?: ExtractedField[][] }[];
 }
 
-interface QCValidationDocument extends ValidationDocument {
-  reviewer: string;
-  reviewedDate: string;
-  reviewerValidations: ReviewerValidation[];
-}
-
-interface ReviewerValidation {
-  fieldId: string;
-  action: "accept" | "correct" | "reject";
-  correctedValue?: string;
-  note?: string;
-  rejectReason?: string;
-}
+// QC validation document is now the same as reviewer validation document
+type QCValidationDocument = ValidationDocument;
 
 interface FieldValidation {
   fieldId: string;
@@ -172,6 +162,7 @@ const AppContent = function AppContent() {
             return {
               doc_handle: docPayload.doc_handle,
               presigned_url: docPayload.presigned_url,
+              readOnly: String(docPayload?.status) === "3",
               tabbedFields: [
                 { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants },
                 { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants },
@@ -202,6 +193,7 @@ const AppContent = function AppContent() {
             fields: defaultFields,
             attachments: attachments,
           };
+          setIsReadOnlyView(false);
         } else {
           throw new Error('API response failed');
         }
@@ -238,45 +230,51 @@ const AppContent = function AppContent() {
         const { documentOperationsAPI } = await import('./services/documentOperationsAPI');
         
         // Try to fetch real QC document data from API
-        const response = await documentOperationsAPI.qcOpenFile({ first_named_insured: item.document });
+        const response = await documentOperationsAPI.qcOpenFile({ first_named_insured: item.accountName || item.document });
         
-        if (response.success && response.data?.document) {
-          const apiDoc = response.data.document;
-          
-          // Filter fields to show only those where qc_action is NOT 'approve'
-          const fieldsForQCReview = apiDoc.fields.filter(field => 
-            field.qc_action !== 'approve'
-          );
-          
-          // Store all fields for submission (including those with qc_action = 'approve')
-          const allFields = apiDoc.fields;
-          
-          // Transform API response to component format
-          // Only show fields where qc_action is NOT 'approve'
+        if (response?.documents && response.documents.length > 0) {
+          // Build attachments array from all documents (same structure as reviewer)
+          const attachments: DocumentAttachment[] = response.documents.map((docPayload: any) => {
+            const exposureVariants = (docPayload.exposure_data || []).map((item: any) => buildFieldsFromObject(item || {}));
+            const accountVariants = (docPayload.account_data || []).map((item: any) => buildFieldsFromObject(item || {}));
+            const lossVariants = (docPayload.loss_data || []).map((item: any) => buildFieldsFromObject(item || {}));
+
+            const firstExposure = exposureVariants[0] || [];
+            const firstAccount = accountVariants[0] || [];
+            const firstLoss = lossVariants[0] || [];
+
+            return {
+              doc_handle: docPayload.doc_handle,
+              presigned_url: docPayload.presigned_url,
+              tabbedFields: [
+                { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants },
+                { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants },
+                { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants },
+              ],
+            };
+          });
+
+          // Use first document as default
+          const firstDoc = attachments[0];
+          const firstDocFields = firstDoc.tabbedFields.find(t => {
+            const variant = (t.variants && t.variants[0]) || t.fields;
+            return variant && variant.length > 0;
+          });
+          const defaultFields = firstDocFields
+            ? (firstDocFields.variants && firstDocFields.variants[0] && firstDocFields.variants[0].length
+                ? firstDocFields.variants[0]
+                : firstDocFields.fields || [])
+            : [];
+
           qcDocument = {
-            id: apiDoc.id || item.id,
-            documentName: apiDoc.documentName || item.document,
-            documentType: apiDoc.documentType || item.type,
-            priority: item.priority,
-            reviewer: apiDoc.reviewer || item.reviewer,
-            reviewedDate: apiDoc.qc_updated_dt?.split(' ')[0] || item.reviewedDate,
-            documentImage: apiDoc.documentImage, // Include document image URL from API
-            allFields: allFields, // Store all fields for submission
-            fields: fieldsForQCReview.map((field, index) => ({
-              id: `field-${index + 1}`,
-              fieldName: field.entity_type,
-              fieldDescription: `AI extracted ${field.entity_type.toLowerCase()} from document`,
-              extractedValue: field.entity_value,
-              confidence: field.confidence,
-              expectedFormat: 'Text',
-              location: { x: 48, y: 175 + (index * 40), width: 180, height: 24 },
-            })),
-            reviewerValidations: fieldsForQCReview.map(field => ({
-              fieldId: `field-${fieldsForQCReview.indexOf(field) + 1}`,
-              action: field.reviewer_action,
-              correctedValue: field.updated_entity_text || undefined,
-              note: field.reviewer_comment || undefined,
-            })),
+            id: response.first_named_insured || item.id,
+            documentName: response.first_named_insured || item.accountName || item.document,
+            documentType: 'Account',
+            priority: 'High',
+            documentImage: firstDoc.presigned_url,
+            tabbedFields: firstDoc.tabbedFields,
+            fields: defaultFields,
+            attachments: attachments,
           };
         } else {
           throw new Error('QC API response failed');
@@ -287,87 +285,15 @@ const AppContent = function AppContent() {
         // Fallback to mock data with original look and feel
         qcDocument = {
           id: item.id,
-          documentName: item.document,
-          documentType: item.type,
-          priority: item.priority,
-          reviewer: item.reviewer,
-          reviewedDate: item.reviewedDate,
-          fields: [
-            {
-              id: "field-1",
-              fieldName: "Total Amount Due",
-              fieldDescription:
-                "The total amount to be paid for this invoice",
-              extractedValue: "$12,847.50",
-              confidence: 67,
-              expectedFormat: "$X,XXX.XX",
-              location: { x: 48, y: 415, width: 220, height: 28 },
-            },
-            {
-              id: "field-2",
-              fieldName: "Policy Number",
-              fieldDescription: "The unique policy identifier",
-              extractedValue: "POL-2024-5678",
-              confidence: 85,
-              expectedFormat: "POL-YYYY-XXXX",
-              location: { x: 48, y: 175, width: 180, height: 24 },
-            },
-            {
-              id: "field-3",
-              fieldName: "Effective Date",
-              fieldDescription:
-                "The date when the policy becomes effective",
-              extractedValue: "January 1, 2025",
-              confidence: 92,
-              expectedFormat: "Month DD, YYYY",
-              location: { x: 48, y: 265, width: 160, height: 24 },
-            },
-            {
-              id: "field-4",
-              fieldName: "Invoice Number",
-              fieldDescription: "The unique invoice identifier",
-              extractedValue: "INV-2024-0947",
-              confidence: 78,
-              expectedFormat: "INV-YYYY-XXXX",
-              location: { x: 48, y: 155, width: 180, height: 24 },
-            },
-            {
-              id: "field-5",
-              fieldName: "Due Date",
-              fieldDescription: "The date when payment is due",
-              extractedValue: "April 15, 2024",
-              confidence: 88,
-              expectedFormat: "Month DD, YYYY",
-              location: { x: 48, y: 245, width: 160, height: 24 },
-            },
+          documentName: item.accountName || item.document,
+          documentType: 'Account',
+          priority: 'High',
+          tabbedFields: [
+            { key: 'loss', label: 'Loss Data', fields: [] },
+            { key: 'account', label: 'Account Data', fields: [] },
+            { key: 'exposure', label: 'Exposure Data', fields: [] },
           ],
-          reviewerValidations: [
-            {
-              fieldId: "field-1",
-              action: "correct",
-              correctedValue: "$12,850.00",
-              note: "Small discrepancy found in total calculation",
-            },
-            {
-              fieldId: "field-2",
-              action: "accept",
-            },
-            {
-              fieldId: "field-3",
-              action: "accept",
-              note: "Verified with policy document",
-            },
-            {
-              fieldId: "field-4",
-              action: "accept",
-            },
-            {
-              fieldId: "field-5",
-              action: "correct",
-              correctedValue: "April 14, 2024",
-              note: "Date was incorrectly extracted",
-            },
-          ],
+          fields: [],
         };
       }
 
@@ -448,41 +374,12 @@ const AppContent = function AppContent() {
         documentName: doc.documentName,
         documentType: doc.documentType,
         priority: "Medium",
-        reviewer: doc.reviewer,
-        reviewedDate: doc.reviewedDate,
-        fields: [
-          {
-            id: "field-1",
-            fieldName: "Total Amount Due",
-            fieldDescription:
-              "The total amount to be paid for this invoice",
-            extractedValue: "$12,847.50",
-            confidence: 67,
-            expectedFormat: "$X,XXX.XX",
-            location: { x: 48, y: 415, width: 220, height: 28 },
-          },
-          {
-            id: "field-2",
-            fieldName: "Policy Number",
-            fieldDescription: "The unique policy identifier",
-            extractedValue: "POL-2024-5678",
-            confidence: 85,
-            expectedFormat: "POL-YYYY-XXXX",
-            location: { x: 48, y: 175, width: 180, height: 24 },
-          },
+        tabbedFields: [
+          { key: 'loss', label: 'Loss Data', fields: [] },
+          { key: 'account', label: 'Account Data', fields: [] },
+          { key: 'exposure', label: 'Exposure Data', fields: [] },
         ],
-        reviewerValidations: [
-          {
-            fieldId: "field-1",
-            action: "correct",
-            correctedValue: "$12,850.00",
-            note: "Small discrepancy found in total calculation",
-          },
-          {
-            fieldId: "field-2",
-            action: "accept",
-          },
-        ],
+        fields: [],
       };
 
       setSelectedQCDocument(historyQCDocument);
@@ -705,6 +602,7 @@ const AppContent = function AppContent() {
             onLogout={handleLogout}
             theme={currentTheme}
             onToggleTheme={toggleTheme}
+            isReadOnly={isReadOnlyView}
           />
         ) : currentView === "history-view" && selectedDocument ? (
           <LazyComponents.ValidationScreen
