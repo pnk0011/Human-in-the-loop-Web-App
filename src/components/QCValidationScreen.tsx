@@ -37,6 +37,7 @@ interface ExtractedField {
   expectedFormat?: string;
   reviewerComment?: string;
   qcComment?: string;
+  corrected?: boolean;
   location: {
     x: number;
     y: number;
@@ -751,7 +752,7 @@ export function QCValidationScreen({
                               {field.fieldName}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <Badge
                               className={`${
                                 field.confidence >= 70
@@ -766,6 +767,11 @@ export function QCValidationScreen({
                             <span className="text-[#80989A]">
                               {field.extractedValue || '—'}
                             </span>
+                            {field.corrected && (
+                              <span className="px-2 py-1 rounded text-xs font-semibold bg-green-600 text-white">
+                                Corrected
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-1 text-xs text-[#80989A]">
                             <span>Page: {field.pageNo ?? '—'}</span>

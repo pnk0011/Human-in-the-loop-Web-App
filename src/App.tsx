@@ -130,6 +130,7 @@ const AppContent = function AppContent() {
     const skipKeys = new Set([
       'document_id','document_name','doc_handle','doc_type_name','extraction_type','create_date_time','processed_flag',
       'input_s3_uri','document_s3_uri','first_named_insured','description','supplemental_description','id',
+      'policy_number','effective_date',
       'qc_status','qc_comment','qc_comments','reviewer_status','reviewer_comment','reviewer_comments'
     ]);
     const fields: any[] = [];
@@ -138,6 +139,7 @@ const AppContent = function AppContent() {
       if (key.endsWith('_confidence') || key.endsWith('_page_no')) return;
       if (key.endsWith('_correction')) return;
       if (value === undefined) return; // include null/empty so users can validate missing data
+      const correctionFlag = obj[`${key}_correction`];
       const confidence = obj[`${key}_confidence`];
       const pageNo = obj[`${key}_page_no`];
       fields.push({
@@ -151,6 +153,7 @@ const AppContent = function AppContent() {
         rowId: typeof obj.id === 'number' ? obj.id : Number(obj.id) || undefined,
         expectedFormat: '',
         location: { x: 0, y: 0, width: 0, height: 0 },
+        corrected: String(correctionFlag ?? '').toLowerCase() === 'true',
       });
     });
     return fields;
