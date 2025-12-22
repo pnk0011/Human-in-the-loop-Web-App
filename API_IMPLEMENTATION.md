@@ -1,3 +1,21 @@
+document_s3_uri text NULL,
+	policy_number text NULL,
+	effective_date text NULL,
+	first_named_insured text NULL,
+	description text NULL,
+	supplemental_description text NULL,
+	doc_handle text NULL,
+	doc_type_name text NULL,
+	extraction_type text NULL,
+	create_date_time text NULL,
+	processed_flag int2 DEFAULT 0 NULL,
+
+
+
+
+
+
+
 {"table_name":"subdata.hil_account_extraction","action":"Approved","id":51,"data":{"corrected_value":"50","original_value":"51","reviewer_comments":"done","page_no":null,"field_name":"id"}}
 
 
