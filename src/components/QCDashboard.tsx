@@ -187,6 +187,7 @@ export function QCDashboard({
       id: doc.id ? doc.id.toString() : `account-${index + 1}`,
       accountName: doc.first_named_insured,
       documentCount: doc.document_count,
+      documentIds: (doc as any).doc_handles || '-',
       descriptionSummary: doc.description_summary,
       reviewerAssigned: doc.reviewer_assigned,
       qcAssigned: doc.qc_assigned,
@@ -523,6 +524,9 @@ export function QCDashboard({
                           </button>
                         </th>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                          Document IDs
+                        </th>
+                        <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                           Summary
                         </th>
                         <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
@@ -617,6 +621,11 @@ export function QCDashboard({
                             <Badge className={getQCStatusBadgeColor(item.status)}>
                               {item.status}
                             </Badge>
+                          </td>
+                          <td className="px-6 py-5 text-[#012F66] dark:text-white text-xs max-w-xs">
+                            <div className="whitespace-pre-wrap break-words">
+                              {item.documentIds || '-'}
+                            </div>
                           </td>
                           <td className="px-6 py-5 text-[#80989A] dark:text-[#a0a0a0] max-w-xs">
                             {item.descriptionSummary || '-'}

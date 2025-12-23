@@ -37,6 +37,7 @@ interface AccountRow {
   id: string;
   accountName: string;
   documentCount: number;
+  documentIds: string;
   documentsAssigned: number;
   documentsCompleted: number;
   descriptionSummary: string;
@@ -61,6 +62,7 @@ export function DocumentAssignment() {
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [docIdFilter, setDocIdFilter] = useState('');
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,16 +85,21 @@ export function DocumentAssignment() {
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
+    setDebouncedSearchQuery(searchQuery);
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Reset to first page when docIdFilter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [docIdFilter]);
+
   // Load accounts on component mount and when filters change
   useEffect(() => {
     loadDocuments();
-  }, [currentPage, debouncedSearchQuery, statusFilter, itemsPerPage]);
+  }, [currentPage, debouncedSearchQuery, statusFilter, itemsPerPage, docIdFilter]);
 
   const loadDocuments = async () => {
     setIsLoading(true);
@@ -112,6 +119,7 @@ export function DocumentAssignment() {
                 : statusFilter !== 'All'
                   ? statusFilter
                   : undefined,
+        documnet_id: docIdFilter || undefined,
       };
 
       const response = await documentAPI.getDocuments(params);
@@ -128,6 +136,7 @@ export function DocumentAssignment() {
           id: doc.id.toString(),
           accountName: doc.first_named_insured,
           documentCount: doc.document_count,
+          documentIds: (doc as any).doc_handles || '-',
           documentsAssigned: (doc as any).documents_assigned ?? 0,
           documentsCompleted: (doc as any).documents_completed ?? 0,
           descriptionSummary: doc.description_summary,
@@ -425,7 +434,7 @@ export function DocumentAssignment() {
       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
         <h3 className="text-[#012F66] dark:text-white mb-4">Filter Policies</h3>
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-end gap-4">
             {isLoading && (
               <div className="flex items-center gap-2 text-[#80989A] dark:text-[#a0a0a0]">
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -437,12 +446,12 @@ export function DocumentAssignment() {
               <span className="text-[#012F66] dark:text-white">Filters</span>
             </div> */}
             <div className="w-full md:w-auto md:min-w-[150px]">
-              <Input
-                placeholder="Search accounts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
-              />
+            <Input
+              placeholder="Search policies..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+            />
             </div>
             <div className="w-full md:w-auto md:min-w-[150px]">
               <label className="block text-[#012F66] dark:text-white mb-2">Status</label>
@@ -457,6 +466,18 @@ export function DocumentAssignment() {
                   <SelectItem value="Completed">Completed</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="w-full md:w-auto md:min-w-[180px]">
+              <label className="block text-[#012F66] dark:text-white mb-2">Document ID</label>
+              <Input
+                placeholder="Search by document ID"
+                value={docIdFilter}
+                onChange={(e) => {
+                  setDocIdFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full dark:bg-[#3a3a3a] dark:border-[#4a4a4a] dark:text-white"
+              />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[#80989A] dark:text-[#a0a0a0] text-sm">Show:</span>
@@ -479,12 +500,13 @@ export function DocumentAssignment() {
                 </SelectContent>
               </Select>
             </div>
-            {(searchQuery || statusFilter !== 'All') && (
+            {(searchQuery || statusFilter !== 'All' || docIdFilter) && (
               <Button
                 onClick={() => {
                   setSearchQuery("");
                   setDebouncedSearchQuery("");
                   setStatusFilter("All");
+                  setDocIdFilter("");
                   setCurrentPage(1);
                 }}
                 variant="outline"
@@ -539,6 +561,9 @@ export function DocumentAssignment() {
                   onClick={() => handleSort('documentCount')}
                 >
                   Total Documents {getSortIcon('documentCount')}
+                </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Document IDs
                 </th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                   Assigned Documents
@@ -623,6 +648,11 @@ export function DocumentAssignment() {
                     <div className="text-[#012F66] dark:text-white font-semibold">{doc.accountName}</div>
                   </td>
                     <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentCount}</td>
+                    <td className="px-6 py-4 text-[#012F66] dark:text-white max-w-xs">
+                      <div className="whitespace-pre-wrap break-words text-xs text-[#012F66] dark:text-white">
+                        {doc.documentIds || '-'}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentsAssigned}</td>
                     <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentsCompleted}</td>
                   <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0] max-w-xs">

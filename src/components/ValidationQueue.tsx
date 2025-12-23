@@ -8,6 +8,7 @@ interface QueueItem {
   id: string;
   accountName: string;
   documentCount: number;
+  documentIds?: string;
   descriptionSummary?: string;
   reviewerAssigned?: string | null;
   qcAssigned?: string | null;
@@ -274,6 +275,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
                     Documents <SortIcon field="documentCount" />
                   </button>
                 </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Document IDs</th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">Summary</th>
                 <th className="px-6 py-4 text-right text-[#012F66] dark:text-white">Action</th>
               </tr>
@@ -299,6 +301,9 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
                       <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-28"></div>
                     </td>
                     <td className="px-6 py-5">
+                      <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-32"></div>
+                    </td>
+                    <td className="px-6 py-5">
                       <div className="h-4 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse w-16"></div>
                     </td>
                     <td className="px-6 py-5">
@@ -309,7 +314,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
               ) : filteredData.length === 0 ? (
                 // Empty state when no documents found after API data is loaded
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center">
+                  <td colSpan={6} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center justify-center" style={{ padding: '20px' }}>
                       <div className="w-16 h-16 bg-[#F5F7FA] dark:bg-[#3a3a3a] rounded-full flex items-center justify-center mb-4">
                         <FileText className="w-8 h-8 text-[#80989A] dark:text-[#a0a0a0]" />
@@ -350,6 +355,11 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
                       </div>
                     </td>
                     <td className="px-6 py-5 text-[#012F66] dark:text-white">{item.documentCount}</td>
+                    <td className="px-6 py-5 text-[#012F66] dark:text-white text-xs max-w-xs">
+                      <div className="whitespace-pre-wrap break-words">
+                        {item.documentIds || '-'}
+                      </div>
+                    </td>
                     <td className="px-6 py-5 text-[#80989A] dark:text-[#a0a0a0] max-w-xs">
                       {item.descriptionSummary || '-'}
                     </td>

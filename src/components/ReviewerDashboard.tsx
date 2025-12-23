@@ -146,6 +146,7 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
         id: docId,
         accountName: doc.first_named_insured,
         documentCount: doc.document_count,
+        documentIds: (doc as any).doc_handles || '-',
         descriptionSummary: doc.description_summary,
         reviewerAssigned: doc.reviewer_assigned,
         qcAssigned: doc.qc_assigned,

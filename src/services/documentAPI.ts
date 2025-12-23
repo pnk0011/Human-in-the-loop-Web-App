@@ -7,6 +7,9 @@ export interface AccountDocument {
   qc_assigned: string | null;
   status: string;
   is_active: boolean;
+  doc_handles?: string;
+  documents_assigned?: number;
+  documents_completed?: number;
 }
 
 export interface DocumentsListResponse {
@@ -33,6 +36,7 @@ export interface GetDocumentsRequest {
   limit?: number;
   search_term?: string;
   status?: string | null;
+  documnet_id?: string; // API uses this exact key name
 }
 
 export interface UniqueDocumentIdsResponse {
@@ -84,6 +88,7 @@ class DocumentAPI {
       if (params.limit) queryParams.append('limit', params.limit.toString());
       if (params.search_term) queryParams.append('search_term', params.search_term);
       if (params.status) queryParams.append('status', params.status);
+      if (params.documnet_id) queryParams.append('documnet_id', params.documnet_id);
 
       const endpoint = `/admin-get-unique-policies?${queryParams.toString()}`;
       const response = await this.makeRequest<DocumentsListResponse>(endpoint, {
