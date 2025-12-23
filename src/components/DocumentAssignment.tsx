@@ -102,7 +102,16 @@ export function DocumentAssignment() {
         page: currentPage,
         limit: itemsPerPage,
         search_term: debouncedSearchQuery || undefined,
-        status: statusFilter !== 'All' ? statusFilter : undefined,
+        status:
+          statusFilter === 'Unassigned'
+            ? 'UD'
+            : statusFilter === 'Completed'
+              ? '1'
+              : statusFilter === 'Assigned'
+                ? '2'
+                : statusFilter !== 'All'
+                  ? statusFilter
+                  : undefined,
       };
 
       const response = await documentAPI.getDocuments(params);
@@ -443,10 +452,9 @@ export function DocumentAssignment() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="All">All Status</SelectItem>
-                  <SelectItem value="0">Unassigned</SelectItem>
-                  <SelectItem value="1">Assigned</SelectItem>
-                  <SelectItem value="2">In Progress</SelectItem>
-                  <SelectItem value="3">Completed</SelectItem>
+                  <SelectItem value="Unassigned">Unassigned</SelectItem>
+                  <SelectItem value="Assigned">Assigned</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -613,7 +621,6 @@ export function DocumentAssignment() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-[#012F66] dark:text-white font-semibold">{doc.accountName}</div>
-                    <div className="text-xs text-[#80989A] dark:text-[#a0a0a0]">ID: {doc.id}</div>
                   </td>
                     <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentCount}</td>
                     <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentsAssigned}</td>

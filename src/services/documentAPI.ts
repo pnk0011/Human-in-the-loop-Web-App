@@ -32,7 +32,7 @@ export interface GetDocumentsRequest {
   page?: number;
   limit?: number;
   search_term?: string;
-  status?: string;
+  status?: string | null;
 }
 
 export interface UniqueDocumentIdsResponse {

@@ -205,10 +205,14 @@ const AppContent = function AppContent() {
             const firstAccount = accountVariants[0] || [];
             const firstLoss = lossVariants[0] || [];
 
+            const readOnlyFlag =
+              ["1", "3"].includes(String(docPayload?.status)) ||
+              !!docPayload?.reviewer_status;
+
             return {
               doc_handle: docPayload.doc_handle,
               presigned_url: docPayload.presigned_url,
-              readOnly: ["1", "3"].includes(String(docPayload?.status)),
+              readOnly: readOnlyFlag,
               status: docPayload.status,
               qc_status: docPayload.qc_status ?? null,
               qc_comments: docPayload.qc_comments ?? docPayload.qc_comment ?? null,

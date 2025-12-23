@@ -182,6 +182,9 @@ export function ValidationScreen({
   const currentVariantIndex = tabVariantIndex[currentTab.key] ?? 0;
   const currentVariantKey = `${currentTab.key}-${currentVariantIndex}`;
   const currentVariantMeta = (currentTab as any)?.variantMeta?.[currentVariantIndex];
+  const isAutoApproved =
+    currentVariantMeta?.qc_status === 'AutoApproved' &&
+    currentVariantMeta?.reviewer_status === 'AutoApproved';
   const currentFields = currentTab?.variants?.[currentVariantIndex]?.length
     ? currentTab.variants[currentVariantIndex]
     : currentTab?.fields || [];
@@ -491,10 +494,6 @@ export function ValidationScreen({
     const currentKey = currentVariantKey;
     const changes = correctedValues[currentKey] || {};
     const fieldsToSave = currentFields.filter((f) => changes[f.id] !== undefined);
-    if (fieldsToSave.length === 0 && !variantNotes[currentKey]) {
-      alert("No changes to save for this data set.");
-      return;
-    }
 
     const tableMap: Record<string, string> = {
       loss: "subdata.hil_loss_extraction",
@@ -514,9 +513,11 @@ export function ValidationScreen({
       dataPayload.reviewer_comments = variantNotes[currentKey] || "";
       dataPayload.qc_comments = "";
 
+      const targetField = fieldsToSave[0] || currentFields[0];
       const targetId =
-        fieldsToSave[0]?.sourceId ||
-        fieldsToSave[0]?.id ||
+        targetField?.sourceId ??
+        (targetField as any)?.rowId ??
+        targetField?.id ??
         currentKey;
 
       await documentOperationsAPI.reviewerUpdatePolicyDocuments({
@@ -526,6 +527,16 @@ export function ValidationScreen({
         data: dataPayload,
       });
       alert("Data set saved successfully.");
+
+      // Reflect changes on UI for current dataset
+      fieldsToSave.forEach((field) => {
+        const newVal = changes[field.id];
+        if (newVal !== undefined) {
+          field.extractedValue = newVal;
+          (field as any).corrected = true;
+        }
+      });
+
       // clear inputs for this data set after save
       setCorrectedValues((prev) => ({ ...prev, [currentKey]: {} }));
     } catch (error: any) {
@@ -1064,7 +1075,7 @@ export function ValidationScreen({
           {/* Save Dataset Button */}
           <Button
             onClick={handleSaveDataset}
-            disabled={isSavingDataset || readOnlyMode}
+            disabled={isSavingDataset || readOnlyMode || isAutoApproved}
             className="mt-4 w-full bg-[#0292DC] hover:bg-[#012F66] text-white flex-shrink-0"
           >
             {isSavingDataset ? (

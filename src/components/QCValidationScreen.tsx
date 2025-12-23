@@ -159,6 +159,9 @@ export function QCValidationScreen({
     '',
   );
   const isDocNotOpen = docStatus !== '3';
+  const isAutoApproved =
+    currentVariantMeta?.qc_status === 'AutoApproved' &&
+    currentVariantMeta?.reviewer_status === 'AutoApproved';
   const currentFields = currentTab?.variants?.[currentVariantIndex]?.length
     ? currentTab.variants[currentVariantIndex]
     : currentTab?.fields || [];
@@ -679,7 +682,7 @@ export function QCValidationScreen({
                     <Button
                       type="button"
                       onClick={() => handleDatasetDecision('approve')}
-                      disabled={isDocNotOpen}
+                      disabled={isDocNotOpen || isAutoApproved}
                       className={`flex-1 ${
                         datasetDecisions[currentVariantKey] === 'approve'
                           ? 'bg-green-600 hover:bg-green-700 text-white'
@@ -694,7 +697,7 @@ export function QCValidationScreen({
                     <Button
                       type="button"
                       onClick={() => handleDatasetDecision('reject')}
-                      disabled={isDocNotOpen}
+                      disabled={isDocNotOpen || isAutoApproved}
                       className={`flex-1 ${
                         datasetDecisions[currentVariantKey] === 'reject'
                           ? 'bg-[#0292DC] hover:bg-[#007bb6] text-white border-2 border-[#0292DC]'
