@@ -137,15 +137,48 @@ export function ValidationScreen({
     ? document.tabbedFields
     : [{ key: 'default', label: 'Fields', fields: document.fields }];
 
+  // Sort dataset variants by their underlying source/row/id so the dropdown is ordered asc
+  const sortedTabs = React.useMemo(() => {
+    return (baseTabs || []).map((tab) => {
+      if (!tab.variants || tab.variants.length <= 1) return tab;
+
+      const combined = tab.variants.map((variant, idx) => ({
+        variant,
+        meta: tab.variantMeta?.[idx],
+      }));
+
+      combined.sort((a, b) => {
+        const aId =
+          (a.variant?.[0] as any)?.sourceId ??
+          (a.variant?.[0] as any)?.rowId ??
+          (a.variant?.[0] as any)?.id ??
+          Number.MAX_SAFE_INTEGER;
+        const bId =
+          (b.variant?.[0] as any)?.sourceId ??
+          (b.variant?.[0] as any)?.rowId ??
+          (b.variant?.[0] as any)?.id ??
+          Number.MAX_SAFE_INTEGER;
+        if (aId === bId) return 0;
+        return aId > bId ? 1 : -1;
+      });
+
+      return {
+        ...tab,
+        variants: combined.map((c) => c.variant),
+        variantMeta: tab.variantMeta ? combined.map((c) => c.meta) : tab.variantMeta,
+      };
+    });
+  }, [baseTabs]);
+
   // Hide tabs with no data (no fields and no variant with fields)
-  const tabbedFields = baseTabs.filter((t) => {
+  const tabbedFields = sortedTabs.filter((t) => {
     const variants = t.variants || [];
     const hasVariantData = variants.some((v) => v && v.length > 0);
     const hasFields = t.fields && t.fields.length > 0;
     return hasVariantData || hasFields;
   });
 
-  const effectiveTabs = tabbedFields.length > 0 ? tabbedFields : baseTabs;
+  const effectiveTabs = tabbedFields.length > 0 ? tabbedFields : sortedTabs;
   
   const allFields = React.useMemo(() => {
     return effectiveTabs.flatMap((t) => {
@@ -995,11 +1028,9 @@ export function ValidationScreen({
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <Badge
                               className={`${
-                                field.confidence >= 70
+                                field.confidence >= 90
                                   ? "bg-[#FFC018]"
-                                  : field.confidence >= 50
-                                    ? "bg-[#FFC018]"
-                                    : "bg-[#FF0081]"
+                                  : "bg-[#FF0081]"
                               } text-white`}
                             >
                               {field.confidence}%

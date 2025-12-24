@@ -758,11 +758,9 @@ export function QCValidationScreen({
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <Badge
                               className={`${
-                                field.confidence >= 70
+                                field.confidence >= 90
                                   ? "bg-[#FFC018]"
-                                  : field.confidence >= 50
-                                    ? "bg-[#FFC018]"
-                                    : "bg-[#FF0081]"
+                                  : "bg-[#FF0081]"
                               } text-white`}
                             >
                               {field.confidence}%
