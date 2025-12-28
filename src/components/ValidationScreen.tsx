@@ -135,6 +135,7 @@ export function ValidationScreen({
   const [correctedValues, setCorrectedValues] = useState<Record<string, Record<string, string>>>({});
   const [isSavingDataset, setIsSavingDataset] = useState(false);
   const [isDeletingDataset, setIsDeletingDataset] = useState(false);
+  const [isRefetchingDocument, setIsRefetchingDocument] = useState(false);
   const [fieldEdits, setFieldEdits] = useState<Record<string, { correctedValue: string; comments: string; status?: 'idle' | 'saving' | 'saved' | 'error'; error?: string }>>({});
   
   // Get current attachment data
@@ -184,6 +185,7 @@ export function ValidationScreen({
     : [{ key: 'default', label: 'Fields', fields: document.fields }];
 
   const refetchCurrentDocument = useCallback(async () => {
+    setIsRefetchingDocument(true);
     try {
       const resp = await documentOperationsAPI.reviewFile({
         first_named_insured: document.documentName || '',
@@ -288,6 +290,8 @@ export function ValidationScreen({
       }
     } catch (e) {
       console.error('Failed to refresh document after delete', e);
+    } finally {
+      setIsRefetchingDocument(false);
     }
   }, [document.documentName, baseTabs, setSelectedAttachmentIndex]);
 
@@ -386,6 +390,15 @@ export function ValidationScreen({
   const currentFields = currentTab?.variants?.[currentVariantIndex]?.length
     ? currentTab.variants[currentVariantIndex]
     : currentTab?.fields || [];
+
+  // Check if there's already an unsaved new dataset in the current tab (sourceId is null)
+  const hasUnsavedNewDataset = React.useMemo(() => {
+    const variants = currentTab?.variants || [];
+    return variants.some((variant) => {
+      const firstField = variant?.[0];
+      return firstField?.sourceId === null || firstField?.sourceId === undefined;
+    });
+  }, [currentTab?.variants]);
 
   // Track validation state for each field
   const [fieldValidations, setFieldValidations] = useState<
@@ -697,7 +710,7 @@ export function ValidationScreen({
     const firstField = currentFields[0];
     const isNewDataset = firstField?.sourceId === null || firstField?.sourceId === undefined;
 
-    // Table maps for existing vs new datasets
+    // Table maps - existing datasets use subdata prefix, new datasets don't
     const existingTableMap: Record<string, string> = {
       loss: "subdata.hil_loss_extraction",
       exposure: "subdata.hil_exposure_extraction",
@@ -706,10 +719,10 @@ export function ValidationScreen({
     };
 
     const newTableMap: Record<string, string> = {
-      loss: "hil_loss_extraction_bkp12_23_25",
-      exposure: "hil_exposure_extraction_bkp12_23_25",
-      account: "hil_account_extraction_bkp12_23_25",
-      default: "hil_account_extraction_bkp12_23_25",
+      loss: "hil_loss_extraction",
+      exposure: "hil_exposure_extraction",
+      account: "hil_account_extraction",
+      default: "hil_account_extraction",
     };
 
     const tableName = isNewDataset 
@@ -998,7 +1011,16 @@ export function ValidationScreen({
   if (!selectedField) return null;
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a] flex flex-col">
+    <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#1a1a1a] flex flex-col relative">
+      {/* Loading overlay when refetching document data */}
+      {isRefetchingDocument && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-[#1a1a1a]/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3">
+            <LoadingSpinner size="lg" />
+            <span className="text-[#012F66] dark:text-white font-medium">Loading document data...</span>
+          </div>
+        </div>
+      )}
       <ValidationHeader 
         onBack={onBack}
         onLogout={onLogout}
@@ -1251,7 +1273,7 @@ export function ValidationScreen({
 
             {/* Fields List */}
             <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-4 border-[#E5E7EB] dark:border-[#3a3a3a]" style={{ maxHeight: '450px' , overflow: 'scroll' }}>
-              {tabbedFields.length > 1 && (
+              {tabbedFields.length > 0 && (
                 <div className="flex items-center gap-2 mb-3">
                   {tabbedFields.map((tab) => (
                     <Button
@@ -1350,7 +1372,8 @@ export function ValidationScreen({
                   <Button
                     type="button"
                     onClick={handleAddDataset}
-                    disabled={readOnlyMode}
+                    disabled={readOnlyMode || hasUnsavedNewDataset}
+                    title={hasUnsavedNewDataset ? "Save the current new data set before adding another" : ""}
                     className="whitespace-nowrap bg-[#0292DC] hover:bg-[#012F66] text-white border border-[#0292DC] shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   >
                     <Plus className="w-4 h-4 mr-2" />

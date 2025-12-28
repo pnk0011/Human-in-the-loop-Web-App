@@ -187,11 +187,11 @@ export function DocumentAssignment() {
       case '0':
         return 'Unassigned';
       case '1':
-        return 'Assigned';
-      case '2':
-        return 'In Progress';
-      case '3':
         return 'Completed';
+      case '2':
+        return 'Assigned';
+      case '3':
+        return 'In Progress';
       default:
         return 'Unassigned';
     }
