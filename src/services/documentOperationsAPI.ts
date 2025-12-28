@@ -101,6 +101,42 @@ export interface ReviewerUpdatePolicyResponse {
   error?: string;
 }
 
+export interface DeleteDatasetRequest {
+  table_name: string;
+  id: number | string;
+}
+
+export interface DeleteDatasetResponse {
+  status?: string;
+  message?: string;
+  error?: string;
+}
+
+export interface AddDatasetRequest {
+  table_name: string;
+  document_id?: string;
+  document_name?: string;
+  document_s3_uri?: string;
+  policy_number?: string;
+  effective_date?: string;
+  first_named_insured?: string;
+  description?: string;
+  supplemental_description?: string;
+  doc_handle?: string;
+  doc_type_name?: string;
+  create_date_time?: string;
+  processed_flag?: string;
+  reviewer_status?: string;
+  reviewer_comments?: string;
+  [key: string]: any; // Allow additional field values
+}
+
+export interface AddDatasetResponse {
+  status?: string;
+  message?: string;
+  error?: string;
+}
+
 // Update File API Interfaces
 export interface FileValidation {
   entity_type: string;
@@ -360,6 +396,22 @@ class DocumentOperationsAPI {
     }
   }
 
+  async deleteReviewerDataset(params: DeleteDatasetRequest): Promise<DeleteDatasetResponse> {
+    try {
+      const response = await this.makeRequest<DeleteDatasetResponse>('/reviewer-add-delete-dataset', {
+        method: 'DELETE',
+        body: JSON.stringify(params),
+      });
+      return response;
+    } catch (error: any) {
+      return {
+        status: 'error',
+        message: error.message || 'Failed to delete dataset',
+        error: error.message,
+      };
+    }
+  }
+
   // Update File API
   async updateFile(params: UpdateFileRequest): Promise<UpdateFileResponse> {
     try {
@@ -447,6 +499,22 @@ class DocumentOperationsAPI {
         message: error.message || 'Failed to fetch reviewers',
         reviewers: [],
         error: error.message || 'Unknown error occurred'
+      };
+    }
+  }
+
+  async addReviewerDataset(params: AddDatasetRequest): Promise<AddDatasetResponse> {
+    try {
+      const response = await this.makeRequest<AddDatasetResponse>('/reviewer-add-delete-dataset', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      });
+      return response;
+    } catch (error: any) {
+      return {
+        status: 'error',
+        message: error.message || 'Failed to add dataset',
+        error: error.message,
       };
     }
   }

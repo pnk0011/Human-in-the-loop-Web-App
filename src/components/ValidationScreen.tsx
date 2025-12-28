@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ValidationHeader } from "./AppHeader";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
@@ -13,6 +13,17 @@ import {
 } from "./ui/select";
 import { ScrollArea } from "./ui/scroll-area";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "./ui/alert-dialog";
+import {
   ZoomIn,
   ZoomOut,
   Maximize,
@@ -23,6 +34,8 @@ import {
   X,
   ArrowLeft,
   CheckCircle2,
+  Plus,
+  Trash,
   LogOut,
   Moon,
   Sun,
@@ -121,6 +134,7 @@ export function ValidationScreen({
   const [variantNotes, setVariantNotes] = useState<Record<string, string>>({});
   const [correctedValues, setCorrectedValues] = useState<Record<string, Record<string, string>>>({});
   const [isSavingDataset, setIsSavingDataset] = useState(false);
+  const [isDeletingDataset, setIsDeletingDataset] = useState(false);
   const [fieldEdits, setFieldEdits] = useState<Record<string, { correctedValue: string; comments: string; status?: 'idle' | 'saving' | 'saved' | 'error'; error?: string }>>({});
   
   // Get current attachment data
@@ -130,6 +144,38 @@ export function ValidationScreen({
   const readOnlyMode = isReadOnly || currentAttachment?.readOnly;
   
   const [tabVariantIndex, setTabVariantIndex] = useState<Record<string, number>>({});
+  const [deletedDatasets, setDeletedDatasets] = useState<Set<string>>(new Set());
+  const [tabState, setTabState] = useState<Record<number, typeof document.tabbedFields>>({});
+  const [newDatasetMeta, setNewDatasetMeta] = useState<Record<string, Record<string, any>>>({});
+
+  const getVariantKey = (tabKey: string, idx: number, variant?: ExtractedField[]) => {
+    const first = variant && variant[0];
+    const idVal =
+      (first as any)?.sourceId ??
+      (first as any)?.rowId ??
+      (first as any)?.id ??
+      idx;
+    return `${tabKey}-${idx}-${idVal}`;
+  };
+
+  // Initialize per-attachment tab state
+  useEffect(() => {
+    if (!document.attachments || document.attachments.length === 0) return;
+    setTabState((prev) => {
+      const next = { ...prev };
+      document.attachments!.forEach((att, idx) => {
+        if (!next[idx]) {
+          next[idx] =
+            (att.tabbedFields && att.tabbedFields.length > 0
+              ? att.tabbedFields
+              : document.tabbedFields && document.tabbedFields.length > 0
+                ? document.tabbedFields
+                : [{ key: 'default', label: 'Fields', fields: document.fields }]);
+        }
+      });
+      return next;
+    });
+  }, [document.attachments, document.tabbedFields, document.fields]);
 
   const baseTabs = currentAttachment
     ? currentAttachment.tabbedFields
@@ -137,38 +183,157 @@ export function ValidationScreen({
     ? document.tabbedFields
     : [{ key: 'default', label: 'Fields', fields: document.fields }];
 
+  const refetchCurrentDocument = useCallback(async () => {
+    try {
+      const resp = await documentOperationsAPI.reviewFile({
+        first_named_insured: document.documentName || '',
+      });
+      if (resp?.documents && resp.documents.length > 0) {
+        const nextTabState: Record<number, any> = {};
+
+        const buildFieldsFromObject = (obj: Record<string, any>) => {
+          const skipKeys = new Set([
+            'document_id','document_name','doc_handle','doc_type_name','extraction_type','create_date_time','processed_flag',
+            'input_s3_uri','document_s3_uri','first_named_insured','description','supplemental_description','id',
+            'policy_number','effective_date',
+            'qc_status','qc_comment','qc_comments','reviewer_status','reviewer_comment','reviewer_comments'
+          ]);
+          const fields: any[] = [];
+          
+          // Store metadata for later use when adding/saving new datasets
+          const _rowMeta = {
+            document_id: obj.document_id ?? null,
+            document_name: obj.document_name ?? null,
+            document_s3_uri: obj.document_s3_uri ?? obj.input_s3_uri ?? null,
+            policy_number: obj.policy_number ?? null,
+            effective_date: obj.effective_date ?? null,
+            first_named_insured: obj.first_named_insured ?? null,
+            description: obj.description ?? null,
+            supplemental_description: obj.supplemental_description ?? null,
+            doc_handle: obj.doc_handle ?? null,
+            doc_type_name: obj.doc_type_name ?? null,
+            extraction_type: obj.extraction_type ?? null,
+            create_date_time: obj.create_date_time ?? null,
+            processed_flag: obj.processed_flag ?? null,
+          };
+          
+          Object.entries(obj || {}).forEach(([key, value]) => {
+            if (skipKeys.has(key)) return;
+            if (key.endsWith('_confidence') || key.endsWith('_page_no')) return;
+            if (key.endsWith('_correction')) return;
+            if (value === undefined) return;
+            const confidence = obj[`${key}_confidence`];
+            const pageNo = obj[`${key}_page_no`];
+            fields.push({
+              id: `${key}`,
+              sourceId: obj.id ?? obj.ID ?? obj.Id ?? undefined,
+              fieldName: key.replace(/_/g, ' '),
+              fieldDescription: key.replace(/_/g, ' '),
+              extractedValue: String(value ?? '').trim(),
+              confidence: Math.round(Number(confidence) * 100) || 0,
+              pageNo: pageNo ?? null,
+              rowId: typeof obj.id === 'number' ? obj.id : Number(obj.id) || undefined,
+              expectedFormat: '',
+              location: { x: 0, y: 0, width: 0, height: 0 },
+              corrected: String(obj[`${key}_correction`] ?? '').toLowerCase() === 'true',
+            });
+          });
+          
+          // Attach metadata to first field for later access
+          if (fields.length > 0) {
+            (fields[0] as any)._rowMeta = _rowMeta;
+          }
+          
+          return fields;
+        };
+
+        resp.documents.forEach((docPayload: any, idx: number) => {
+          const exposureData = docPayload.exposure_data || [];
+          const accountData = docPayload.account_data || [];
+          const lossData = docPayload.loss_data || [];
+          const exposureVariants = exposureData.map((item: any) => buildFieldsFromObject(item || {}));
+          const accountVariants = accountData.map((item: any) => buildFieldsFromObject(item || {}));
+          const lossVariants = lossData.map((item: any) => buildFieldsFromObject(item || {}));
+
+          const exposureVariantMeta = exposureData.map((item: any) => ({
+            qc_status: item?.qc_status ?? null,
+            qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+            reviewer_status: item?.reviewer_status ?? null,
+            reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+          }));
+          const accountVariantMeta = accountData.map((item: any) => ({
+            qc_status: item?.qc_status ?? null,
+            qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+            reviewer_status: item?.reviewer_status ?? null,
+            reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+          }));
+          const lossVariantMeta = lossData.map((item: any) => ({
+            qc_status: item?.qc_status ?? null,
+            qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+            reviewer_status: item?.reviewer_status ?? null,
+            reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+          }));
+
+          nextTabState[idx] = [
+            { key: 'loss', label: 'Loss Data', fields: lossVariants[0] || [], variants: lossVariants, variantMeta: lossVariantMeta },
+            { key: 'account', label: 'Account Data', fields: accountVariants[0] || [], variants: accountVariants, variantMeta: accountVariantMeta },
+            { key: 'exposure', label: 'Exposure Data', fields: exposureVariants[0] || [], variants: exposureVariants, variantMeta: exposureVariantMeta },
+          ];
+        });
+
+        setTabState(nextTabState);
+        setDeletedDatasets(new Set());
+        setTabVariantIndex({});
+        setSelectedAttachmentIndex(0);
+      }
+    } catch (e) {
+      console.error('Failed to refresh document after delete', e);
+    }
+  }, [document.documentName, baseTabs, setSelectedAttachmentIndex]);
+
   // Sort dataset variants by their underlying source/row/id so the dropdown is ordered asc
   const sortedTabs = React.useMemo(() => {
-    return (baseTabs || []).map((tab) => {
-      if (!tab.variants || tab.variants.length <= 1) return tab;
+    const activeTabs =
+      tabState[selectedAttachmentIndex] && tabState[selectedAttachmentIndex]?.length
+        ? tabState[selectedAttachmentIndex]!
+        : baseTabs;
+
+    return (activeTabs || []).map((tab) => {
+      if (!tab.variants || tab.variants.length === 0) return tab;
 
       const combined = tab.variants.map((variant, idx) => ({
         variant,
         meta: tab.variantMeta?.[idx],
+        key: getVariantKey(tab.key, idx, variant),
       }));
 
       combined.sort((a, b) => {
-        const aId =
-          (a.variant?.[0] as any)?.sourceId ??
-          (a.variant?.[0] as any)?.rowId ??
-          (a.variant?.[0] as any)?.id ??
-          Number.MAX_SAFE_INTEGER;
-        const bId =
-          (b.variant?.[0] as any)?.sourceId ??
-          (b.variant?.[0] as any)?.rowId ??
-          (b.variant?.[0] as any)?.id ??
-          Number.MAX_SAFE_INTEGER;
+        // Get numeric ID for sorting - newly created datasets (null sourceId) go to end
+        const getNumericId = (variant: any) => {
+          const first = variant?.[0];
+          const sourceId = first?.sourceId;
+          const rowId = first?.rowId;
+          // If sourceId is null/undefined or not a number, check rowId
+          if (sourceId != null && typeof sourceId === 'number') return sourceId;
+          if (rowId != null && typeof rowId === 'number') return rowId;
+          // For newly created datasets (null sourceId), put at end
+          return Number.MAX_SAFE_INTEGER;
+        };
+        const aId = getNumericId(a.variant);
+        const bId = getNumericId(b.variant);
         if (aId === bId) return 0;
         return aId > bId ? 1 : -1;
       });
 
+      const filtered = combined.filter((c) => !deletedDatasets.has(c.key));
+
       return {
         ...tab,
-        variants: combined.map((c) => c.variant),
-        variantMeta: tab.variantMeta ? combined.map((c) => c.meta) : tab.variantMeta,
+        variants: filtered.map((c) => c.variant),
+        variantMeta: tab.variantMeta ? filtered.map((c) => c.meta) : tab.variantMeta,
       };
     });
-  }, [baseTabs]);
+  }, [baseTabs, deletedDatasets, tabState, selectedAttachmentIndex]);
 
   // Hide tabs with no data (no fields and no variant with fields)
   const tabbedFields = sortedTabs.filter((t) => {
@@ -528,54 +693,272 @@ export function ValidationScreen({
     const changes = correctedValues[currentKey] || {};
     const fieldsToSave = currentFields.filter((f) => changes[f.id] !== undefined);
 
-    const tableMap: Record<string, string> = {
+    // Check if this is a newly created dataset (sourceId is null)
+    const firstField = currentFields[0];
+    const isNewDataset = firstField?.sourceId === null || firstField?.sourceId === undefined;
+
+    // Table maps for existing vs new datasets
+    const existingTableMap: Record<string, string> = {
       loss: "subdata.hil_loss_extraction",
       exposure: "subdata.hil_exposure_extraction",
       account: "subdata.hil_account_extraction",
       default: "subdata.hil_account_extraction",
     };
 
-    const tableName = tableMap[currentTab.key] || tableMap.default;
+    const newTableMap: Record<string, string> = {
+      loss: "hil_loss_extraction_bkp12_23_25",
+      exposure: "hil_exposure_extraction_bkp12_23_25",
+      account: "hil_account_extraction_bkp12_23_25",
+      default: "hil_account_extraction_bkp12_23_25",
+    };
+
+    const tableName = isNewDataset 
+      ? (newTableMap[currentTab.key] || newTableMap.default)
+      : (existingTableMap[currentTab.key] || existingTableMap.default);
+
     setIsSavingDataset(true);
     try {
-      const dataPayload: Record<string, any> = {};
-      fieldsToSave.forEach((field) => {
-        dataPayload[field.id] = changes[field.id];
-        dataPayload[`${field.id}_correction`] = "true";
-      });
-      dataPayload.reviewer_comments = variantNotes[currentKey] || "";
-      dataPayload.qc_comments = "";
+      if (isNewDataset) {
+        // Get metadata from first field's _rowMeta (copied from source variant)
+        const rowMeta = (firstField as any)?._rowMeta || {};
+        
+        // Generate current timestamp in required format
+        const now = new Date();
+        const createDateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(6, '0')}`;
 
-      const targetField = fieldsToSave[0] || currentFields[0];
-      const targetId =
-        targetField?.sourceId ??
-        (targetField as any)?.rowId ??
-        targetField?.id ??
-        currentKey;
+        // For newly created datasets, use POST to add endpoint
+        const newDataPayload: Record<string, any> = {
+          table_name: tableName,
+          // Use metadata from source variant, with fallbacks
+          document_id: rowMeta.document_id || currentAttachment?.doc_handle || '',
+          document_name: rowMeta.document_name || `${currentAttachment?.doc_handle || ''}_COMBINED.pdf`,
+          policy_number: rowMeta.policy_number || '',
+          effective_date: rowMeta.effective_date || '',
+          first_named_insured: rowMeta.first_named_insured || document.documentName || '',
+          description: rowMeta.description || '',
+          supplemental_description: rowMeta.supplemental_description || '',
+          doc_handle: rowMeta.doc_handle || currentAttachment?.doc_handle || '',
+          doc_type_name: rowMeta.doc_type_name || '',
+          create_date_time: createDateTime,
+          processed_flag: "0",
+          reviewer_status: "Approved",
+        };
 
-      await documentOperationsAPI.reviewerUpdatePolicyDocuments({
-        table_name: tableName,
-        action: "Approved",
-        id: targetId,
-        data: dataPayload,
-      });
-      alert("Data set saved successfully.");
+        // Only add field values that user has modified (from changes object)
+        // Strip _new_timestamp_index suffix from field IDs to get original field names
+        fieldsToSave.forEach((field) => {
+          const originalFieldName = field.id.replace(/_new_\d+_\d+$/, '');
+          newDataPayload[originalFieldName] = changes[field.id];
+          newDataPayload[`${originalFieldName}_confidence`] = field.confidence || null;
+          newDataPayload[`${originalFieldName}_page_no`] = field.pageNo || null;
+        });
 
-      // Reflect changes on UI for current dataset
-      fieldsToSave.forEach((field) => {
-        const newVal = changes[field.id];
-        if (newVal !== undefined) {
-          field.extractedValue = newVal;
-          (field as any).corrected = true;
+        // Add reviewer comments
+        newDataPayload.reviewer_comments = variantNotes[currentKey] || "";
+
+        const addResp = await documentOperationsAPI.addReviewerDataset(newDataPayload as any);
+
+        if (addResp.status === 'error' || addResp.error) {
+          throw new Error(addResp.message || addResp.error || 'Failed to add data set');
         }
-      });
 
-      // clear inputs for this data set after save
-      setCorrectedValues((prev) => ({ ...prev, [currentKey]: {} }));
+        alert("New data set saved successfully.");
+        // Refresh to get the new ID from backend
+        await refetchCurrentDocument();
+      } else {
+        // For existing datasets, use PUT to update endpoint
+        const dataPayload: Record<string, any> = {};
+        fieldsToSave.forEach((field) => {
+          dataPayload[field.id] = changes[field.id];
+          dataPayload[`${field.id}_correction`] = "true";
+        });
+        dataPayload.reviewer_comments = variantNotes[currentKey] || "";
+        dataPayload.qc_comments = "";
+
+        const targetField = fieldsToSave[0] || currentFields[0];
+        const targetId =
+          targetField?.sourceId ??
+          (targetField as any)?.rowId ??
+          targetField?.id ??
+          currentKey;
+
+        await documentOperationsAPI.reviewerUpdatePolicyDocuments({
+          table_name: tableName,
+          action: "Approved",
+          id: targetId,
+          data: dataPayload,
+        });
+        alert("Data set saved successfully.");
+
+        // Reflect changes on UI for current dataset
+        fieldsToSave.forEach((field) => {
+          const newVal = changes[field.id];
+          if (newVal !== undefined) {
+            field.extractedValue = newVal;
+            (field as any).corrected = true;
+          }
+        });
+
+        // clear inputs for this data set after save
+        setCorrectedValues((prev) => ({ ...prev, [currentKey]: {} }));
+      }
     } catch (error: any) {
       alert(error?.message || "Failed to save data set.");
     } finally {
       setIsSavingDataset(false);
+    }
+  };
+
+  const handleDeleteDataset = async () => {
+    if (readOnlyMode) return;
+    const variants = currentTab?.variants || [];
+    if (!variants.length) return;
+    const key = getVariantKey(currentTab.key, currentVariantIndex, variants[currentVariantIndex]);
+
+    // build target id similar to save
+    const targetField = variants[currentVariantIndex]?.[0] || currentFields[0];
+    const tableMap: Record<string, string> = {
+      loss: "hil_loss_extraction",
+      exposure: "hil_exposure_extraction",
+      account: "hil_account_extraction",
+      default: "hil_account_extraction",
+    };
+    const tableName = tableMap[currentTab.key] || tableMap.default;
+    const targetId =
+      targetField?.sourceId ??
+      (targetField as any)?.rowId ??
+      targetField?.id ??
+      currentVariantKey;
+
+    setIsDeletingDataset(true);
+    try {
+      const resp = await documentOperationsAPI.deleteReviewerDataset({
+        table_name: tableName,
+        id: targetId,
+      });
+      if (resp.status === 'error' || resp.error) {
+        throw new Error(resp.message || resp.error || 'Failed to delete data set');
+      }
+      setDeletedDatasets((prev) => {
+        const next = new Set(prev);
+        next.add(key);
+        return next;
+      });
+      setTabVariantIndex((prev) => ({ ...prev, [currentTab.key]: 0 }));
+      alert("Data set deleted successfully.");
+      await refetchCurrentDocument();
+    } catch (error: any) {
+      alert(error?.message || "Failed to delete data set.");
+    } finally {
+      setIsDeletingDataset(false);
+    }
+  };
+
+  const handleAddDataset = () => {
+    // Use sortedTabs which is the source of truth for the dropdown
+    const currentTabs = sortedTabs;
+
+    if (!currentTabs || currentTabs.length === 0) return;
+
+    // Find the current tab
+    const tabIndex = currentTabs.findIndex((t) => t.key === currentTab.key);
+    if (tabIndex === -1) return;
+
+    const targetTab = currentTabs[tabIndex];
+    
+    // Get the source variants - use variants if available, otherwise wrap fields in array
+    const sourceVariants = (targetTab.variants && targetTab.variants.length > 0) 
+      ? targetTab.variants 
+      : (targetTab.fields && targetTab.fields.length > 0) 
+        ? [targetTab.fields] 
+        : [];
+    
+    const lastVariant = sourceVariants[sourceVariants.length - 1] || [];
+
+    if (lastVariant.length === 0) {
+      alert("No data set to copy from.");
+      return;
+    }
+
+    // Get metadata from source variant's first field
+    const sourceMetadata = (lastVariant[0] as any)?._rowMeta || {};
+
+    // Clone the last variant with null values for data fields
+    const timestamp = Date.now();
+    const newVariant: ExtractedField[] = lastVariant.map((field, idx) => {
+      const newField: any = {
+        ...field,
+        id: `${field.id ?? 'field'}_new_${timestamp}_${idx}`,
+        sourceId: null, // New dataset has no ID yet - will be assigned by backend
+        rowId: undefined,
+        extractedValue: '',
+        confidence: 0,
+        pageNo: null,
+        corrected: undefined,
+      };
+      // Copy metadata to first field of new variant
+      if (idx === 0) {
+        newField._rowMeta = { ...sourceMetadata };
+      }
+      return newField;
+    });
+
+    // Create new variantMeta entry (empty)
+    const newMeta: VariantMeta = {
+      qc_status: null,
+      qc_comments: null,
+      reviewer_status: null,
+      reviewer_comments: null,
+    };
+
+    // Build updated tabs - update ALL tabs but only add variant to current tab
+    const updatedTabs = currentTabs.map((tab, idx) => {
+      if (idx !== tabIndex) return tab;
+      
+      // Get existing variants or create from fields
+      const existingVariants = (tab.variants && tab.variants.length > 0) 
+        ? tab.variants 
+        : (tab.fields && tab.fields.length > 0) 
+          ? [tab.fields] 
+          : [];
+      const existingMeta = tab.variantMeta || [];
+      
+      return {
+        ...tab,
+        variants: [...existingVariants, newVariant],
+        variantMeta: [...existingMeta, newMeta],
+      };
+    });
+
+    // Update tabState - this will trigger sortedTabs to recompute
+    setTabState((prev) => ({
+      ...prev,
+      [selectedAttachmentIndex]: updatedTabs,
+    }));
+
+    // Calculate the new variant index (it will be at the end)
+    const existingVariantsCount = (targetTab.variants && targetTab.variants.length > 0) 
+      ? targetTab.variants.length 
+      : (targetTab.fields && targetTab.fields.length > 0) 
+        ? 1 
+        : 0;
+    const newVariantIdx = existingVariantsCount;
+
+    // Select the newly added variant
+    setTabVariantIndex((prev) => ({
+      ...prev,
+      [currentTab.key]: newVariantIdx,
+    }));
+
+    // Initialize corrected values for new variant
+    setCorrectedValues((prev) => ({
+      ...prev,
+      [`${currentTab.key}-${newVariantIdx}`]: {},
+    }));
+
+    // Select first field of new variant
+    if (newVariant.length > 0) {
+      setSelectedFieldId(newVariant[0].id);
     }
   };
 
@@ -896,32 +1279,83 @@ export function ValidationScreen({
               )}
 
               {/* Variant selector for current tab if multiple variants */}
-              {currentTab?.variants && currentTab.variants.length > 1 && (
-                <div className="mb-3">
-                  <Select
-                    value={String(currentVariantIndex)}
-                    onValueChange={(val) => {
-                      const idx = Number(val);
-                      setTabVariantIndex((prev) => ({ ...prev, [currentTab.key]: idx }));
-                      // clear inputs for new variant selection
-                      setCorrectedValues((prev) => ({ ...prev, [`${currentTab.key}-${idx}`]: {} }));
-                      const variantFields = currentTab.variants?.[idx] || [];
-                      if (variantFields.length > 0) {
-                        setSelectedFieldId(variantFields[0].id);
-                      }
-                    }}
+              {currentTab?.variants && currentTab.variants.length > 0 && (
+                <div className="mb-3 flex flex-col gap-2">
+                  {currentTab.variants.length > 1 && (
+                    <Select
+                      value={String(currentVariantIndex)}
+                      onValueChange={(val) => {
+                        const idx = Number(val);
+                        setTabVariantIndex((prev) => ({ ...prev, [currentTab.key]: idx }));
+                        // clear inputs for new variant selection
+                        setCorrectedValues((prev) => ({ ...prev, [`${currentTab.key}-${idx}`]: {} }));
+                        const variantFields = currentTab.variants?.[idx] || [];
+                        if (variantFields.length > 0) {
+                          setSelectedFieldId(variantFields[0].id);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full border-[#D0D5DD] dark:border-[#3a3a3a]">
+                        <SelectValue placeholder="Select data set" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currentTab.variants.map((_, idx) => (
+                          <SelectItem key={`${currentTab.key}-${idx}`} value={String(idx)}>
+                            {currentTab.label} Set #{idx + 1}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={readOnlyMode || isDeletingDataset}
+                        className="whitespace-nowrap bg-red-600 text-white border border-red-700 shadow-sm cursor-pointer disabled:cursor-not-allowed"
+                        style={{ backgroundColor: '#a80c0c' }}
+                      >
+                        <Trash className="w-4 h-4 mr-2" />
+                        Delete Data Set
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this data set?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will remove the selected data set from this policy. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel
+                          disabled={isDeletingDataset}
+                          className="cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDeleteDataset}
+                          disabled={isDeletingDataset}
+                          className="bg-red-600 hover:bg-red-700 text-white border border-red-700 shadow-sm dark:bg-red-700 dark:hover:bg-red-800 cursor-pointer disabled:cursor-not-allowed"
+                          style={{ backgroundColor: '#a80c0c' }}
+                        >
+                          {isDeletingDataset ? 'Deleting...' : 'Delete'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  <Button
+                    type="button"
+                    onClick={handleAddDataset}
+                    disabled={readOnlyMode}
+                    className="whitespace-nowrap bg-[#0292DC] hover:bg-[#012F66] text-white border border-[#0292DC] shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   >
-                    <SelectTrigger className="w-full border-[#D0D5DD] dark:border-[#3a3a3a]">
-                      <SelectValue placeholder="Select data set" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currentTab.variants.map((_, idx) => (
-                        <SelectItem key={`${currentTab.key}-${idx}`} value={String(idx)}>
-                          {currentTab.label} Set #{idx + 1}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Data Set
+                  </Button>
                 </div>
               )}
 

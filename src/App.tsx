@@ -117,6 +117,40 @@ const AppContent = function AppContent() {
       // Simulate app initialization
       await new Promise(resolve => setTimeout(resolve, 1000));
       setIsInitializing(false);
+
+      // Resume validation if requested (after dataset delete reload)
+      const resume = sessionStorage.getItem('resumeValidation');
+      if (resume) {
+        try {
+          const parsed = JSON.parse(resume);
+          if (parsed?.first_named_insured) {
+            await handleValidateClick({
+              accountName: parsed.first_named_insured,
+              document: parsed.first_named_insured,
+            });
+            if (typeof parsed.selectedAttachmentIndex === 'number') {
+              setTimeout(() => {
+                // select attachment index if available
+                setSelectedDocument((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        attachments:
+                          prev.attachments && prev.attachments.length > parsed.selectedAttachmentIndex
+                            ? prev.attachments
+                            : prev.attachments,
+                      }
+                    : prev,
+                );
+              }, 0);
+            }
+          }
+        } catch (e) {
+          // ignore resume errors
+        } finally {
+          sessionStorage.removeItem('resumeValidation');
+        }
+      }
     };
     
     initializeApp();
@@ -134,6 +168,24 @@ const AppContent = function AppContent() {
       'qc_status','qc_comment','qc_comments','reviewer_status','reviewer_comment','reviewer_comments'
     ]);
     const fields: any[] = [];
+    
+    // Store metadata for later use when adding/saving new datasets
+    const _rowMeta = {
+      document_id: obj.document_id ?? null,
+      document_name: obj.document_name ?? null,
+      document_s3_uri: obj.document_s3_uri ?? obj.input_s3_uri ?? null,
+      policy_number: obj.policy_number ?? null,
+      effective_date: obj.effective_date ?? null,
+      first_named_insured: obj.first_named_insured ?? null,
+      description: obj.description ?? null,
+      supplemental_description: obj.supplemental_description ?? null,
+      doc_handle: obj.doc_handle ?? null,
+      doc_type_name: obj.doc_type_name ?? null,
+      extraction_type: obj.extraction_type ?? null,
+      create_date_time: obj.create_date_time ?? null,
+      processed_flag: obj.processed_flag ?? null,
+    };
+    
     Object.entries(obj || {}).forEach(([key, value]) => {
       if (skipKeys.has(key)) return;
       if (key.endsWith('_confidence') || key.endsWith('_page_no')) return;
@@ -156,6 +208,12 @@ const AppContent = function AppContent() {
         corrected: String(correctionFlag ?? '').toLowerCase() === 'true',
       });
     });
+    
+    // Attach metadata to first field for later access
+    if (fields.length > 0) {
+      (fields[0] as any)._rowMeta = _rowMeta;
+    }
+    
     return fields;
   };
 
