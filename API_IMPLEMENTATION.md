@@ -1,3 +1,116 @@
+
+
+Please find the API to add/delete a dataset, 3 testing tables are in place so that we don’t insert junk data into actual tables. Please utilize the same for testing purposes
+
+ 
+
+subdata.hil_loss_extraction_bkp12_23_25
+subdata.hil_account_extraction_bkp12_23_25
+subdata.hil_exposure_extraction_bkp12_23_25
+ 
+
+Lets discuss once you log in
+
+ 
+
+
+
+API
+
+1
+
+Request Type
+
+DELETE
+
+API Url
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/reviewer-add-delete-dataset
+
+Request Body
+
+{
+
+ "table_name": "hil_loss_extraction",
+
+ "id": 740
+
+}
+
+API
+
+Request Type
+
+POST
+
+ 
+
+API Url
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/reviewer-add-delete-dataset
+
+ 
+
+Request Body
+
+{
+
+ "table_name": "hil_loss_extraction_bkp12_23_25",
+
+    "document_id" : "13573860",
+
+    "document_name" : "13573860_COMBINED.pdf",
+
+    "claim_no" : "10999",  
+
+    "claim_no_confidence" : "1",
+
+    "claim_no_page_no" : "34",
+
+    "document_s3_uri" : "s3://mpg-dev1-ai-input-file-extractor-bucket/13573860_COMBINED.pdf",
+
+    "policy_number" : "896",
+
+    "effective_date" : "2020-01-01",
+
+    "first_named_insured" : "FRIENDS ASSOCIATION OF SERVICES FOR THE ELDERLY",
+
+    "description" : "SUBMISSION",
+
+    "supplemental_description" : "INITIAL REQUEST",
+
+    "doc_handle" : "13573860",
+
+    "doc_type_name" : "Indication/Quote",
+
+    "create_date_time" : "2025-12-22 07:54:15.221487",
+
+    "processed_flag" : "0",
+
+    "reviewer_status" :"Approved"
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+==========================================================================================
+
 document_s3_uri text NULL,
 	policy_number text NULL,
 	effective_date text NULL,
