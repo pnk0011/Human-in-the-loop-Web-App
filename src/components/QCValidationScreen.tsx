@@ -671,7 +671,7 @@ export function QCValidationScreen({
                         <div className="mt-2 text-sm text-[#012F66] dark:text-white">
                           <p className="font-medium">QC Comment</p>
                           <p className="text-[#475467] dark:text-[#cfcfcf]">
-                            {currentVariantMeta.qc_comments || currentVariantMeta.qc_comment}
+                            {String(currentVariantMeta.qc_comments || currentVariantMeta.qc_comment || '')}
                           </p>
                         </div>
                       )}
@@ -766,7 +766,7 @@ export function QCValidationScreen({
                               {field.confidence}%
                             </Badge>
                             <span className="text-[#80989A]">
-                              {field.extractedValue || '—'}
+                              {String(field.extractedValue ?? '') || '—'}
                             </span>
                             {field.corrected && (
                               <span className="px-2 py-1 rounded text-xs font-semibold bg-green-600 text-white">
@@ -775,14 +775,14 @@ export function QCValidationScreen({
                             )}
                           </div>
                           <div className="flex items-center gap-2 mt-1 text-xs text-[#80989A]">
-                            <span>Page: {field.pageNo ?? '—'}</span>
+                            <span>Page: {field.pageNo != null ? String(field.pageNo) : '—'}</span>
                             <span className="mx-1">|</span>
                             <span>Confidence: {field.confidence}%</span>
                           </div>
                           {field.reviewerComment && (
                             <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
                               <p className="text-xs text-blue-800 dark:text-blue-200 font-medium">Reviewer Note:</p>
-                              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">{field.reviewerComment}</p>
+                              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">{String(field.reviewerComment)}</p>
                             </div>
                           )}
                         </div>
@@ -806,7 +806,7 @@ export function QCValidationScreen({
                   </span>
                 </div>
                 <p className="text-[#012F66] dark:text-white pl-4">
-                  {selectedField.reviewerComment}
+                  {String(selectedField.reviewerComment)}
                 </p>
               </div>
             )}

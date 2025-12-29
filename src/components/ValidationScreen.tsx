@@ -1493,7 +1493,7 @@ export function ValidationScreen({
                               {field.confidence}%
                             </Badge>
                             <span className="text-[#80989A]">
-                              {field.extractedValue || '—'}
+                              {String(field.extractedValue ?? '') || '—'}
                             </span>
                             {field.corrected && (
                               <span className="px-2 py-1 rounded text-xs font-semibold bg-green-600 text-white">
@@ -1502,12 +1502,12 @@ export function ValidationScreen({
                             )}
                           </div>
                       <div className="flex items-center gap-2 mt-1 text-xs text-[#80989A]">
-                        <span>Page: {field.pageNo ?? '—'}</span>
+                        <span>Page: {field.pageNo != null ? String(field.pageNo) : '—'}</span>
                         <span className="mx-1">|</span>
                         <span>Confidence: {field.confidence}%</span>
                       </div>
                           <div className="mt-2 space-y-1">
-                            <p className="text-xs text-[#80989A]">Original: {field.extractedValue || '—'}</p>
+                            <p className="text-xs text-[#80989A]">Original: {String(field.extractedValue ?? '') || '—'}</p>
                             <Input
                               value={(correctedValues[currentVariantKey]?.[field.id]) ?? ''}
                               onChange={(e) => handleCorrectedValueChange(field.id, e.target.value)}

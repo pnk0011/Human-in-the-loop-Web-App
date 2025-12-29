@@ -61,19 +61,10 @@ export function QCDashboard({
   const [completedDocuments, setCompletedDocuments] = useState<QCDocument[]>([]);
   const [isLoadingCompleted, setIsLoadingCompleted] = useState(false);
 
-  // Reviewer filter
+  // Legacy filter placeholders (document-level filters removed in new account flow)
   const [reviewerFilter, setReviewerFilter] = useState('all');
-  
-  // Extract unique reviewers from API documents
-  const reviewers = React.useMemo(() => {
-    const uniqueReviewers = new Set<string>();
-    apiDocuments.forEach((doc) => {
-      if (doc.reviewer_assigned && doc.reviewer_assigned.trim()) {
-        uniqueReviewers.add(doc.reviewer_assigned.trim());
-      }
-    });
-    return Array.from(uniqueReviewers).sort();
-  }, [apiDocuments]);
+  const [isLoadingReviewers] = useState(false);
+  const [reviewers] = useState<string[]>([]);
 
   // Handle validate click with per-item loading state
   const handleValidateClick = async (item: any) => {
@@ -90,7 +81,7 @@ export function QCDashboard({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [accountSearch, statusFilter, reviewerFilter, itemsPerPage]);
+  }, [accountSearch, statusFilter, itemsPerPage]);
 
   // Load API data for QC documents
   useEffect(() => {
@@ -203,11 +194,6 @@ export function QCDashboard({
       status: getQCStatusFromApiResponse(doc.status),
       isActive: doc.is_active,
     }));
-
-    // Apply reviewer filter
-    if (reviewerFilter && reviewerFilter !== 'all') {
-      items = items.filter((item) => item.reviewerAssigned === reviewerFilter);
-    }
 
     if (accountSearch.trim()) {
       const q = accountSearch.toLowerCase();
@@ -401,7 +387,6 @@ export function QCDashboard({
   const resetFilters = () => {
     setAccountSearch("");
     setStatusFilter("all");
-    setReviewerFilter("all");
     setCurrentPage(1);
   };
 
@@ -436,9 +421,10 @@ export function QCDashboard({
                     <Select
                       value={reviewerFilter}
                       onValueChange={setReviewerFilter}
+                      disabled={isLoadingReviewers}
                     >
                       <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
-                        <SelectValue placeholder="All Reviewers" />
+                        <SelectValue placeholder={isLoadingReviewers ? "Loading Reviewers..." : "All Reviewers"} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">
@@ -600,7 +586,7 @@ export function QCDashboard({
                                   : "No documents match your current filters. Try adjusting your search criteria or reset the filters."
                                 }
                               </p>
-                              {(reviewerFilter !== 'all' || (apiDocuments.length === 0 && !isLoading)) && (
+                              {(apiDocuments.length === 0 && !isLoading) && (
                                 <Button
                                   onClick={resetFilters}
                                   variant="outline"
