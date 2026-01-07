@@ -1,5 +1,9 @@
 
 
+
+https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/reviewer-get-assigned-policies?reviewer_assigned=demoreviewer%40medpro.com&page=1&limit=50&status=2&documnet_id=134008458
+
+===========================================
 data
 : 
 {document_id: "13380539", document_name: "13380539_COMBINED.pdf", claim_no: null,…}
