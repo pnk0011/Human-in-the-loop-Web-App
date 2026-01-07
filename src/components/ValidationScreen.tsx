@@ -66,44 +66,112 @@ interface ExtractedField {
   };
 }
 
-// Priority mapping for Account Data fields
-const ACCOUNT_FIELD_PRIORITY: Record<string, number> = {
-  profit_status: 1,
-  primary_excess_both: 2,
-  expiration_date: 2,
-  pharmacy: 3,
-  child_daycare_count: 3,
-  adult_daycare_count: 3,
-  ebl_employees: 3,
-  stop_gap_liability: 3,
-  hired_nonowned_auto: 3,
-  swimming_pool: 3,
-  saunas_hot_tubs: 3,
-  exercise_weight_rooms: 3,
-  indoor_parking: 3,
-  community_center: 3,
-  restaurants: 3,
-  medical_equipment_rental: 3,
-  beauty_shops: 3,
-  vacant_buildings: 3,
-  vacant_land: 3,
-  dwellings: 3,
-  storage_garages: 3,
-  chapels: 3,
-  offices_sq_ft: 3,
-  underlying_auto_limit: 3,
-  underlying_auto_premium: 3,
-  underlying_employer_liability_limit: 3,
-  underlying_wc_premium: 3,
-  fein_number: 3,
-  courts: 3,
+// Field priority mapping per tab
+const FIELD_PRIORITY_MAP: Record<string, Record<string, number>> = {
+  account: {
+    profit_status: 1,
+    primary_excess_both: 2,
+    expiration_date: 2,
+    pharmacy: 3,
+    child_daycare_count: 3,
+    adult_daycare_count: 3,
+    ebl_employees: 3,
+    stop_gap_liability: 3,
+    hired_nonowned_auto: 3,
+    swimming_pool: 3,
+    saunas_hot_tubs: 3,
+    exercise_weight_rooms: 3,
+    indoor_parking: 3,
+    community_center: 3,
+    restaurants: 3,
+    medical_equipment_rental: 3,
+    beauty_shops: 3,
+    vacant_buildings: 3,
+    vacant_land: 3,
+    dwellings: 3,
+    storage_garages: 3,
+    chapels: 3,
+    offices_sq_ft: 3,
+    underlying_auto_limit: 3,
+    underlying_auto_premium: 3,
+    underlying_employer_liability_limit: 3,
+    underlying_wc_premium: 3,
+    fein_number: 3,
+    courts: 3,
+  },
+  loss: {
+    evaluation_date: 1,
+    claimant_name: 1,
+    claim_no: 1,
+    type: 1,
+    status: 1,
+    loss_date: 1,
+    report_date: 1,
+    loss_paid: 1,
+    loss_reserve: 1,
+    alae_paid: 1,
+    alae_reserve: 1,
+    carrier_name: 1,
+    facility: 1,
+    state: 1,
+    loss_comments: 1,
+    close_date: 2,
+  },
+  exposure: {
+    location_name: 1,
+    license_number: 1,
+    address: 1,
+    state: 1,
+    county: 1,
+    pl_policy_type: 1,
+    gl_policy_type: 1,
+    pl_retro_date: 1,
+    gl_retro_date: 1,
+    facility_open_date: 1,
+    primary_pl_limit: 1,
+    primary_gl_limit: 1,
+    excess_gl_limit: 1,
+    excess_pl_limit: 1,
+    deductible: 1,
+    defense_cost_treatment: 1,
+    sub_acute: 1,
+    skilled: 1,
+    intermediate_care: 1,
+    assisted_living: 1,
+    memory_care: 1,
+    independent_living: 1,
+    home_health: 1,
+    rehab: 1,
+    formerly_known_as: 2,
+    dba_name: 2,
+    cover_age_range: 3,
+    '1st_shift_rn_count': 3,
+    '1st_shift_lpn_lvn_count': 3,
+    '1st_shift_cna_personal_caregiver_count': 3,
+    '1st_shift_agency_count': 3,
+    '1st_shift_pool_count': 3,
+    '2nd_shift_rn_count': 3,
+    '2nd_shift_lpn_lvn_count': 3,
+    '2nd_shift_cna_personal_caregiver_count': 3,
+    '2nd_shift_agency_count': 3,
+    '2nd_shift_pool_count': 3,
+    '3rd_shift_rn_count': 3,
+    '3rd_shift_lpn_lvn_count': 3,
+    '3rd_shift_cna_personal_caregiver_count': 3,
+    '3rd_shift_agency_count': 3,
+    '3rd_shift_pool_count': 3,
+    turnover_pct_rn: 3,
+    turnover_pct_lpn: 3,
+    turnover_cna_personal_caregiver: 3,
+  },
 };
 
-// Helper function to get field priority
-const getFieldPriority = (fieldName: string): number => {
-  // Convert display name back to snake_case for lookup
-  const snakeCaseName = fieldName.toLowerCase().replace(/\s+/g, '_');
-  return ACCOUNT_FIELD_PRIORITY[snakeCaseName] ?? 3; // Default to P3
+const toSnakeCase = (value: string) => value.toLowerCase().replace(/\s+/g, '_');
+
+const getFieldPriority = (tabKey: string | undefined, fieldName: string): number => {
+  const priorities = FIELD_PRIORITY_MAP[tabKey ?? ''] || FIELD_PRIORITY_MAP.account;
+  const snake = toSnakeCase(fieldName);
+  return priorities[snake] ?? 3;
 };
 
 interface VariantMeta {
@@ -432,13 +500,14 @@ export function ValidationScreen({
     ? currentTab.variants[currentVariantIndex]
     : currentTab?.fields || [];
   
-  // Sort fields by priority for Account Data tab
+  // Sort fields by priority for Account/Loss/Exposure Data tabs
   const currentFields = React.useMemo(() => {
-    if (activeTab === 'account') {
+    if (activeTab === 'account' || activeTab === 'loss' || activeTab === 'exposure') {
       return [...rawCurrentFields].sort((a, b) => {
-        const priorityA = getFieldPriority(a.fieldName);
-        const priorityB = getFieldPriority(b.fieldName);
-        return priorityA - priorityB;
+        const priorityA = getFieldPriority(activeTab, a.fieldName);
+        const priorityB = getFieldPriority(activeTab, b.fieldName);
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        return a.fieldName.localeCompare(b.fieldName);
       });
     }
     return rawCurrentFields;
@@ -881,8 +950,16 @@ export function ValidationScreen({
     if (!variants.length) return;
     const key = getVariantKey(currentTab.key, currentVariantIndex, variants[currentVariantIndex]);
 
-    // build target id similar to save
+    // Get document_id from metadata
     const targetField = variants[currentVariantIndex]?.[0] || currentFields[0];
+    const metadata = (targetField as any)?._rowMeta || {};
+    const documentId = metadata.document_id;
+
+    if (!documentId) {
+      alert("Document ID not found. Cannot delete data set.");
+      return;
+    }
+
     const tableMap: Record<string, string> = {
       loss: "hil_loss_extraction",
       exposure: "hil_exposure_extraction",
@@ -890,17 +967,12 @@ export function ValidationScreen({
       default: "hil_account_extraction",
     };
     const tableName = tableMap[currentTab.key] || tableMap.default;
-    const targetId =
-      targetField?.sourceId ??
-      (targetField as any)?.rowId ??
-      targetField?.id ??
-      currentVariantKey;
 
     setIsDeletingDataset(true);
     try {
       const resp = await documentOperationsAPI.deleteReviewerDataset({
         table_name: tableName,
-        id: targetId,
+        document_id: documentId,
       });
       if (resp.status === 'error' || resp.error) {
         throw new Error(resp.message || resp.error || 'Failed to delete data set');
@@ -1398,9 +1470,9 @@ export function ValidationScreen({
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete this data set?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete whole data set?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will remove the selected data set from this policy. This action cannot be undone.
+                          This will remove all data sets of selected tab from this policy. This action cannot be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -1534,7 +1606,7 @@ export function ValidationScreen({
                             <span className="text-[#012F66]">
                               {field.fieldName}
                             </span>
-                            {activeTab === 'account' && (
+                            {(activeTab === 'account' || activeTab === 'loss' || activeTab === 'exposure') && (
                               <span
                                 style={{
                                   display: 'inline-flex',
@@ -1545,22 +1617,22 @@ export function ValidationScreen({
                                   fontSize: '11px',
                                   fontWeight: 700,
                                   color: '#FFFFFF',
-                                  backgroundColor: getFieldPriority(field.fieldName) === 1
+                                  backgroundColor: getFieldPriority(activeTab, field.fieldName) === 1
                                     ? '#DC2626'
-                                    : getFieldPriority(field.fieldName) === 2
+                                    : getFieldPriority(activeTab, field.fieldName) === 2
                                     ? '#F59E0B'
                                     : '#6B7280',
                                   border: `2px solid ${
-                                    getFieldPriority(field.fieldName) === 1
+                                    getFieldPriority(activeTab, field.fieldName) === 1
                                       ? '#991B1B'
-                                      : getFieldPriority(field.fieldName) === 2
+                                      : getFieldPriority(activeTab, field.fieldName) === 2
                                       ? '#B45309'
                                       : '#374151'
                                   }`,
                                   boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
                                 }}
                               >
-                                P{getFieldPriority(field.fieldName)}
+                                P{getFieldPriority(activeTab, field.fieldName)}
                               </span>
                             )}
                           </div>

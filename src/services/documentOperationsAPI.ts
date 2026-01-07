@@ -104,7 +104,7 @@ export interface ReviewerUpdatePolicyResponse {
 
 export interface DeleteDatasetRequest {
   table_name: string;
-  id: number | string;
+  document_id: string;
 }
 
 export interface DeleteDatasetResponse {
