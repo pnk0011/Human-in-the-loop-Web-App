@@ -57,6 +57,7 @@ interface ExtractedField {
   expectedFormat?: string;
   qcComment?: string; // QC comment from previous review
   corrected?: boolean;
+  priority?: number; // Field priority (1, 2, or 3)
   location: {
     x: number;
     y: number;
@@ -64,6 +65,46 @@ interface ExtractedField {
     height: number;
   };
 }
+
+// Priority mapping for Account Data fields
+const ACCOUNT_FIELD_PRIORITY: Record<string, number> = {
+  profit_status: 1,
+  primary_excess_both: 2,
+  expiration_date: 2,
+  pharmacy: 3,
+  child_daycare_count: 3,
+  adult_daycare_count: 3,
+  ebl_employees: 3,
+  stop_gap_liability: 3,
+  hired_nonowned_auto: 3,
+  swimming_pool: 3,
+  saunas_hot_tubs: 3,
+  exercise_weight_rooms: 3,
+  indoor_parking: 3,
+  community_center: 3,
+  restaurants: 3,
+  medical_equipment_rental: 3,
+  beauty_shops: 3,
+  vacant_buildings: 3,
+  vacant_land: 3,
+  dwellings: 3,
+  storage_garages: 3,
+  chapels: 3,
+  offices_sq_ft: 3,
+  underlying_auto_limit: 3,
+  underlying_auto_premium: 3,
+  underlying_employer_liability_limit: 3,
+  underlying_wc_premium: 3,
+  fein_number: 3,
+  courts: 3,
+};
+
+// Helper function to get field priority
+const getFieldPriority = (fieldName: string): number => {
+  // Convert display name back to snake_case for lookup
+  const snakeCaseName = fieldName.toLowerCase().replace(/\s+/g, '_');
+  return ACCOUNT_FIELD_PRIORITY[snakeCaseName] ?? 3; // Default to P3
+};
 
 interface VariantMeta {
   qc_status?: string | null;
@@ -387,9 +428,21 @@ export function ValidationScreen({
   const isAutoApproved =
     currentVariantMeta?.qc_status === 'AutoApproved' &&
     currentVariantMeta?.reviewer_status === 'AutoApproved';
-  const currentFields = currentTab?.variants?.[currentVariantIndex]?.length
+  const rawCurrentFields = currentTab?.variants?.[currentVariantIndex]?.length
     ? currentTab.variants[currentVariantIndex]
     : currentTab?.fields || [];
+  
+  // Sort fields by priority for Account Data tab
+  const currentFields = React.useMemo(() => {
+    if (activeTab === 'account') {
+      return [...rawCurrentFields].sort((a, b) => {
+        const priorityA = getFieldPriority(a.fieldName);
+        const priorityB = getFieldPriority(b.fieldName);
+        return priorityA - priorityB;
+      });
+    }
+    return rawCurrentFields;
+  }, [rawCurrentFields, activeTab]);
 
   // Check if there's already an unsaved new dataset in the current tab (sourceId is null)
   const hasUnsavedNewDataset = React.useMemo(() => {
@@ -1481,6 +1534,35 @@ export function ValidationScreen({
                             <span className="text-[#012F66]">
                               {field.fieldName}
                             </span>
+                            {activeTab === 'account' && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  color: '#FFFFFF',
+                                  backgroundColor: getFieldPriority(field.fieldName) === 1
+                                    ? '#DC2626'
+                                    : getFieldPriority(field.fieldName) === 2
+                                    ? '#F59E0B'
+                                    : '#6B7280',
+                                  border: `2px solid ${
+                                    getFieldPriority(field.fieldName) === 1
+                                      ? '#991B1B'
+                                      : getFieldPriority(field.fieldName) === 2
+                                      ? '#B45309'
+                                      : '#374151'
+                                  }`,
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                                }}
+                              >
+                                P{getFieldPriority(field.fieldName)}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <Badge

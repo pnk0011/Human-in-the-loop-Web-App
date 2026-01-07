@@ -36,6 +36,7 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
   const [completedDocuments, setCompletedDocuments] = useState<ReviewerDocument[]>([]);
   const [isLoadingCompleted, setIsLoadingCompleted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [docIdFilter, setDocIdFilter] = useState('');
   const [stats, setStats] = useState<{
     Assigned_accounts: number;
     Completed_accounts: number;
@@ -59,6 +60,7 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
               status: '2',
               page,
               limit: pageSize,
+              document_id: docIdFilter || undefined,
             });
 
             if (response.status !== 'success') {
@@ -100,7 +102,7 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
     };
 
     loadApiData();
-  }, [user?.email]);
+  }, [user?.email, docIdFilter]);
 
   // Load completed documents for work history tab
   useEffect(() => {
@@ -212,6 +214,8 @@ export function ReviewerDashboard({ onValidateClick, onViewHistoryClick, onLogou
               // Pass API documents converted to QueueItem format
               apiDocuments={convertApiDocumentsToQueueItems()}
               isLoading={isLoading}
+              docIdFilter={docIdFilter}
+              onDocIdFilterChange={setDocIdFilter}
             />
           </>
                   ) : activeTab === 'Work History' ? (

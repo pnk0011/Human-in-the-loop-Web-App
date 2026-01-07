@@ -20,6 +20,8 @@ interface ValidationQueueProps {
   onValidateClick?: (item: QueueItem) => Promise<void>;
   apiDocuments?: QueueItem[];
   isLoading?: boolean;
+  docIdFilter?: string;
+  onDocIdFilterChange?: (value: string) => void;
 }
 
 const mockData: QueueItem[] = [
@@ -58,8 +60,10 @@ const mockData: QueueItem[] = [
 type SortField = 'account' | 'documentCount' | 'status';
 type SortDirection = 'asc' | 'desc';
 
-export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: externalIsLoading }: ValidationQueueProps = {}) {
-  const [searchQuery, setSearchQuery] = useState('');
+export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: externalIsLoading, docIdFilter: externalDocIdFilter, onDocIdFilterChange }: ValidationQueueProps = {}) {
+  const [internalDocIdFilter, setInternalDocIdFilter] = useState('');
+  const docIdFilter = externalDocIdFilter ?? internalDocIdFilter;
+  const setDocIdFilter = onDocIdFilterChange ?? setInternalDocIdFilter;
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
@@ -82,16 +86,8 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
   // Use only API documents, no fallback to dummy data
   const dataSource = apiDocuments || [];
   
-  // Filter accounts using search/status/active controls
+  // Data is already filtered by API when docIdFilter is provided
   let filteredData = [...dataSource];
-
-  if (searchQuery.trim()) {
-    const query = searchQuery.toLowerCase();
-    filteredData = filteredData.filter(item =>
-      item.accountName.toLowerCase().includes(query) ||
-      (item.descriptionSummary?.toLowerCase().includes(query) ?? false)
-    );
-  }
 
   // Status/active filters removed per request
   // Sort to prioritize Reassigned status documents at the top
@@ -175,7 +171,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
   };
 
   const resetFilters = () => {
-    setSearchQuery('');
+    setDocIdFilter('');
     setCurrentPage(1);
   };
 
@@ -185,15 +181,15 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
       <div className="bg-white dark:bg-[#2a2a2a] p-6 rounded-lg shadow-sm border border-[#E5E7EB] dark:border-[#3a3a3a]">
         <h3 className="text-[#012F66] dark:text-white mb-4">Filter Policies</h3>
         <div className="flex flex-wrap gap-4 mb-4">
-          <div className="w-full md:max-w-xs">
-            <label className="block text-[#012F66] dark:text-white mb-2">Search</label>
+          <div className="w-full md:w-auto md:min-w-[180px]">
+            <label className="block text-[#012F66] dark:text-white mb-2">Document ID</label>
             <input
-              value={searchQuery}
+              value={docIdFilter}
               onChange={(event) => {
-                setSearchQuery(event.target.value);
+                setDocIdFilter(event.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search by account or summary"
+              placeholder="Search by Document ID"
               className="w-full px-3 py-2 rounded-md border border-[#D0D5DD] dark:border-[#4a4a4a] bg-white dark:bg-[#3a3a3a] text-[#012F66] dark:text-white"
             />
           </div>
@@ -328,7 +324,7 @@ export function ValidationQueue({ onValidateClick, apiDocuments, isLoading: exte
                           : "No accounts match your current filters. Try adjusting your search criteria or reset the filters."
                         }
                       </p>
-                      {(searchQuery || (apiDocuments && apiDocuments.length === 0 && dataSource.length === 0)) && (
+                      {(docIdFilter || (apiDocuments && apiDocuments.length === 0 && dataSource.length === 0)) && (
                         <Button
                           onClick={resetFilters}
                           variant="outline"

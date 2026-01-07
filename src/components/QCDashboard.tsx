@@ -40,7 +40,7 @@ export function QCDashboard({
 }: QCDashboardProps) {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("Current Queue");
-  const [accountSearch, setAccountSearch] = useState("");
+  const [docIdFilter, setDocIdFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -61,10 +61,6 @@ export function QCDashboard({
   const [completedDocuments, setCompletedDocuments] = useState<QCDocument[]>([]);
   const [isLoadingCompleted, setIsLoadingCompleted] = useState(false);
 
-  // Legacy filter placeholders (document-level filters removed in new account flow)
-  const [reviewerFilter, setReviewerFilter] = useState('all');
-  const [isLoadingReviewers] = useState(false);
-  const [reviewers] = useState<string[]>([]);
 
   // Handle validate click with per-item loading state
   const handleValidateClick = async (item: any) => {
@@ -81,7 +77,7 @@ export function QCDashboard({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [accountSearch, statusFilter, itemsPerPage]);
+  }, [docIdFilter, statusFilter, itemsPerPage]);
 
   // Load API data for QC documents
   useEffect(() => {
@@ -94,7 +90,7 @@ export function QCDashboard({
             page: currentPage,
             limit: itemsPerPage,
             status: statusFilter !== 'all' ? statusFilter : undefined,
-            first_named_insured: accountSearch || undefined,
+            document_id: docIdFilter || undefined,
           };
           
           const response = await documentOperationsAPI.getQCDocuments(params);
@@ -133,7 +129,7 @@ export function QCDashboard({
     };
 
     loadApiData();
-  }, [user?.email, accountSearch, statusFilter, currentPage, itemsPerPage]);
+  }, [user?.email, docIdFilter, statusFilter, currentPage, itemsPerPage]);
 
   // Load completed documents for work history tab (status=1)
   useEffect(() => {
@@ -195,14 +191,7 @@ export function QCDashboard({
       isActive: doc.is_active,
     }));
 
-    if (accountSearch.trim()) {
-      const q = accountSearch.toLowerCase();
-      items = items.filter(
-        (item) =>
-          item.accountName.toLowerCase().includes(q) ||
-          (item.descriptionSummary?.toLowerCase().includes(q) ?? false)
-      );
-    }
+    // Document ID filter is handled by backend API
 
     if (statusFilter !== 'all') {
       items = items.filter(
@@ -385,7 +374,7 @@ export function QCDashboard({
   };
 
   const resetFilters = () => {
-    setAccountSearch("");
+    setDocIdFilter("");
     setStatusFilter("all");
     setCurrentPage(1);
   };
@@ -414,32 +403,20 @@ export function QCDashboard({
                   Filter Policies
                 </h3>
                 <div className="flex flex-wrap gap-4 mb-4">
-                  <div className="w-full md:w-auto md:min-w-[150px]">
+                  <div className="w-full md:w-auto md:min-w-[180px]">
                     <label className="block text-[#012F66] dark:text-white mb-2">
-                      Reviewer
+                      Document ID
                     </label>
-                    <Select
-                      value={reviewerFilter}
-                      onValueChange={setReviewerFilter}
-                      disabled={isLoadingReviewers}
-                    >
-                      <SelectTrigger className="w-full md:w-auto bg-white dark:bg-[#3a3a3a] border-[#D0D5DD] dark:border-[#4a4a4a] dark:text-white">
-                        <SelectValue placeholder={isLoadingReviewers ? "Loading Reviewers..." : "All Reviewers"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">
-                          All Reviewers
-                        </SelectItem>
-                        {reviewers.map((reviewer) => (
-                          <SelectItem key={reviewer} value={reviewer}>
-                            {reviewer}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <input
+                      value={docIdFilter}
+                      onChange={(e) => {
+                        setDocIdFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      placeholder="Search by Document ID"
+                      className="w-full px-3 py-2 rounded-md border border-[#D0D5DD] dark:border-[#4a4a4a] bg-white dark:bg-[#3a3a3a] text-[#012F66] dark:text-white"
+                    />
                   </div>
-
-
 
                   <div className="w-full md:w-auto md:min-w-[150px]">
                     <label className="block text-[#012F66] dark:text-white mb-2">

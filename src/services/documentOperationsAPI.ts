@@ -31,6 +31,7 @@ export interface GetReviewerDocumentsRequest {
   limit?: number;
   status?: string;
   first_named_insured?: string;
+  document_id?: string;
 }
 
 export interface ReviewerDocument {
@@ -163,6 +164,7 @@ export interface GetQCDocumentsRequest {
   limit?: number;
   status?: string;
   first_named_insured?: string;
+  document_id?: string;
 }
 
 export interface QCDocument {
@@ -311,6 +313,10 @@ class DocumentOperationsAPI {
         query.append('first_named_insured', params.first_named_insured);
       }
 
+      if (params.document_id) {
+        query.append('document_id', params.document_id);
+      }
+
       const endpoint = `/reviewer-get-assigned-policies?${query.toString()}`;
 
       const raw = await this.makeRequest<GetReviewerDocumentsResponse>(endpoint, {
@@ -443,6 +449,10 @@ class DocumentOperationsAPI {
 
     if (params.first_named_insured) {
       queryParams.append('first_named_insured', params.first_named_insured);
+    }
+
+    if (params.document_id) {
+      queryParams.append('document_id', params.document_id);
     }
 
     const raw = await this.makeRequest<GetQCDocumentsResponse>(`/qc-get-assigned-policies?${queryParams}`, {
