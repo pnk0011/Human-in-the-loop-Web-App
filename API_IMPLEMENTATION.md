@@ -1,6 +1,75 @@
 
 
 
+Field Name	Priority	UI Mapping
+Identifier	1	  NR
+Policy or Account Number	1	  NR
+Account Name	1	  NR
+Effective Date	1	  NR
+Profit Status	1	"
+profit_status"
+Underwriter 	1	  NR
+Religious or Fraternal Organization Affiliated	1	  NR
+Primary, Excess or Both 	2	"
+primary_excess_both"
+Expiration Date	2	expiration_date
+Pharmacy (Revenue)	3	pharmacy
+Child Daycare (# Children)	3	"child_daycare_count
+"
+Adult Daycare (# People)	3	"adult_daycare_count
+"
+EBL (# Employees) - Number of employees if EBL Coverage is available.	3	"ebl_employees
+"
+Stop Gap Liability	3	"stop_gap_liability
+"
+Hired/NO Auto (# Employees)	3	hired_nonowned_auto
+Swimming Pools (Pool)	3	"
+swimming_pool"
+Saunas/Hot Tubs (Item)	3	"
+saunas_hot_tubs
+"
+Tennis/Racquet/Handball/Pickleball (Court)	3	NA
+Exercise/Weight Rooms (Room)	3	exercise_weight_rooms
+Indoor Parking (Space)	3	"
+indoor_parking
+"
+Community Center (Sq Ft)	3	"
+community_center
+"
+Restaurants (Receipts)	3	"
+restaurants
+"
+Medical Equip. (Rental)	3	"
+medical_equipment_rental"
+Beauty Shops (Units)	3	"
+beauty_shops"
+Vacant Buildings (Sq Ft)	3	"
+vacant_buildings"
+Vacant Land (Acres)	3	"
+vacant_land"
+Dwellings (Units)	3	"
+dwellings
+"
+Storage Facilities/Garages (Units)	3	"
+storage_garages
+"
+Chapels (Units)	3	chapels
+Offices (Sq Ft)	3	"
+offices_sq_ft"
+Underlying Auto Limit	3	"
+underlying_auto_limit"
+Underlying Auto Premium	3	"
+underlying_auto_premium
+"
+Underlying Employer Liability Limit	3	"underlying_employer_liability_limit
+"
+Underlying Worker's Comp Premium	3	"
+underlying_wc_premium
+"
+
+=================================================================================
+
+
 https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/reviewer-get-assigned-policies?reviewer_assigned=demoreviewer%40medpro.com&page=1&limit=50&status=2&documnet_id=134008458
 
 ===========================================
