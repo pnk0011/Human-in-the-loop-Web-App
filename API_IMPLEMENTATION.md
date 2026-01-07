@@ -1,4 +1,106 @@
+=================================
+    LD
 
+Field Name	Priority	UI Mapping
+Identifier	1	NA
+Populated	1	NA
+Evaluation Date	1	evaluation_date
+Claimant Name	1	claimant_name
+Claim Number 	1	claim_no
+Type	1	type
+Status	1	status
+Loss Date 	1	loss_date
+Report Date	1	report_date
+ Loss Paid 	1	loss_paid
+ Loss Reserve 	1	"loss_reserve
+"
+ ALAE Paid  	1	alae_paid
+ ALAE Reserve 	1	alae_reserve
+Carrier	1	carrier_name
+Facility	1	facility
+Facility - Assumed	1	NA
+State	1	state
+Loss Comments	1	loss_comments
+Close Date	2	close_date
+
+
+===================================================================================
+  ED
+
+Field Name	Priority	UI Mapping
+Identifier	1	NA
+Location Name	1	"location_name
+"
+License Number	1	license_number
+Address	1	address
+State	1	state
+County	1	county
+PL Policy Type 	1	"
+pl_policy_type"
+GL Policy Type	1	gl_policy_type
+PL Retro Date	1	"pl_retro_date
+"
+GL Retro Date	1	"
+gl_retro_date"
+Oldest Loss History Date (This field is not required as fields to consider are available below)	1	??
+Facility Open Date	1	"facility_open_date
+"
+Oldest Date with Loss	1	NA
+Oldest Report Date with Loss	1	NA
+Oldest Policy Date on Loss Runs	1	NA
+Primary PL Limit	1	"
+primary_pl_limit"
+Primary GL Limit	1	"primary_gl_limit
+"
+Excess GL Limit	1	"
+excess_gl_limit"
+Excess PL Limit	1	excess_pl_limit
+Excess PL Attachment Point	1	NA
+Excess GL Attachment Point	1	NA
+Deductible or SIR	1	deductible 
+Deductible	1	deductible 
+Defense Cost Treatment	1	defense_cost_treatment
+CMS Rating	1	NA
+Special Focus Facility	1	NA
+Sub-acute	1	"
+sub_acute"
+Skilled	1	skilled
+Intermed. Care	1	intermediate_care
+Assisted Living	1	assisted_living
+Memory Care	1	"
+memory_care"
+Independent Living	1	independent_living
+Home Health	1	home_health
+Rehab	1	rehab
+Formerly Known As	2	formerly_known_as
+DBA Name	2	dba_name
+Resident Age Census Count Under 30	3	cover_age_range
+ Count 30-54	3	cover_age_range
+ Count 55-64	3	cover_age_range
+ Count 65-74	3	cover_age_range
+ Count 75-84	3	cover_age_range
+ Count 84+	3	cover_age_range
+1st shift - RN Count 	3	1st_shift_rn_count
+1st shift - LPN/LVN Count 	3	1st_shift_lpn_lvn_count
+1st shift - CNA/Personal Caregiver Count 	3	1st_shift_cna_personal_caregiver_count
+1st shift - Agency Count 	3	1st_shift_agency_count
+1st shift - Pool Count 	3	1st_shift_pool_count
+2nd shift - RN Count 	3	2nd_shift_rn_count
+2nd shift - LPN/LVN Count 	3	2nd_shift_lpn_lvn_count
+2nd shift - CNA/Personal Caregiver Count 	3	2nd_shift_cna_personal_caregiver_count
+2nd shift - Agency Count 	3	2nd_shift_agency_count
+2nd shift - Pool Count 	3	2nd_shift_pool_count
+3rd shift - RN Count 	3	3rd_shift_rn_count
+3rd shift - LPN/LVN Count 	3	3rd_shift_lpn_lvn_count
+3rd shift - CNA/Personal Caregiver Count 	3	3rd_shift_cna_personal_caregiver_count
+3rd shift - Agency Count 	3	3rd_shift_agency_count
+3rd shift - Pool Count 	3	3rd_shift_pool_count
+Turnover % - RN	3	turnover_pct_rn
+Turnover % -  LPN/LVN	3	turnover_pct_lpn
+Turnover % -  CNA/Personal Caregiver	3	turnover_cna_personal_caregiver
+FEIN Number 	3	NA
+
+================================================================================================
 
 
 Field Name	Priority	UI Mapping
