@@ -14,7 +14,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from './ui/pagination';
-import { Users, ChevronUp, ChevronDown, Loader2, FileText, AlertCircle, RefreshCw } from 'lucide-react';
+import { Users, ChevronUp, ChevronDown, Loader2, FileText, AlertCircle, RefreshCw, Download } from 'lucide-react';
 import { toast } from "sonner";
 import { documentAPI, AccountDocument, GetDocumentsRequest } from '../services/documentAPI';
 import { documentOperationsAPI, AssignReviewerRequest } from '../services/documentOperationsAPI';
@@ -38,6 +38,7 @@ interface AccountRow {
   accountName: string;
   documentCount: number;
   documentIds: string;
+  unassignedDocumentIds?: string;
   documentsAssigned: number;
   documentsCompleted: number;
   descriptionSummary: string;
@@ -56,6 +57,8 @@ export function DocumentAssignment() {
     Total_policies: 0,
     Assigned_policies: 0,
     Completed_policies: 0,
+    Assigned_documents: 0,
+    Completed_documents: 0,
   };
   const [documents, setDocuments] = useState<AccountRow[]>([]);
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
@@ -126,10 +129,10 @@ export function DocumentAssignment() {
       
       const apiList = (response as any).policies || response.files;
       if (response.status === 'success' && Array.isArray(apiList)) {
-        // Set stats from API response
-        if (response.stats) {
-          setStats(response.stats);
-        }
+      // Set stats from API response
+      if (response.stats) {
+        setStats(response.stats);
+      }
         
         // Convert API response to match component expectations
         const formattedDocuments: AccountRow[] = apiList.map((doc: AccountDocument) => ({
@@ -137,6 +140,7 @@ export function DocumentAssignment() {
           accountName: doc.first_named_insured,
           documentCount: doc.document_count,
           documentIds: (doc as any).doc_handles || '-',
+          unassignedDocumentIds: (doc as any).unassigned_doc_handle || '',
           documentsAssigned: (doc as any).documents_assigned ?? 0,
           documentsCompleted: (doc as any).documents_completed ?? 0,
           descriptionSummary: doc.description_summary,
@@ -390,6 +394,54 @@ export function DocumentAssignment() {
   // Use API paginated data directly (server-side pagination)
   const paginatedDocuments = filteredDocuments;
 
+  const handleDownload = () => {
+    if (!filteredDocuments.length) {
+      toast.error('No records to download');
+      return;
+    }
+
+    const headers = [
+      'Policy',
+      'Document IDs',
+      'Total Documents',
+      'Assigned Documents',
+      'Completed Documents',
+      'Summary',
+      'Reviewer',
+      'QC',
+      'Status',
+    ];
+
+    const escapeCsv = (val: any) => {
+      const str = String(val ?? '');
+      // Escape quotes by doubling, wrap in quotes
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+
+    const rows = filteredDocuments.map((doc) => [
+      escapeCsv(doc.accountName),
+      escapeCsv(doc.documentIds),
+      escapeCsv(doc.documentCount),
+      escapeCsv(doc.documentsAssigned),
+      escapeCsv(doc.documentsCompleted),
+      escapeCsv(doc.descriptionSummary),
+      escapeCsv(doc.reviewerAssigned || '-'),
+      escapeCsv(doc.qcAssigned || '-'),
+      escapeCsv(doc.status),
+    ]);
+
+    const csv = ['\uFEFF' + headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'document-assignment.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   // Reset to page 1 when filters change
   const handleFilterChange = (filterSetter: (value: string) => void, value: string) => {
     filterSetter(value);
@@ -399,7 +451,7 @@ export function DocumentAssignment() {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
           <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Total Policies</div>
           {isLoading ? (
@@ -425,6 +477,26 @@ export function DocumentAssignment() {
           ) : (
             <div className="text-green-600 text-3xl font-bold">
               {stats.Completed_policies}
+            </div>
+          )}
+        </div>
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Assigned Documents</div>
+          {isLoading ? (
+            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+          ) : (
+            <div className="text-[#0292DC] text-3xl font-bold">
+              {stats.Assigned_documents}
+            </div>
+          )}
+        </div>
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-lg shadow-sm p-6 border border-[#E5E7EB] dark:border-[#3a3a3a]">
+          <div className="text-[#80989A] dark:text-[#a0a0a0] mb-2">Completed Documents</div>
+          {isLoading ? (
+            <div className="h-9 bg-[#E5E7EB] dark:bg-[#3a3a3a] rounded animate-pulse"></div>
+          ) : (
+            <div className="text-green-600 text-3xl font-bold">
+              {stats.Completed_documents}
             </div>
           )}
         </div>
@@ -535,6 +607,16 @@ export function DocumentAssignment() {
               </>
             )}
           </div>
+            <div className="w-full md:w-auto">
+              <Button
+                onClick={handleDownload}
+                className="bg-[#0292DC] hover:bg-[#012F66] text-white flex items-center gap-2"
+                variant="default"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </Button>
+            </div>
         </div>
       </div>
 
@@ -648,11 +730,27 @@ export function DocumentAssignment() {
                     <div className="text-[#012F66] dark:text-white font-semibold">{doc.accountName}</div>
                   </td>
                     <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentCount}</td>
-                    <td className="px-6 py-4 text-[#012F66] dark:text-white max-w-xs">
-                      <div className="whitespace-pre-wrap break-words text-xs text-[#012F66] dark:text-white">
-                        {doc.documentIds || '-'}
-                      </div>
-                    </td>
+                  <td className="px-6 py-4 text-[#012F66] dark:text-white max-w-xs">
+                    <div className="whitespace-pre-wrap break-words text-xs">
+                      {(doc.documentIds || '').split('|').map((id) => {
+                        const trimmed = id.trim();
+                        if (!trimmed) return null;
+                        const isUnassigned = (doc.unassignedDocumentIds || '').split('|').map(s => s.trim()).includes(trimmed);
+                        return (
+                          <span
+                            key={trimmed}
+                            className={`inline-flex items-center px-2 py-1 rounded mr-2 mb-2 ${
+                              isUnassigned
+                                ? 'bg-[#FFF7E6] text-[#B45309] border border-[#F59E0B]'
+                                : 'bg-[#E5E7EB] text-[#012F66] dark:bg-[#3a3a3a] dark:text-white'
+                            }`}
+                          >
+                            {trimmed}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </td>
                     <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentsAssigned}</td>
                     <td className="px-6 py-4 text-[#012F66] dark:text-white">{doc.documentsCompleted}</td>
                   <td className="px-6 py-4 text-[#80989A] dark:text-[#a0a0a0] max-w-xs">

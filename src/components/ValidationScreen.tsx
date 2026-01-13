@@ -1446,11 +1446,24 @@ export function ValidationScreen({
                         <SelectValue placeholder="Select data set" />
                       </SelectTrigger>
                       <SelectContent>
-                        {currentTab.variants.map((_, idx) => (
-                          <SelectItem key={`${currentTab.key}-${idx}`} value={String(idx)}>
-                            {currentTab.label} Set #{idx + 1}
-                          </SelectItem>
-                        ))}
+                        {currentTab.variants.map((_, idx) => {
+                          const meta = currentTab.variantMeta?.[idx];
+                          const isAutoApproved =
+                            meta?.qc_status === 'AutoApproved' ||
+                            meta?.reviewer_status === 'AutoApproved';
+                          return (
+                            <SelectItem key={`${currentTab.key}-${idx}`} value={String(idx)}>
+                              <span className="flex items-center gap-2">
+                                <span>{currentTab.label} Set #{idx + 1}</span>
+                                {isAutoApproved && (
+                                  <span className="text-[11px] px-2 py-0.5 rounded bg-[#0292DC] text-white font-semibold">
+                                    Auto Approved
+                                  </span>
+                                )}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   )}
