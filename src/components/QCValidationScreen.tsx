@@ -162,7 +162,7 @@ interface DocumentAttachment {
     label: string;
     fields: ExtractedField[];
     variants?: ExtractedField[][];
-    variantMeta?: { qc_status?: string | null; qc_comments?: string | null; qc_comment?: string | null }[];
+    variantMeta?: { qc_status?: string | null; qc_comments?: string | null; qc_comment?: string | null; reviewer_status?: string | null; reviewer_comments?: string | null }[];
   }[];
 }
 
@@ -273,18 +273,13 @@ export function QCValidationScreen({
     ? currentTab.variants[currentVariantIndex]
     : currentTab?.fields || [];
   
-  // Sort fields by priority for Account/Loss/Exposure Data tabs
+  // Sort fields by ascending confidence (ties by field name)
   const currentFields = React.useMemo(() => {
-    if (activeTab === 'account' || activeTab === 'loss' || activeTab === 'exposure') {
-      return [...rawCurrentFields].sort((a, b) => {
-        const priorityA = getFieldPriority(activeTab, a.fieldName);
-        const priorityB = getFieldPriority(activeTab, b.fieldName);
-        if (priorityA !== priorityB) return priorityA - priorityB;
-        return a.fieldName.localeCompare(b.fieldName);
-      });
-    }
-    return rawCurrentFields;
-  }, [rawCurrentFields, activeTab]);
+    return [...rawCurrentFields].sort((a, b) => {
+      if (a.confidence !== b.confidence) return a.confidence - b.confidence;
+      return a.fieldName.localeCompare(b.fieldName);
+    });
+  }, [rawCurrentFields]);
 
   // Track validation state for each field
   const [fieldValidations, setFieldValidations] = useState<Record<string, FieldValidation>>(
@@ -764,11 +759,24 @@ export function QCValidationScreen({
                       <SelectValue placeholder="Select data set" />
                     </SelectTrigger>
                     <SelectContent>
-                      {currentTab.variants.map((_, idx) => (
-                        <SelectItem key={`${currentTab.key}-${idx}`} value={String(idx)}>
-                          {currentTab.label} Set #{idx + 1}
-                        </SelectItem>
-                      ))}
+                      {currentTab.variants.map((_, idx) => {
+                        const meta = currentTab.variantMeta?.[idx];
+                        const isAutoApproved =
+                          meta?.qc_status === 'AutoApproved' &&
+                          meta?.reviewer_status === 'AutoApproved';
+                        return (
+                          <SelectItem key={`${currentTab.key}-${idx}`} value={String(idx)}>
+                            <span className="flex items-center gap-2">
+                              <span>{currentTab.label} Set #{idx + 1}</span>
+                              {isAutoApproved && (
+                                <span className="text-[11px] px-2 py-0.5 rounded bg-[#0292DC] text-white font-semibold">
+                                  Auto Approved
+                                </span>
+                              )}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
