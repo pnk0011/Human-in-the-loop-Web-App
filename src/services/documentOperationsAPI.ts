@@ -466,9 +466,10 @@ class DocumentOperationsAPI {
     if (raw.stats) {
       normalized.stats = {
         Assigned_accounts: raw.stats.Assigned_accounts ?? raw.stats.Policy_Assigned ?? 0,
-        Completed_accounts: raw.stats.Completed_accounts ?? 0,
+        Completed_accounts: raw.stats.Completed_accounts ?? raw.stats.Completed_policies ?? 0,
         Policy_Assigned: raw.stats.Policy_Assigned,
         Total_Filtered_Records: raw.stats.Total_Filtered_Records,
+        Completed_policies: raw.stats.Completed_policies,
       };
     }
 

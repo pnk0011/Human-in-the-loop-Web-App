@@ -648,6 +648,9 @@ export function DocumentAssignment() {
                   Document IDs
                 </th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
+                  Unassigned Document IDs
+                </th>
+                <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
                   Assigned Documents
                 </th>
                 <th className="px-6 py-4 text-left text-[#012F66] dark:text-white">
@@ -735,15 +738,26 @@ export function DocumentAssignment() {
                       {(doc.documentIds || '').split('|').map((id) => {
                         const trimmed = id.trim();
                         if (!trimmed) return null;
-                        const isUnassigned = (doc.unassignedDocumentIds || '').split('|').map(s => s.trim()).includes(trimmed);
                         return (
                           <span
                             key={trimmed}
-                            className={`inline-flex items-center px-2 py-1 rounded mr-2 mb-2 ${
-                              isUnassigned
-                                ? 'bg-[#FFF7E6] text-[#B45309] border border-[#F59E0B]'
-                                : 'bg-[#E5E7EB] text-[#012F66] dark:bg-[#3a3a3a] dark:text-white'
-                            }`}
+                            className="inline-flex items-center px-2 py-1 rounded mr-2 mb-2 bg-[#E5E7EB] text-[#012F66] dark:bg-[#3a3a3a] dark:text-white"
+                          >
+                            {trimmed}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-[#012F66] dark:text-white max-w-xs">
+                    <div className="whitespace-pre-wrap break-words text-xs">
+                      {(doc.unassignedDocumentIds || '').split('|').map((id) => {
+                        const trimmed = id.trim();
+                        if (!trimmed) return null;
+                        return (
+                          <span
+                            key={trimmed}
+                            className="inline-flex items-center px-2 py-1 rounded mr-2 mb-2 bg-[#FFF7E6] text-[#B45309] border border-[#F59E0B]"
                           >
                             {trimmed}
                           </span>

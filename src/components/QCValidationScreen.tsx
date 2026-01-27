@@ -194,6 +194,7 @@ interface QCValidationScreenProps {
   onLogout?: () => void;
   theme?: "light" | "dark";
   onToggleTheme?: () => void;
+  onDocumentRefresh?: () => Promise<void>;
 }
 
 export function QCValidationScreen({
@@ -204,6 +205,7 @@ export function QCValidationScreen({
   onLogout,
   theme,
   onToggleTheme,
+  onDocumentRefresh,
 }: QCValidationScreenProps) {
   const [zoom, setZoom] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
@@ -329,6 +331,34 @@ export function QCValidationScreen({
       }
     }
   }, [selectedAttachmentIndex, allFields]);
+
+  // Reset component state when document changes (e.g., after successful QC submission and refresh)
+  // Use a ref to track previous document to detect changes
+  const prevDocumentRef = React.useRef<string>('');
+  useEffect(() => {
+    // Create a unique key from document properties to detect changes
+    const documentKey = JSON.stringify({
+      id: document.id,
+      documentName: document.documentName,
+      attachments: document.attachments?.map(a => a.doc_handle).join(','),
+      tabbedFields: document.tabbedFields?.map(t => `${t.key}-${t.variants?.length || 0}`).join(','),
+    });
+    
+    // Only reset if document actually changed
+    if (prevDocumentRef.current !== documentKey) {
+      prevDocumentRef.current = documentKey;
+      setDatasetDecisions({});
+      setVariantNotes({});
+      setTabVariantIndex({});
+      setSelectedAttachmentIndex(0);
+      setFieldValidations({});
+      // Reset to first tab when document changes
+      const tabs = document.tabbedFields || (document.attachments?.[0]?.tabbedFields) || [];
+      if (tabs.length > 0) {
+        setActiveTab(tabs[0].key);
+      }
+    }
+  }, [document]);
 
   // Reset datasetDecisions and variantNotes when switching attachments
   useEffect(() => {
@@ -467,6 +497,12 @@ export function QCValidationScreen({
         id: targetId,
         data: dataPayload,
       });
+      
+      // Refresh document data from backend after successful save
+      if (onDocumentRefresh) {
+        await onDocumentRefresh();
+      }
+      
       alert(`Data set ${decision === 'approve' ? 'approved' : 'rejected'} successfully.`);
       setDatasetDecisions((prev) => ({ ...prev, [currentKey]: null }));
       setVariantNotes((prev) => ({ ...prev, [currentKey]: '' }));

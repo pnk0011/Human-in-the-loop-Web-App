@@ -229,6 +229,13 @@ const AppContent = function AppContent() {
         // Try to fetch real document data from API
         const response = await documentOperationsAPI.reviewFile({ first_named_insured: item.accountName || item.document });
         
+        if (response?.documents && response.documents.length === 0) {
+          setSelectedDocument(null);
+          setIsReadOnlyView(false);
+          setCurrentView("dashboard");
+          return;
+        }
+
         if (response?.documents && response.documents.length > 0) {
           // Build attachments array from all documents
           const attachments: DocumentAttachment[] = response.documents.map((docPayload: any) => {
@@ -344,6 +351,12 @@ const AppContent = function AppContent() {
         // Try to fetch real QC document data from API
         const response = await documentOperationsAPI.qcOpenFile({ first_named_insured: item.accountName || item.document });
         
+        if (response?.documents && response.documents.length === 0) {
+          setSelectedQCDocument(null);
+          setCurrentView("dashboard");
+          return;
+        }
+
         if (response?.documents && response.documents.length > 0) {
           // Build attachments array from all documents (same structure as reviewer)
           const attachments: DocumentAttachment[] = response.documents.map((docPayload: any) => {
@@ -594,8 +607,100 @@ const AppContent = function AppContent() {
     });
   }, [withLoading, selectedDocument]);
 
+  // Function to refresh QC document data from backend
+  const handleRefreshQCDocument = useCallback(async () => {
+    if (!selectedQCDocument) return;
+    
+    try {
+      const { documentOperationsAPI } = await import('./services/documentOperationsAPI');
+      const refreshed = await documentOperationsAPI.qcOpenFile({
+        first_named_insured: selectedQCDocument.documentName,
+      });
+
+      if (refreshed?.documents && refreshed.documents.length === 0) {
+        setSelectedQCDocument(null);
+        setCurrentView("dashboard");
+        return;
+      }
+
+      if (refreshed?.documents && refreshed.documents.length > 0) {
+        const attachments: DocumentAttachment[] = refreshed.documents.map((docPayload: any) => {
+          const exposureData = docPayload.exposure_data || [];
+          const accountData = docPayload.account_data || [];
+          const lossData = docPayload.loss_data || [];
+
+          const exposureVariants = exposureData.map((item: any) => buildFieldsFromObject(item || {}));
+          const accountVariants = accountData.map((item: any) => buildFieldsFromObject(item || {}));
+          const lossVariants = lossData.map((item: any) => buildFieldsFromObject(item || {}));
+
+          const exposureVariantMeta = exposureData.map((item: any) => ({
+            qc_status: item?.qc_status ?? null,
+            qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+            reviewer_status: item?.reviewer_status ?? null,
+            reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+          }));
+          const accountVariantMeta = accountData.map((item: any) => ({
+            qc_status: item?.qc_status ?? null,
+            qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+            reviewer_status: item?.reviewer_status ?? null,
+            reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+          }));
+          const lossVariantMeta = lossData.map((item: any) => ({
+            qc_status: item?.qc_status ?? null,
+            qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+            reviewer_status: item?.reviewer_status ?? null,
+            reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+          }));
+
+          const firstExposure = exposureVariants[0] || [];
+          const firstAccount = accountVariants[0] || [];
+          const firstLoss = lossVariants[0] || [];
+
+          return {
+            doc_handle: docPayload.doc_handle,
+            presigned_url: docPayload.presigned_url,
+            status: docPayload.status,
+            tabbedFields: [
+              { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants, variantMeta: lossVariantMeta },
+              { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants, variantMeta: accountVariantMeta },
+              { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants, variantMeta: exposureVariantMeta },
+            ],
+          } as DocumentAttachment;
+        });
+
+        const firstDoc = attachments[0];
+        const firstDocFields = firstDoc.tabbedFields.find(t => {
+          const variant = (t.variants && t.variants[0]) || t.fields;
+          return variant && variant.length > 0;
+        });
+        const defaultFields = firstDocFields
+          ? (firstDocFields.variants && firstDocFields.variants[0] && firstDocFields.variants[0].length
+              ? firstDocFields.variants[0]
+              : firstDocFields.fields || [])
+          : [];
+
+        const qcDocument: QCValidationDocument = {
+          id: refreshed.first_named_insured || selectedQCDocument.id,
+          documentName: refreshed.first_named_insured || selectedQCDocument.documentName,
+          documentType: 'Account',
+          priority: 'High',
+          documentImage: firstDoc.presigned_url,
+          tabbedFields: firstDoc.tabbedFields,
+          fields: defaultFields,
+          attachments: attachments,
+          status: refreshed.documents?.[0]?.status,
+        };
+
+        setSelectedQCDocument(qcDocument);
+      }
+    } catch (error) {
+      console.error('Failed to refresh QC document:', error);
+    }
+  }, [selectedQCDocument]);
+
   const handleSubmitQCReview = useCallback(async (decisions: QCDecision[]) => {
     return withLoading(async () => {
+      let didRefresh = false;
       try {
         // Try to submit to QC API if we have a selected QC document
         if (selectedQCDocument) {
@@ -641,22 +746,115 @@ const AppContent = function AppContent() {
             validations: qcValidations,
           });
 
-          if (response.message) {
-            // QC API submission successful
-          } else {
-            // QC API submission failed, using fallback
+          // Check if submission was successful
+          if (response && response.message && response.total_rows_updated !== undefined) {
+            // QC API submission successful - reload latest policy details from backend
+            try {
+              const refreshed = await documentOperationsAPI.qcOpenFile({
+                first_named_insured: selectedQCDocument.documentName,
+              });
+
+              if (refreshed?.documents && refreshed.documents.length === 0) {
+                setQcQueueCount((prev) => Math.max(0, prev - 1));
+                setSelectedQCDocument(null);
+                setCurrentView("dashboard");
+                didRefresh = true;
+                return;
+              }
+
+              if (refreshed?.documents && refreshed.documents.length > 0) {
+                const attachments: DocumentAttachment[] = refreshed.documents.map((docPayload: any) => {
+                  const exposureData = docPayload.exposure_data || [];
+                  const accountData = docPayload.account_data || [];
+                  const lossData = docPayload.loss_data || [];
+
+                  const exposureVariants = exposureData.map((item: any) => buildFieldsFromObject(item || {}));
+                  const accountVariants = accountData.map((item: any) => buildFieldsFromObject(item || {}));
+                  const lossVariants = lossData.map((item: any) => buildFieldsFromObject(item || {}));
+
+                  const exposureVariantMeta = exposureData.map((item: any) => ({
+                    qc_status: item?.qc_status ?? null,
+                    qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+                    reviewer_status: item?.reviewer_status ?? null,
+                    reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+                  }));
+                  const accountVariantMeta = accountData.map((item: any) => ({
+                    qc_status: item?.qc_status ?? null,
+                    qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+                    reviewer_status: item?.reviewer_status ?? null,
+                    reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+                  }));
+                  const lossVariantMeta = lossData.map((item: any) => ({
+                    qc_status: item?.qc_status ?? null,
+                    qc_comments: item?.qc_comments ?? item?.qc_comment ?? null,
+                    reviewer_status: item?.reviewer_status ?? null,
+                    reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
+                  }));
+
+                  const firstExposure = exposureVariants[0] || [];
+                  const firstAccount = accountVariants[0] || [];
+                  const firstLoss = lossVariants[0] || [];
+
+                  return {
+                    doc_handle: docPayload.doc_handle,
+                    presigned_url: docPayload.presigned_url,
+                    status: docPayload.status,
+                    tabbedFields: [
+                      { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants, variantMeta: lossVariantMeta },
+                      { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants, variantMeta: accountVariantMeta },
+                      { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants, variantMeta: exposureVariantMeta },
+                    ],
+                  } as DocumentAttachment;
+                });
+
+                const firstDoc = attachments[0];
+                const firstDocFields = firstDoc.tabbedFields.find(t => {
+                  const variant = (t.variants && t.variants[0]) || t.fields;
+                  return variant && variant.length > 0;
+                });
+                const defaultFields = firstDocFields
+                  ? (firstDocFields.variants && firstDocFields.variants[0] && firstDocFields.variants[0].length
+                      ? firstDocFields.variants[0]
+                      : firstDocFields.fields || [])
+                  : [];
+
+                const qcDocument: QCValidationDocument = {
+                  id: refreshed.first_named_insured || selectedQCDocument.id,
+                  documentName: refreshed.first_named_insured || selectedQCDocument.documentName,
+                  documentType: 'Account',
+                  priority: 'High',
+                  documentImage: firstDoc.presigned_url,
+                  tabbedFields: firstDoc.tabbedFields,
+                  fields: defaultFields,
+                  attachments: attachments,
+                  status: refreshed.documents?.[0]?.status,
+                };
+
+                // Update the document state to trigger re-render with fresh data
+                setSelectedQCDocument(qcDocument);
+                // Ensure we stay on QC validation view
+                setCurrentView("qc-validation");
+                didRefresh = true;
+                return; // Exit early since we successfully refreshed
+              }
+            } catch (refreshError) {
+              // If refresh fails, log error but don't fall back to dashboard
+              console.error('Failed to refresh QC document after submission:', refreshError);
+            }
           }
         }
       } catch (error) {
         // QC API submission failed, using fallback
       }
       
-      // Always update UI regardless of API success/failure
-      // Decrease QC queue count
-      setQcQueueCount((prev) => Math.max(0, prev - 1));
-      // Return to dashboard
-      setCurrentView("dashboard");
-      setSelectedQCDocument(null);
+      // If we could not refresh the policy data, fall back to old behavior
+      if (!didRefresh) {
+        // Decrease QC queue count
+        setQcQueueCount((prev) => Math.max(0, prev - 1));
+        // Return to dashboard
+        setCurrentView("dashboard");
+        setSelectedQCDocument(null);
+      }
     });
   }, [withLoading, selectedQCDocument]);
 
@@ -709,6 +907,7 @@ const AppContent = function AppContent() {
             theme={currentTheme}
             onToggleTheme={toggleTheme}
             isReadOnly={isReadOnlyView}
+            onDocumentRefresh={handleRefreshQCDocument}
           />
         ) : currentView === "qc-validation" && selectedQCDocument ? (
           <LazyComponents.QCValidationScreen
@@ -719,6 +918,7 @@ const AppContent = function AppContent() {
             onLogout={handleLogout}
             theme={currentTheme}
             onToggleTheme={toggleTheme}
+            onDocumentRefresh={handleRefreshQCDocument}
           />
         ) : null
       ) : currentUserRole === "Reviewer" ? (
