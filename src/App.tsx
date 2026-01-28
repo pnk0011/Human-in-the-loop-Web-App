@@ -217,6 +217,65 @@ const AppContent = function AppContent() {
     return fields;
   };
 
+  const getVariantKey = (variant?: any[]) => {
+    const first = variant?.[0] as any;
+    if (!first) return '';
+    return (
+      first?._rowMeta?.document_id ??
+      first?._rowMeta?.doc_handle ??
+      first?.sourceId ??
+      first?.rowId ??
+      first?.id ??
+      ''
+    );
+  };
+
+  const reorderVariantsWithPrevious = (
+    variants: any[][],
+    variantMeta: any[] | undefined,
+    rawData: any[],
+    previousVariants?: any[][],
+    previousRawData?: any[],
+  ) => {
+    if (!previousVariants || previousVariants.length === 0 || !previousRawData || previousRawData.length === 0) {
+      return { variants, variantMeta };
+    }
+
+    // Build order map from previous raw data IDs
+    const order = new Map<string, number>();
+    previousRawData.forEach((rawItem, idx) => {
+      const key = String(rawItem?.id ?? rawItem?.ID ?? rawItem?.Id ?? '');
+      if (key && !order.has(key)) {
+        order.set(key, idx);
+      }
+    });
+
+    if (order.size === 0) {
+      return { variants, variantMeta };
+    }
+
+    // Create indexed array with raw data IDs
+    const indexed = variants.map((v, idx) => ({
+      v,
+      meta: variantMeta?.[idx],
+      key: String(rawData[idx]?.id ?? rawData[idx]?.ID ?? rawData[idx]?.Id ?? ''),
+      idx,
+    }));
+
+    // Sort by previous order
+    indexed.sort((a, b) => {
+      const aOrder = a.key && order.has(a.key) ? order.get(a.key)! : Number.MAX_SAFE_INTEGER;
+      const bOrder = b.key && order.has(b.key) ? order.get(b.key)! : Number.MAX_SAFE_INTEGER;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.idx - b.idx;
+    });
+
+    return {
+      variants: indexed.map((item) => item.v),
+      variantMeta: variantMeta ? indexed.map((item) => item.meta) : variantMeta,
+    };
+  };
+
   const handleValidateClick = useCallback(async (item: any) => {
     return withLoading(async () => {
       // Try to load real API data first, fallback to mock data
@@ -396,9 +455,9 @@ const AppContent = function AppContent() {
               presigned_url: docPayload.presigned_url,
               status: docPayload.status,
               tabbedFields: [
-                { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants, variantMeta: lossVariantMeta },
-                { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants, variantMeta: accountVariantMeta },
-                { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants, variantMeta: exposureVariantMeta },
+                { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants, variantMeta: lossVariantMeta, _rawData: lossData },
+                { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants, variantMeta: accountVariantMeta, _rawData: accountData },
+                { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants, variantMeta: exposureVariantMeta, _rawData: exposureData },
               ],
             };
           });
@@ -624,7 +683,30 @@ const AppContent = function AppContent() {
       }
 
       if (refreshed?.documents && refreshed.documents.length > 0) {
+        // Store previous raw data for ordering preservation
+        const previousDataByHandle = new Map<string, { exposure: any[], account: any[], loss: any[] }>();
+        const previousAttachmentsByHandle = new Map<string, DocumentAttachment>();
+        
+        selectedQCDocument.attachments?.forEach((attachment) => {
+          if (attachment.doc_handle) {
+            previousAttachmentsByHandle.set(attachment.doc_handle, attachment);
+            // Try to extract raw data from the attachment (stored in allFields if available)
+            const prevExposure = attachment.tabbedFields?.find((t) => t.key === 'exposure');
+            const prevAccount = attachment.tabbedFields?.find((t) => t.key === 'account');
+            const prevLoss = attachment.tabbedFields?.find((t) => t.key === 'loss');
+            
+            previousDataByHandle.set(attachment.doc_handle, {
+              exposure: (prevExposure as any)?._rawData || [],
+              account: (prevAccount as any)?._rawData || [],
+              loss: (prevLoss as any)?._rawData || [],
+            });
+          }
+        });
+
         const attachments: DocumentAttachment[] = refreshed.documents.map((docPayload: any) => {
+          const previousAttachment = previousAttachmentsByHandle.get(docPayload.doc_handle);
+          const previousRawData = previousDataByHandle.get(docPayload.doc_handle);
+          
           const exposureData = docPayload.exposure_data || [];
           const accountData = docPayload.account_data || [];
           const lossData = docPayload.loss_data || [];
@@ -652,19 +734,47 @@ const AppContent = function AppContent() {
             reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
           }));
 
-          const firstExposure = exposureVariants[0] || [];
-          const firstAccount = accountVariants[0] || [];
-          const firstLoss = lossVariants[0] || [];
+          const previousExposure = previousAttachment?.tabbedFields?.find((t) => t.key === 'exposure');
+          const previousAccount = previousAttachment?.tabbedFields?.find((t) => t.key === 'account');
+          const previousLoss = previousAttachment?.tabbedFields?.find((t) => t.key === 'loss');
+
+          const reorderedExposure = reorderVariantsWithPrevious(
+            exposureVariants,
+            exposureVariantMeta,
+            exposureData,
+            previousExposure?.variants,
+            previousRawData?.exposure,
+          );
+          const reorderedAccount = reorderVariantsWithPrevious(
+            accountVariants,
+            accountVariantMeta,
+            accountData,
+            previousAccount?.variants,
+            previousRawData?.account,
+          );
+          const reorderedLoss = reorderVariantsWithPrevious(
+            lossVariants,
+            lossVariantMeta,
+            lossData,
+            previousLoss?.variants,
+            previousRawData?.loss,
+          );
+
+          const firstExposure = reorderedExposure.variants[0] || [];
+          const firstAccount = reorderedAccount.variants[0] || [];
+          const firstLoss = reorderedLoss.variants[0] || [];
+
+          const tabbedFieldsWithRawData = [
+            { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: reorderedLoss.variants, variantMeta: reorderedLoss.variantMeta, _rawData: lossData },
+            { key: 'account', label: 'Account Data', fields: firstAccount, variants: reorderedAccount.variants, variantMeta: reorderedAccount.variantMeta, _rawData: accountData },
+            { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: reorderedExposure.variants, variantMeta: reorderedExposure.variantMeta, _rawData: exposureData },
+          ];
 
           return {
             doc_handle: docPayload.doc_handle,
             presigned_url: docPayload.presigned_url,
             status: docPayload.status,
-            tabbedFields: [
-              { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants, variantMeta: lossVariantMeta },
-              { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants, variantMeta: accountVariantMeta },
-              { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants, variantMeta: exposureVariantMeta },
-            ],
+            tabbedFields: tabbedFieldsWithRawData,
           } as DocumentAttachment;
         });
 
@@ -763,7 +873,30 @@ const AppContent = function AppContent() {
               }
 
               if (refreshed?.documents && refreshed.documents.length > 0) {
+                // Store previous raw data for ordering preservation
+                const previousDataByHandle = new Map<string, { exposure: any[], account: any[], loss: any[] }>();
+                const previousAttachmentsByHandle = new Map<string, DocumentAttachment>();
+                
+                selectedQCDocument.attachments?.forEach((attachment) => {
+                  if (attachment.doc_handle) {
+                    previousAttachmentsByHandle.set(attachment.doc_handle, attachment);
+                    // Try to extract raw data from the attachment (stored in allFields if available)
+                    const prevExposure = attachment.tabbedFields?.find((t) => t.key === 'exposure');
+                    const prevAccount = attachment.tabbedFields?.find((t) => t.key === 'account');
+                    const prevLoss = attachment.tabbedFields?.find((t) => t.key === 'loss');
+                    
+                    previousDataByHandle.set(attachment.doc_handle, {
+                      exposure: (prevExposure as any)?._rawData || [],
+                      account: (prevAccount as any)?._rawData || [],
+                      loss: (prevLoss as any)?._rawData || [],
+                    });
+                  }
+                });
+
                 const attachments: DocumentAttachment[] = refreshed.documents.map((docPayload: any) => {
+                  const previousAttachment = previousAttachmentsByHandle.get(docPayload.doc_handle);
+                  const previousRawData = previousDataByHandle.get(docPayload.doc_handle);
+                  
                   const exposureData = docPayload.exposure_data || [];
                   const accountData = docPayload.account_data || [];
                   const lossData = docPayload.loss_data || [];
@@ -791,19 +924,47 @@ const AppContent = function AppContent() {
                     reviewer_comments: item?.reviewer_comments ?? item?.reviewer_comment ?? null,
                   }));
 
-                  const firstExposure = exposureVariants[0] || [];
-                  const firstAccount = accountVariants[0] || [];
-                  const firstLoss = lossVariants[0] || [];
+                  const previousExposure = previousAttachment?.tabbedFields?.find((t) => t.key === 'exposure');
+                  const previousAccount = previousAttachment?.tabbedFields?.find((t) => t.key === 'account');
+                  const previousLoss = previousAttachment?.tabbedFields?.find((t) => t.key === 'loss');
+
+                  const reorderedExposure = reorderVariantsWithPrevious(
+                    exposureVariants,
+                    exposureVariantMeta,
+                    exposureData,
+                    previousExposure?.variants,
+                    previousRawData?.exposure,
+                  );
+                  const reorderedAccount = reorderVariantsWithPrevious(
+                    accountVariants,
+                    accountVariantMeta,
+                    accountData,
+                    previousAccount?.variants,
+                    previousRawData?.account,
+                  );
+                  const reorderedLoss = reorderVariantsWithPrevious(
+                    lossVariants,
+                    lossVariantMeta,
+                    lossData,
+                    previousLoss?.variants,
+                    previousRawData?.loss,
+                  );
+
+                  const firstExposure = reorderedExposure.variants[0] || [];
+                  const firstAccount = reorderedAccount.variants[0] || [];
+                  const firstLoss = reorderedLoss.variants[0] || [];
+
+                  const tabbedFieldsWithRawData = [
+                    { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: reorderedLoss.variants, variantMeta: reorderedLoss.variantMeta, _rawData: lossData },
+                    { key: 'account', label: 'Account Data', fields: firstAccount, variants: reorderedAccount.variants, variantMeta: reorderedAccount.variantMeta, _rawData: accountData },
+                    { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: reorderedExposure.variants, variantMeta: reorderedExposure.variantMeta, _rawData: exposureData },
+                  ];
 
                   return {
                     doc_handle: docPayload.doc_handle,
                     presigned_url: docPayload.presigned_url,
                     status: docPayload.status,
-                    tabbedFields: [
-                      { key: 'loss', label: 'Loss Data', fields: firstLoss, variants: lossVariants, variantMeta: lossVariantMeta },
-                      { key: 'account', label: 'Account Data', fields: firstAccount, variants: accountVariants, variantMeta: accountVariantMeta },
-                      { key: 'exposure', label: 'Exposure Data', fields: firstExposure, variants: exposureVariants, variantMeta: exposureVariantMeta },
-                    ],
+                    tabbedFields: tabbedFieldsWithRawData,
                   } as DocumentAttachment;
                 });
 
