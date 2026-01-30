@@ -408,7 +408,7 @@ export function DocumentAssignment() {
       const getStatusParam = () => {
         switch (statusFilter) {
           case 'Unassigned':
-            return 'UD';
+            return 'null';
           case 'Completed':
             return '1';
           case 'Assigned':

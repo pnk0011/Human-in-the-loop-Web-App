@@ -256,6 +256,30 @@ export function QCValidationScreen({
   const [accuracy] = useState(94);
 
   const currentTab = effectiveTabs.find((t) => t.key === activeTab) || effectiveTabs[0];
+  
+  // Create sorted indices for variants based on raw data IDs
+  const sortedVariantIndices = React.useMemo(() => {
+    if (!currentTab?.variants || currentTab.variants.length === 0) return [];
+    
+    const rawData = (currentTab as any)?._rawData || [];
+    if (rawData.length === 0) {
+      // No raw data, return original indices
+      return currentTab.variants.map((_, idx) => idx);
+    }
+    
+    // Create array of [index, id] pairs
+    const indexIdPairs = currentTab.variants.map((_, idx) => {
+      const id = rawData[idx]?.id ?? rawData[idx]?.ID ?? rawData[idx]?.Id ?? Number.MAX_SAFE_INTEGER;
+      return { index: idx, id: Number(id) || Number.MAX_SAFE_INTEGER };
+    });
+    
+    // Sort by id in ascending order
+    indexIdPairs.sort((a, b) => a.id - b.id);
+    
+    // Return sorted indices
+    return indexIdPairs.map(pair => pair.index);
+  }, [currentTab]);
+  
   const currentVariantIndex = tabVariantIndex[currentTab.key] ?? 0;
   const currentVariantKey = `${currentTab.key}-${currentVariantIndex}`;
   const currentVariantMeta = currentTab?.variantMeta?.[currentVariantIndex];
@@ -795,7 +819,7 @@ export function QCValidationScreen({
                       <SelectValue placeholder="Select data set" />
                     </SelectTrigger>
                     <SelectContent>
-                      {currentTab.variants.map((_, idx) => {
+                      {sortedVariantIndices.map((idx, displayOrder) => {
                         const meta = currentTab.variantMeta?.[idx];
                         const isAutoApproved =
                           meta?.qc_status === 'AutoApproved' &&
@@ -803,7 +827,7 @@ export function QCValidationScreen({
                         return (
                           <SelectItem key={`${currentTab.key}-${idx}`} value={String(idx)}>
                             <span className="flex items-center gap-2">
-                              <span>{currentTab.label} Set #{idx + 1}</span>
+                              <span>{currentTab.label} Set #{displayOrder + 1}</span>
                               {isAutoApproved && (
                                 <span className="text-[11px] px-2 py-0.5 rounded bg-[#0292DC] text-white font-semibold">
                                   Auto Approved
