@@ -85,6 +85,9 @@ export function DocumentAssignment() {
   // Loading state for reviewers
   const [isLoadingAllReviewers, setIsLoadingAllReviewers] = useState(false);
   
+  // Loading state for download
+  const [isDownloading, setIsDownloading] = useState(false);
+  
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -394,52 +397,94 @@ export function DocumentAssignment() {
   // Use API paginated data directly (server-side pagination)
   const paginatedDocuments = filteredDocuments;
 
-  const handleDownload = () => {
-    if (!filteredDocuments.length) {
-      toast.error('No records to download');
-      return;
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    
+    try {
+      // Map status filter to API parameter
+      const getStatusParam = () => {
+        switch (statusFilter) {
+          case 'Unassigned':
+            return 'UD';
+          case 'Completed':
+            return '1';
+          case 'Assigned':
+            return '2';
+          case 'All':
+          default:
+            return undefined;
+        }
+      };
+
+      const statusParam = getStatusParam();
+      const apiUrl = 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/mpg-uat-hil-download-all-policies';
+      const url = statusParam ? `${apiUrl}?status=${statusParam}` : apiUrl;
+
+      // Call the backend API
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to download: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Check if we have policies data
+      if (!data.policies || !Array.isArray(data.policies) || data.policies.length === 0) {
+        toast.error('No data available to download');
+        return;
+      }
+
+      // Dynamically import xlsx library
+      const XLSX = await import('xlsx');
+
+      // Prepare data for Excel
+      const excelData = data.policies.map((policy: any) => ({
+        'Policy': policy.first_named_insured || '-',
+        'Document IDs': policy.doc_handles || '-',
+        'Unassigned Document IDs': policy.unassigned_doc_handle || '-',
+        'Total Documents': policy.document_count || 0,
+        'Assigned Documents': policy.documents_assigned || 0,
+        'Completed Documents': policy.documents_completed || 0,
+        'Summary': policy.description_summary || '-',
+        'Reviewer': policy.reviewer_assigned || '-',
+        'QC': policy.qc_assigned || '-',
+        'Status': getStatusFromApi(policy.status),
+      }));
+
+      // Create worksheet and workbook
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Policies');
+
+      // Auto-size columns
+      const maxWidth = 50;
+      const colWidths = Object.keys(excelData[0] || {}).map((key) => {
+        const maxLength = Math.max(
+          key.length,
+          ...excelData.map((row: any) => String(row[key] || '').length)
+        );
+        return { wch: Math.min(maxLength + 2, maxWidth) };
+      });
+      worksheet['!cols'] = colWidths;
+
+      // Generate Excel file and trigger download
+      const timestamp = new Date().toISOString().split('T')[0];
+      const statusSuffix = statusFilter !== 'All' ? `_${statusFilter}` : '';
+      XLSX.writeFile(workbook, `policies${statusSuffix}_${timestamp}.xlsx`);
+
+      toast.success(`Successfully downloaded ${data.policies.length} policies`);
+    } catch (error: any) {
+      console.error('Download error:', error);
+      toast.error(error.message || 'Failed to download policies. Please try again.');
+    } finally {
+      setIsDownloading(false);
     }
-
-    const headers = [
-      'Policy',
-      'Document IDs',
-      'Total Documents',
-      'Assigned Documents',
-      'Completed Documents',
-      'Summary',
-      'Reviewer',
-      'QC',
-      'Status',
-    ];
-
-    const escapeCsv = (val: any) => {
-      const str = String(val ?? '');
-      // Escape quotes by doubling, wrap in quotes
-      return `"${str.replace(/"/g, '""')}"`;
-    };
-
-    const rows = filteredDocuments.map((doc) => [
-      escapeCsv(doc.accountName),
-      escapeCsv(doc.documentIds),
-      escapeCsv(doc.documentCount),
-      escapeCsv(doc.documentsAssigned),
-      escapeCsv(doc.documentsCompleted),
-      escapeCsv(doc.descriptionSummary),
-      escapeCsv(doc.reviewerAssigned || '-'),
-      escapeCsv(doc.qcAssigned || '-'),
-      escapeCsv(doc.status),
-    ]);
-
-    const csv = ['\uFEFF' + headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'document-assignment.csv';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   // Reset to page 1 when filters change
@@ -610,11 +655,21 @@ export function DocumentAssignment() {
             <div className="w-full md:w-auto">
               <Button
                 onClick={handleDownload}
-                className="bg-[#0292DC] hover:bg-[#012F66] text-white flex items-center gap-2"
+                disabled={isDownloading}
+                className="bg-[#0292DC] hover:bg-[#012F66] text-white flex items-center gap-2 disabled:opacity-50 cursor-pointer"
                 variant="default"
               >
-                <Download className="w-4 h-4" />
-                Download
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Downloading...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Download
+                  </>
+                )}
               </Button>
             </div>
         </div>
