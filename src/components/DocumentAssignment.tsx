@@ -19,6 +19,9 @@ import { toast } from "sonner";
 import { documentAPI, AccountDocument, GetDocumentsRequest } from '../services/documentAPI';
 import { documentOperationsAPI, AssignReviewerRequest } from '../services/documentOperationsAPI';
 
+// Get API key from environment variable
+const API_KEY = (import.meta as any).env?.VITE_HEADER_KEY || 'jLGO7tJFHxB0bVc0UmGe6Esns9pkiJR8V3lV8qJ5';
+
 // Document interface is imported from documentAPI service
 
 interface User {
@@ -425,6 +428,7 @@ export function DocumentAssignment() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'x-api-key': API_KEY,
         },
       });
 
