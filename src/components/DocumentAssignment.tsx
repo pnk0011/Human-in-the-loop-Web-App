@@ -408,7 +408,7 @@ export function DocumentAssignment() {
       const getStatusParam = () => {
         switch (statusFilter) {
           case 'Unassigned':
-            return 'null';
+            return 'UD';
           case 'Completed':
             return '1';
           case 'Assigned':
@@ -420,7 +420,7 @@ export function DocumentAssignment() {
       };
 
       const statusParam = getStatusParam();
-      const apiUrl = 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/mpg-uat-hil-download-all-policies';
+      const apiUrl = 'https://vl6dkatfng.execute-api.us-east-2.amazonaws.com/uat/admin-download';
       const url = statusParam ? `${apiUrl}?status=${statusParam}` : apiUrl;
 
       // Call the backend API

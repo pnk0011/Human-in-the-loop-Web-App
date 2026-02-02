@@ -294,7 +294,7 @@ const AppContent = function AppContent() {
           setCurrentView("dashboard");
           return;
         }
-
+        
         if (response?.documents && response.documents.length > 0) {
           // Build attachments array from all documents
           const attachments: DocumentAttachment[] = response.documents.map((docPayload: any) => {
@@ -415,7 +415,7 @@ const AppContent = function AppContent() {
           setCurrentView("dashboard");
           return;
         }
-
+        
         if (response?.documents && response.documents.length > 0) {
           // Build attachments array from all documents (same structure as reviewer)
           const attachments: DocumentAttachment[] = response.documents.map((docPayload: any) => {
@@ -665,6 +665,11 @@ const AppContent = function AppContent() {
       setSelectedDocument(null);
     });
   }, [withLoading, selectedDocument]);
+
+  // Function to update QC document locally
+  const handleUpdateQCDocument = useCallback((updatedDocument: QCValidationDocument) => {
+    setSelectedQCDocument(updatedDocument);
+  }, []);
 
   // Function to refresh QC document data from backend
   const handleRefreshQCDocument = useCallback(async () => {
@@ -1010,11 +1015,11 @@ const AppContent = function AppContent() {
       
       // If we could not refresh the policy data, fall back to old behavior
       if (!didRefresh) {
-        // Decrease QC queue count
-        setQcQueueCount((prev) => Math.max(0, prev - 1));
-        // Return to dashboard
-        setCurrentView("dashboard");
-        setSelectedQCDocument(null);
+      // Decrease QC queue count
+      setQcQueueCount((prev) => Math.max(0, prev - 1));
+      // Return to dashboard
+      setCurrentView("dashboard");
+      setSelectedQCDocument(null);
       }
     });
   }, [withLoading, selectedQCDocument]);
@@ -1069,6 +1074,7 @@ const AppContent = function AppContent() {
             onToggleTheme={toggleTheme}
             isReadOnly={isReadOnlyView}
             onDocumentRefresh={handleRefreshQCDocument}
+            onDocumentUpdate={handleUpdateQCDocument}
           />
         ) : currentView === "qc-validation" && selectedQCDocument ? (
           <LazyComponents.QCValidationScreen
@@ -1080,6 +1086,7 @@ const AppContent = function AppContent() {
             theme={currentTheme}
             onToggleTheme={toggleTheme}
             onDocumentRefresh={handleRefreshQCDocument}
+            onDocumentUpdate={handleUpdateQCDocument}
           />
         ) : null
       ) : currentUserRole === "Reviewer" ? (

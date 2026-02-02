@@ -195,6 +195,7 @@ interface QCValidationScreenProps {
   theme?: "light" | "dark";
   onToggleTheme?: () => void;
   onDocumentRefresh?: () => Promise<void>;
+  onDocumentUpdate?: (updatedDocument: QCValidationDocument) => void;
 }
 
 export function QCValidationScreen({
@@ -206,6 +207,7 @@ export function QCValidationScreen({
   theme,
   onToggleTheme,
   onDocumentRefresh,
+  onDocumentUpdate,
 }: QCValidationScreenProps) {
   const [zoom, setZoom] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
@@ -522,9 +524,34 @@ export function QCValidationScreen({
         data: dataPayload,
       });
       
-      // Refresh document data from backend after successful save
-      if (onDocumentRefresh) {
-        await onDocumentRefresh();
+      // Update the document locally to reflect the changes
+      if (onDocumentUpdate) {
+        const updatedDocument = { ...document };
+        if (updatedDocument.attachments && updatedDocument.attachments[selectedAttachmentIndex]) {
+          const attachment = { ...updatedDocument.attachments[selectedAttachmentIndex] };
+          const tabbedFields = [...(attachment.tabbedFields || [])];
+          const tabIndex = tabbedFields.findIndex(t => t.key === currentTab.key);
+          
+          if (tabIndex >= 0) {
+            const tab = { ...tabbedFields[tabIndex] };
+            const variantMeta = [...(tab.variantMeta || [])];
+            
+            if (variantMeta[currentVariantIndex]) {
+              variantMeta[currentVariantIndex] = {
+                ...variantMeta[currentVariantIndex],
+                qc_status: decision === 'approve' ? 'Approved' : 'Declined',
+                qc_comments: variantNotes[currentKey] || "",
+              };
+            }
+            
+            tab.variantMeta = variantMeta;
+            tabbedFields[tabIndex] = tab;
+            attachment.tabbedFields = tabbedFields;
+            updatedDocument.attachments[selectedAttachmentIndex] = attachment;
+          }
+        }
+        
+        onDocumentUpdate(updatedDocument);
       }
       
       alert(`Data set ${decision === 'approve' ? 'approved' : 'rejected'} successfully.`);
