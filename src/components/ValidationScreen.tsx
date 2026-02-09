@@ -500,13 +500,18 @@ export function ValidationScreen({
     ? currentTab.variants[currentVariantIndex]
     : currentTab?.fields || [];
   
-  // Sort fields by ascending confidence (ties by field name)
+  // Sort fields: <90% confidence first, then >=90%, each by P1->P2->P3
   const currentFields = React.useMemo(() => {
     return [...rawCurrentFields].sort((a, b) => {
-      if (a.confidence !== b.confidence) return a.confidence - b.confidence;
+      const aLow = a.confidence < 90 ? 0 : 1;
+      const bLow = b.confidence < 90 ? 0 : 1;
+      if (aLow !== bLow) return aLow - bLow;
+      const priorityA = getFieldPriority(activeTab, a.fieldName);
+      const priorityB = getFieldPriority(activeTab, b.fieldName);
+      if (priorityA !== priorityB) return priorityA - priorityB;
       return a.fieldName.localeCompare(b.fieldName);
     });
-  }, [rawCurrentFields]);
+  }, [rawCurrentFields, activeTab]);
 
   // Check if there's already an unsaved new dataset in the current tab (sourceId is null)
   const hasUnsavedNewDataset = React.useMemo(() => {

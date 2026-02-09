@@ -301,13 +301,18 @@ export function QCValidationScreen({
     ? currentTab.variants[currentVariantIndex]
     : currentTab?.fields || [];
   
-  // Sort fields by ascending confidence (ties by field name)
+  // Sort fields: <90% confidence first, then >=90%, each by P1->P2->P3
   const currentFields = React.useMemo(() => {
     return [...rawCurrentFields].sort((a, b) => {
-      if (a.confidence !== b.confidence) return a.confidence - b.confidence;
+      const aLow = a.confidence < 90 ? 0 : 1;
+      const bLow = b.confidence < 90 ? 0 : 1;
+      if (aLow !== bLow) return aLow - bLow;
+      const priorityA = getFieldPriority(activeTab, a.fieldName);
+      const priorityB = getFieldPriority(activeTab, b.fieldName);
+      if (priorityA !== priorityB) return priorityA - priorityB;
       return a.fieldName.localeCompare(b.fieldName);
     });
-  }, [rawCurrentFields]);
+  }, [rawCurrentFields, activeTab]);
 
   // Track validation state for each field
   const [fieldValidations, setFieldValidations] = useState<Record<string, FieldValidation>>(
@@ -524,18 +529,20 @@ export function QCValidationScreen({
         data: dataPayload,
       });
       
-      // Update the document locally to reflect the changes
-      if (onDocumentUpdate) {
+      // Refresh document data from backend after successful save
+      if (onDocumentRefresh) {
+        await onDocumentRefresh();
+      } else if (onDocumentUpdate) {
         const updatedDocument = { ...document };
         if (updatedDocument.attachments && updatedDocument.attachments[selectedAttachmentIndex]) {
           const attachment = { ...updatedDocument.attachments[selectedAttachmentIndex] };
           const tabbedFields = [...(attachment.tabbedFields || [])];
-          const tabIndex = tabbedFields.findIndex(t => t.key === currentTab.key);
-          
+          const tabIndex = tabbedFields.findIndex((t) => t.key === currentTab.key);
+
           if (tabIndex >= 0) {
             const tab = { ...tabbedFields[tabIndex] };
             const variantMeta = [...(tab.variantMeta || [])];
-            
+
             if (variantMeta[currentVariantIndex]) {
               variantMeta[currentVariantIndex] = {
                 ...variantMeta[currentVariantIndex],
@@ -543,14 +550,14 @@ export function QCValidationScreen({
                 qc_comments: variantNotes[currentKey] || "",
               };
             }
-            
+
             tab.variantMeta = variantMeta;
             tabbedFields[tabIndex] = tab;
             attachment.tabbedFields = tabbedFields;
             updatedDocument.attachments[selectedAttachmentIndex] = attachment;
           }
         }
-        
+
         onDocumentUpdate(updatedDocument);
       }
       
