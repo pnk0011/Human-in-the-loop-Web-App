@@ -1,58 +1,46 @@
-EXPERIENCE SUMMARY
-• Results-oriented Senior Front-end Team Lead with 7 years 6 months of experience indesigning and deploying scalable web applications.• Strong experience in ReactJs, Javascript, Typescript.• Adept at building scalable applications, leading cross-functional teams, and deliveringexceptional solutions.TECHNICAL SKILLSProgramming Languages: Javascript, TypescriptLibraries: React, Redux, React Testing LibraryWeb Technologies: HTML5, CSS3, SASSModule bundler: Webpack, ViteFrameworks: Bootstrap, JestProgramming Paradigm: Functional and Object-OrientedDatabase: MySQLServers: NginxOthers: Nodejs, Git, Jira, Docker, GCPSoft Skills: Problem-solving, Excellent communication, LeadershipPROJECTS:Principal ConsultantGenpact Aug 2024 – Feb 2026Project: Medpro Gen AI
+Having overall 7 years 6 months of IT experience with strong expertise in Front-end development using ReactJS, JavaScript, and TypeScript.
+Extensive experience in Design, Analysis, Development & Implementation of various scalable web applications and component libraries.
+Excellent analytical, problem-solving skills and a motivated team lead with excellent communication and interpersonal skills.
+Strong knowledge of front-end architecture with emphasis on reusable components, performance optimization, and scalable design patterns including requirement analysis, design, development, testing and implementation.
+Worked on ReactJS with extensive experience in creating and deploying production-grade applications using Vite, Webpack, and CI/CD pipelines.
+Worked with React ecosystem version including experience in state management using Redux, routing, lazy loading, memoization and optimized bundle builds.
+Worked on creating Integration components with different input/output patterns like REST APIs, Databases, File systems and third-party tools like Jira, GCP, Docker.
+Involved in various front-end flows like Data Visualization, Form Management, and Document Validation pipelines using React and TypeScript.
+Extensive experience using React patterns like HOCs, custom hooks, Context API, Redux Toolkit, React Testing Library, and component-driven architecture.
+Extensive experience in debugging and performance tuning of React applications for better load times and rendering efficiency.
+Involved in implementing analytics and tracking across applications using Google Analytics and Google Tag Manager.
+Wrote reusable primitive and semantic CSS design token systems from scratch ensuring consistent styling across multiple applications.
+Got exposure to Gen AI-powered Human-in-the-Loop (HITL) document review workflows by leading development of the MedPro Gen AI platform.
 
-• The platform enables Admins, Reviewers, and QC users tocollaboratively validate and approve documents through astructured, automated pipeline.• Led the end-to-end development of a Human-in-the-Loopweb application to streamline document review and validationacross Admin, Reviewer, and QC roles.• Designed a scalable front-end architecture leveraging React,TypeScript, Vite, and TailwindCSS with strict linting, dynamicrouting, and reusable component patterns.• Improved performance by 60% through lazy loading,memoization, and optimized bundle builds using Vite.• Collaborated with cross-functional stakeholders to defineHITL process logic, ensuring high data accuracy.Project: RT Connector• Created scalable primitive and semantic css tokens from scratch,ensuring consistent styling across multiple applications.• Developed responsive React and Angular interfaces for an enhanced userexperience.• Debugged and fixed critical/major production bugs.• Worked and fixed critical/major security vulnerabilities issues across multiplerepos.• Collaborated with Designers and Tech leads to ensure seamless feature delivery inan agile environment.Senior Platform EngineerMilestone Technologies, Inc. March 2023 – May 2024Project: Paysafe Bussiness and Partner Portal
+TECHNICAL SKILLS
+Programming Languages: JavaScript, TypeScript
+Libraries & Frameworks: React, Redux, Redux Toolkit, React Testing Library, Bootstrap, Jest, TailwindCSS
+Web Technologies: HTML5, CSS3, SASS
+Module Bundlers: Webpack, Vite
+Databases: MySQL
+Servers & DevOps: Nginx, Docker, GCP, Nodejs
+Tools: Git, Jira
+Soft Skills: Problem-solving, Excellent Communication, Leadership
 
-Developed In product communication feature which enhanced message navigation andimproved user interface.• Developed pay by link feature where user can create a shareable payment linkagainst any order and share it with customers.• Developed virtual terminal feature which provides merchant a platform wheremerchant can enter customer card details to complete a payment.• All the components were unit tested and 90% + of coverage.• All the components created as part of revamp are highly reusable with better userexperience.Senior Software EngineerInnominds Software Feb 2021 – Jan 2023Project: ON!TRACK 3.0 (Hilti)• Collaborated closely with the backend team to successfully implement advancedfeatures such as duplicate transfer detection.• Delivered an engaging user experience by optimizing images, code, and ensuringcross-browser compatibility.• Implemented Google analytics across application using Google Tag manager.• Enhanced application performance through the implementation of Reduxmodularization.• Addressed critical and major bugs throughout the application.ConsultantDH Digital Pvt. Ltd. Jan 2018 – Jan 2021• Collaborated closely with product owners to grasp their functional needs and offereddetailed technical design insights.• Created OD/TP different claim process flow with single payment underwriting screen toprocess insurance cases by underwriter easily.• Addressed critical and major bugs throughout the application.EducationBachelor of Engineering – Computer ScienceKNIT , Sultanpur, 2013 – 2017Languages
+Responsibilities on Various Projects:
+Led and managed workshops with clients and stakeholders to clarify business needs and requirements for front-end features.
+Involved in code review and mentoring of junior team members on React, TypeScript, and best practices.
+Involved in requirement gathering, providing estimates to clients, UI/component designing, testing and deploying in Test/Prod environments.
+Involved in Technical/Functional Document review and contributed to architectural decisions.
+Led the end-to-end development of a Human-in-the-Loop web application (MedPro Gen AI) to streamline document review and validation across Admin, Reviewer, and QC roles.
+Designed scalable front-end architecture leveraging React, TypeScript, Vite, and TailwindCSS with strict linting, dynamic routing, and reusable component patterns.
+Improved application performance by 60% through lazy loading, memoization, and optimized bundle builds.
+Developed In-product communication, Pay-by-Link, and Virtual Terminal features for Paysafe Business and Partner Portal with 90%+ unit test coverage.
+Collaborated closely with backend teams to implement advanced features such as duplicate transfer detection and cross-browser compatibility for ON!TRACK 3.0 (Hilti).
+Implemented Google Analytics across applications using Google Tag Manager.
+Created OD/TP different claim process flows with a single payment underwriting screen for insurance case processing at DH Digital Pvt. Ltd.
+Addressed critical and major bugs and security vulnerabilities throughout multiple applications and repositories.
 
+EDUCATION
+Bachelor of Engineering – Computer Science, KNIT, Sultanpur, 2013 – 2017
 
-
-
-
-
-
-======================================
-Having overall 10 years of IT experience and good exposure in ETL using Talend, SQL  and in Shell scripting.​
-
-Extensive experience in Design, Analysis, Development & Implementation of various ETL/Integration/Scripting
-jobs​
-
-Excellent analytical, problemsolving skills and a motivated team player with excellent interpersonal skills. ​
-
-Having Good knowledge on Data Warehousing  concepts with emphasis on Extraction Transformation and Loading
-data of a business process including requirement analysis, design, development, testing and implementation.​
-
-Worked on Talend on-premise version 6.1 with experience in creating and scheduling jobs in TAC.​
-
-Worked On Talend Cloud version 7.3 with experience in creating and scheduling Tasks/Jobs in TMC.​
-
-
-Worked on creating Integration jobs with different input/output component types like Files (csv, Excel, json, XML),
-Databases, Rest API (Get,POST )for integration with various tools like Sharepoint, JIRA etc.​
-
-Involved in various ETL Flows like Data Synchronization, Data Migration using Talend.​
-
-Extensive experience using Talend components like tMap, tFileInput/tFileOutput, tHashInput/Output
-components,tBufferInput/Output, tRunJob, tJava ,tJavaRow, tAggregateRow etc.   ​
-
-Extensive experience in error handling and problem fixing in Talend jobs for better performance by implementing
-Performance Tuning techniques.​
-
-Involved in Implementing Slowly Changing Dimensions using Talend​
-
-Wrote scripts using Shell scripting and Expect Programming to automate the diagnostics of Modem issues for a
-Telecom client.​
-
-Got exposure to Talend Data Quality tool by attending training workshops.​
-
-​
-
-Responsibilities on Various Projects:​
-
-Led and managed workshops with clients to clarify the Business needs and requirements.​
-
-Involved in code review and mentoring of Junior team members.​
-
-Involved in requirement gathering, providing estimates to client, Job designing, Testing and deploying in Test/Prod.​
-
-Involved in Technical/Functional Document review.
+WORK HISTORY
+Principal Consultant – Genpact (Aug 2024 – Feb 2026)
+Senior Platform Engineer – Milestone Technologies, Inc. (March 2023 – May 2024)
+Senior Software Engineer – Innominds Software (Feb 2021 – Jan 2023)
+Consultant – DH Digital Pvt. Ltd. (Jan 2018 – Jan 2021)
