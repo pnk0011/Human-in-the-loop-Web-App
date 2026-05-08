@@ -1,4 +1,4 @@
-# Human-in-the-Loop Web App
+# Validation Portal App
 
 A modern React-based web application for medical insurance data validation with role-based access control, document management, and quality assurance workflows.
 
@@ -264,4 +264,4 @@ Once everything is set up correctly, you should see:
 - ✅ Role-based access control functioning
 - ✅ Responsive design working across devices
 
-The Human-in-the-Loop Web App is ready for development! 🚀
+The App is ready for development! 🚀
